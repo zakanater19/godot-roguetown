@@ -1,3 +1,4 @@
+
 # res://playerbackend.gd
 extends RefCounted
 
@@ -43,9 +44,15 @@ func get_detailed_description() -> String:
 		desc += "\n[color=purple][b][font_size=24]BANDIT!!![/font_size][/b][/color]"
 
 	if player.hands[0] != null:
-		desc += "\n[color=gray]right hand:[/color] " + player.hands[0].name.get_slice("@", 0)
+		var rhand_name = player.hands[0].get("item_type")
+		if rhand_name == null or rhand_name == "":
+			rhand_name = player.hands[0].name.get_slice("@", 0)
+		desc += "\n[color=gray]right hand:[/color] " + rhand_name
 	if player.hands[1] != null:
-		desc += "\n[color=gray]left hand:[/color] " + player.hands[1].name.get_slice("@", 0)
+		var lhand_name = player.hands[1].get("item_type")
+		if lhand_name == null or lhand_name == "":
+			lhand_name = player.hands[1].name.get_slice("@", 0)
+		desc += "\n[color=gray]left hand:[/color] " + lhand_name
 
 	var slots_order: Array[String] =["head", "cloak", "armor", "backpack", "waist", "clothing", "trousers", "feet"]
 	for slot in slots_order:
@@ -69,7 +76,26 @@ func inspect_at(world_pos: Vector2) -> void:
 	var target_tile := Vector2i(int(world_pos.x / World.TILE_SIZE), int(world_pos.y / World.TILE_SIZE))
 	var best_npc:  Node  = null
 	var best_dist: float = INF
-	
+
+	# Self-inspect: if clicking on own tile, show self (equipped clothing + hands)
+	if target_tile == player.tile_pos:
+		show_inspect_text(get_description(), get_detailed_description())
+		return
+
+	# Check held items explicitly (they are filtered from pickable group below)
+	for i in range(2):
+		var held = player.hands[i]
+		if held == null or not is_instance_valid(held):
+			continue
+		var hand_tile := Vector2i(int(held.global_position.x / World.TILE_SIZE), int(held.global_position.y / World.TILE_SIZE))
+		if hand_tile == target_tile:
+			var itype = held.get("item_type")
+			if itype == null or itype == "":
+				itype = held.name.get_slice("@", 0)
+			var hand_label := "right hand" if i == 0 else "left hand"
+			show_inspect_text(itype + " (in " + hand_label + ")", "")
+			return
+
 	# Check NPCs
 	for obj in World.get_entities_at_tile(target_tile):
 		var d: float = (world_pos - player.global_position).length()
@@ -594,3 +620,5 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				World.rpc_damage_wall(target_tile)
 			else:
 				World.rpc_damage_wall.rpc_id(1, target_tile)
+
+

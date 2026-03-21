@@ -1,3 +1,4 @@
+
 # res://player.gd
 extends Node2D
 
@@ -565,8 +566,8 @@ func sync_hands(hand_names: Array) -> void:
 
 func _setup_clothing_sprites() -> void:
 	var layers = [["TrousersSprite", 1], 
-		["ClothingSprite", 2],["BackpackSprite", 2],["ChestSprite", 3], 
-		["WaistSprite", 4],["BootsSprite", 5],
+		["ClothingSprite", 2],["ChestSprite", 3],["BackpackSprite", 4], 
+		["WaistSprite", 5],["BootsSprite", 5],
 		["HelmetSprite", 6],["CloakSprite", 7]
 	]
 	
@@ -1111,6 +1112,31 @@ func _sync_active_hand(hand_idx: int) -> void:
 		if sender_id == 1:
 			active_hand = hand_idx
 
+# Moves the item from hand `from_idx` into hand `to_idx` (which must be empty).
+# Called from HUD when the player clicks an occupied hand while active hand is empty.
+@rpc("any_peer", "call_local", "reliable")
+func rpc_transfer_to_hand(from_idx: int, to_idx: int) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+
+	if multiplayer.is_server():
+		if sender_id != get_multiplayer_authority():
+			return
+		if hands[to_idx] != null or hands[from_idx] == null:
+			return
+		hands[to_idx]   = hands[from_idx]
+		hands[from_idx] = null
+		if _is_local_authority():
+			_update_hands_ui()
+		rpc("rpc_transfer_to_hand", from_idx, to_idx)
+	else:
+		if sender_id != 1:
+			return
+		hands[to_idx]   = hands[from_idx]
+		hands[from_idx] = null
+		if _is_local_authority():
+			_update_hands_ui()
+
 # ===========================================================================
 # Chat
 # ===========================================================================
@@ -1270,3 +1296,5 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 		var vp_size = get_viewport_rect().size
 		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
 		
+
+

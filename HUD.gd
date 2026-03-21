@@ -1,3 +1,4 @@
+
 # res://HUD.gd
 extends CanvasLayer
 
@@ -547,15 +548,60 @@ func update_clothing_display(equipped: Dictionary) -> void:
 # ── Input handlers ────────────────────────────────────────────────────────────
 
 func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
-	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT): return
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
 	if player == null: return
-	
+
 	var clicked_item: Node = player.hands[hand_idx]
-	if clicked_item == null: return
-	
-	# Forward the click to the item's standard interaction pipeline
-	if clicked_item.has_method("_input_event"):
-		clicked_item._input_event(get_viewport(), event, 0)
+
+	if Input.is_key_pressed(KEY_SHIFT):
+		if clicked_item == null: return
+		var itype = clicked_item.get("item_type")
+		if itype == null or itype == "":
+			itype = clicked_item.name.get_slice("@", 0)
+		var hand_label := "right hand" if hand_idx == 0 else "left hand"
+		player._show_inspect_text(itype + " (in " + hand_label + ")", "")
+		return
+
+	# If the clicked hand has a satchel and the active hand holds an item, insert into satchel
+	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] != null:
+		var itype = clicked_item.get("item_type")
+		if itype == "Satchel":
+			var active_held: Node = player.hands[player.active_hand]
+			if active_held.get("too_large_for_satchel") == true:
+				var label = active_held.get("item_type") if active_held.get("item_type") != null else active_held.name
+				Sidebar.add_message("[color=#ffaaaa]" + label + " is too large to fit in the satchel.[/color]")
+				return
+			if player.multiplayer.is_server():
+				World.rpc_request_satchel_insert(clicked_item.get_path(), player.active_hand)
+			else:
+				World.rpc_request_satchel_insert.rpc_id(1, clicked_item.get_path(), player.active_hand)
+			return
+
+	# If the clicked hand has an item and the active hand is empty, handle transfer or storage open
+	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] == null:
+		# Storage items (e.g. satchel) open their inventory instead of transferring to active hand
+		if clicked_item.has_method("_open_ui"):
+			if clicked_item.get("_ui_layer") != null and is_instance_valid(clicked_item.get("_ui_layer")):
+				clicked_item._close_ui()
+			else:
+				clicked_item._open_ui()
+			return
+		if player.multiplayer.has_multiplayer_peer():
+			if player.multiplayer.is_server():
+				player.rpc_transfer_to_hand(hand_idx, player.active_hand)
+			else:
+				player.rpc_transfer_to_hand.rpc_id(1, hand_idx, player.active_hand)
+		return
+
+	# Switch active hand to the clicked hand
+	if player.active_hand != hand_idx:
+		player.active_hand = hand_idx
+		player._update_hands_ui()
+		if player.multiplayer.has_multiplayer_peer():
+			if player.multiplayer.is_server():
+				player.rpc("_sync_active_hand", hand_idx)
+			else:
+				player.rpc_id(1, "_sync_active_hand", hand_idx)
 
 func _on_intent_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
@@ -578,6 +624,12 @@ func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
 	if player == null: return
 	var held: Node         = player.hands[player.active_hand]
 	var currently_equipped = player.equipped.get(slot_name, null)
+
+	if Input.is_key_pressed(KEY_SHIFT):
+		if currently_equipped != null and currently_equipped != "":
+			player._show_inspect_text(slot_name + ": " + currently_equipped, "")
+		return
+
 	if held != null:
 		var item_slot = held.get("slot")
 		if item_slot == slot_name and currently_equipped == null: player._equip_clothing_to_slot(held, slot_name)
