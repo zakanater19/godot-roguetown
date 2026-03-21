@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=4]
+
+[ext_resource type="Script" path="res://objects/object_item.gd" id="1_oigd"]
+[ext_resource type="Texture2D" path="res://clothing/merchantrobe.png" id="2_merchantrobe"]
+[ext_resource type="Resource" path="res://items/merchantrobe.tres" id="3_itemdata"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(28, 14)
+
+[node name="Merchantrobe" type="Area2D"]
+z_index = 5
+script = ExtResource("1_oigd")
+item_data = ExtResource("3_itemdata")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(1.0, 1.0)
+texture = ExtResource("2_merchantrobe")
+region_enabled = true
+region_rect = Rect2(0, 0, 32, 32)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")

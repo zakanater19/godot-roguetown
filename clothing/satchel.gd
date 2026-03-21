@@ -1,0 +1,317 @@
+@tool
+extends Area2D
+
+const TILE_SIZE: int  = 64
+const MAX_SLOTS: int  = 10
+const DRAG_THRESHOLD: float = 10.0
+
+var item_type: String = "Satchel"
+var slot: String = "backpack"
+
+# Each slot is null (empty) or a Dictionary: {scene_path: String, item_type: String}
+var contents: Array =[]
+
+# Local-only UI references — only populated on the client that opened the satchel
+var _ui_layer:  CanvasLayer = null
+var _slot_btns: Array       =[]
+
+# Drag-to-open: set on press over the satchel, cleared on release
+var _drag_started:      bool    = false
+var _drag_press_screen: Vector2 = Vector2.ZERO
+
+
+func get_description() -> String:
+	return "a leather satchel, useful for carrying things"
+
+
+func get_use_delay() -> float:
+	return 0.3
+
+
+func _ready() -> void:
+	if Engine.is_editor_hint():
+		return
+	add_to_group("pickable")
+	
+	# ONLY initialize the contents array to null entries if it hasn't been restored
+	if contents.size() != MAX_SLOTS:
+		contents.resize(MAX_SLOTS)
+		for i in MAX_SLOTS:
+			contents[i] = null
+
+
+func _process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
+	# rpc_confirm_pickup disables all CollisionShape2D children on pickup so
+	# that held items don't interfere with ground clicks. For the satchel we
+	# need the collision to stay active so _input_event keeps firing even while
+	# the satchel is sitting in the player's hand. Setting it safely prevents
+	# constant physics tree rebuilds per frame which breaks mouse picking.
+	var col := get_node_or_null("CollisionShape2D")
+	if col != null and col.disabled:
+		col.disabled = false
+
+	# Auto-close the UI if the local player has moved more than one tile away
+	# from the satchel while it is open (mirrors the loot-menu behaviour).
+	if _ui_layer != null and is_instance_valid(_ui_layer):
+		var player: Node = World.get_local_player()
+		if player != null:
+			var my_tile := Vector2i(
+				int(global_position.x / TILE_SIZE),
+				int(global_position.y  / TILE_SIZE)
+			)
+			var diff: Vector2i = (my_tile - player.tile_pos).abs()
+			if diff.x > 1 or diff.y > 1:
+				_close_ui()
+
+
+# ---------------------------------------------------------------------------
+# Ensure the UI is closed if this node is removed from the tree (e.g. when
+# the satchel is equipped to the backpack slot and queue_free() is called).
+# ---------------------------------------------------------------------------
+
+func _exit_tree() -> void:
+	if Engine.is_editor_hint():
+		return
+	_close_ui()
+
+
+# ---------------------------------------------------------------------------
+# Global input — catches LMB release even when mouse has moved off the satchel.
+# Used exclusively to detect a drag-to-open gesture from the ground.
+# ---------------------------------------------------------------------------
+
+func _input(event: InputEvent) -> void:
+	if Engine.is_editor_hint():
+		return
+	if not _drag_started:
+		return
+	if not (event is InputEventMouseButton \
+			and event.button_index == MOUSE_BUTTON_LEFT \
+			and not event.pressed):
+		return
+
+	# A release has occurred — consume the drag flag regardless of outcome
+	_drag_started = false
+
+	var player: Node = World.get_local_player()
+	if player == null:
+		return
+
+	# Only applies when the satchel is on the ground (not held in either hand)
+	if player.hands[0] == self or player.hands[1] == self:
+		return
+
+	# Active hand must be empty
+	if player.hands[player.active_hand] != null:
+		return
+
+	# Must have moved far enough to count as a drag
+	var drag_dist: float = event.position.distance_to(_drag_press_screen)
+	if drag_dist <= DRAG_THRESHOLD:
+		return
+
+	# Satchel must be within interaction range
+	var my_tile := Vector2i(
+		int(global_position.x / TILE_SIZE),
+		int(global_position.y  / TILE_SIZE)
+	)
+	var diff: Vector2i = (my_tile - player.tile_pos).abs()
+	if diff.x > 1 or diff.y > 1:
+		return
+
+	# Mouse must have been released near the player (dragged onto self)
+	var mw := get_global_mouse_position()
+	if mw.distance_to(player.pixel_pos) >= float(TILE_SIZE) * 0.6:
+		return
+
+	# All checks passed — open/close the UI without picking the satchel up
+	get_viewport().set_input_as_handled()
+	if _ui_layer != null and is_instance_valid(_ui_layer):
+		_close_ui()
+	else:
+		_open_ui()
+
+
+# ---------------------------------------------------------------------------
+# World click interaction
+# ---------------------------------------------------------------------------
+
+func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
+	if Engine.is_editor_hint():
+		return
+		
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if Input.is_key_pressed(KEY_SHIFT):
+			return
+
+		# Claim the click so the player's unhandled input doesn't trigger weapon swings
+		get_viewport().set_input_as_handled()
+
+		if event.pressed:
+			# Record drag origin so _input can detect a drag-to-open gesture
+			_drag_started      = true
+			_drag_press_screen = event.position
+			return
+
+		# Execute all drag/drop and interactions ONLY on mouse button release to allow
+		# users to safely click and drag the item without it popping straight into their hand
+		if not event.pressed:
+			# If we get a release here the mouse is still over the satchel — not a drag
+			_drag_started = false
+
+			var player: Node = World.get_local_player()
+			if player == null:
+				return
+
+			var my_tile := Vector2i(
+				int(global_position.x / TILE_SIZE),
+				int(global_position.y  / TILE_SIZE)
+			)
+			var diff: Vector2i = (my_tile - player.tile_pos).abs()
+			if diff.x > 1 or diff.y > 1:
+				return
+
+			var active_held: Node  = player.hands[player.active_hand]
+			var other_hand:  int   = 1 - player.active_hand
+			var in_other_hand: bool = (player.hands[other_hand] == self)
+			var in_active_hand: bool = (active_held == self)
+
+			if active_held != null and not in_active_hand:
+				# Check client-side before sending any RPC — saves a round-trip and
+				# gives immediate feedback for items flagged as too large.
+				if active_held.get("too_large_for_satchel") == true:
+					var item_label: String = active_held.get("item_type") if active_held.get("item_type") != null else active_held.name
+					Sidebar.add_message("[color=#ffaaaa]" + item_label + " is too large to fit in the satchel.[/color]")
+					return
+
+				# Active hand holds something ELSE — insert it into the satchel.
+				# Works whether the satchel is on the ground or held in the other hand.
+				if multiplayer.is_server():
+					World.rpc_request_satchel_insert(get_path(), player.active_hand)
+				else:
+					World.rpc_request_satchel_insert.rpc_id(1, get_path(), player.active_hand)
+
+			elif in_other_hand or in_active_hand:
+				# Active hand is empty and satchel is in the other hand, or we clicked 
+				# our active hand which holds the satchel — open/close UI.
+				if _ui_layer != null and is_instance_valid(_ui_layer):
+					_close_ui()
+				else:
+					_open_ui()
+
+			else:
+				# Satchel is on the ground and active hand is empty — pick it up.
+				if player.has_method("_on_object_picked_up"):
+					player._on_object_picked_up(self)
+
+
+# ---------------------------------------------------------------------------
+# Satchel UI (local / client-only)
+# ---------------------------------------------------------------------------
+
+func _open_ui() -> void:
+	_ui_layer = CanvasLayer.new()
+	_ui_layer.layer = 20
+	get_tree().root.add_child(_ui_layer)
+
+	var panel := PanelContainer.new()
+	panel.anchor_left   = 0.5
+	panel.anchor_right  = 0.5
+	panel.anchor_top    = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left   = -120
+	panel.offset_right  = 120
+	panel.offset_top    = -170
+	panel.offset_bottom = 170
+	_ui_layer.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(vbox)
+
+	# --- Title row ---
+	var title_row := HBoxContainer.new()
+	vbox.add_child(title_row)
+
+	var title_lbl := Label.new()
+	title_lbl.text                  = "Satchel"
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.add_theme_font_size_override("font_size", 13)
+	title_row.add_child(title_lbl)
+
+	var close_btn := Button.new()
+	close_btn.text                = "X"
+	close_btn.custom_minimum_size = Vector2(24, 20)
+	close_btn.pressed.connect(_close_ui)
+	title_row.add_child(close_btn)
+
+	vbox.add_child(HSeparator.new())
+
+	# --- Slot grid (2 columns × 5 rows = 10 slots) ---
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	vbox.add_child(grid)
+
+	_slot_btns.clear()
+	for i in MAX_SLOTS:
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(100, 30)
+		btn.add_theme_font_size_override("font_size", 10)
+		var si: int = i
+		btn.pressed.connect(func(): _on_slot_pressed(si))
+		grid.add_child(btn)
+		_slot_btns.append(btn)
+
+	_refresh_ui()
+
+
+func _refresh_ui() -> void:
+	for i in _slot_btns.size():
+		var btn: Button     = _slot_btns[i]
+		var slot_entry      = contents[i] if i < contents.size() else null
+		if slot_entry != null:
+			btn.text     = slot_entry.get("item_type", "?")
+			btn.disabled = false
+		else:
+			btn.text     = "[empty]"
+			btn.disabled = true
+
+
+func _close_ui() -> void:
+	_slot_btns.clear()
+	if _ui_layer != null and is_instance_valid(_ui_layer):
+		_ui_layer.queue_free()
+	_ui_layer = null
+
+
+# ---------------------------------------------------------------------------
+# Slot extraction request (called when a player clicks an occupied slot)
+# ---------------------------------------------------------------------------
+
+func _on_slot_pressed(slot_index: int) -> void:
+	var player: Node = World.get_local_player()
+	if player == null:
+		return
+
+	# Re-check proximity — player may have walked away since opening the UI
+	var my_tile := Vector2i(
+		int(global_position.x / TILE_SIZE),
+		int(global_position.y  / TILE_SIZE)
+	)
+	var diff: Vector2i = (my_tile - player.tile_pos).abs()
+	if diff.x > 1 or diff.y > 1:
+		_close_ui()
+		return
+
+	# The player's active hand must be empty to receive the item
+	if player.hands[player.active_hand] != null:
+		return
+
+	if multiplayer.is_server():
+		World.rpc_request_satchel_extract(get_path(), slot_index, player.active_hand)
+	else:
+		World.rpc_request_satchel_extract.rpc_id(1, get_path(), slot_index, player.active_hand)
