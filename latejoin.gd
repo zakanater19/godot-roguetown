@@ -256,7 +256,8 @@ func _capture_player_state(player_node: Node) -> Dictionary:
 		"intent": player_node.intent,
 		"sleep_state": player_node.get("sleep_state") if player_node.has_method("toggle_sleep") else 0,
 		"is_lying_down": player_node.get("is_lying_down") == true,
-		"skills": player_node.skills.duplicate() if player_node.skills else {}
+		"skills": player_node.skills.duplicate() if player_node.skills else {},
+		"grabbed_by_peer": player_node.grabbed_by.get_multiplayer_authority() if (player_node.grabbed_by != null and is_instance_valid(player_node.grabbed_by)) else -1
 	}
 	return state
 
@@ -350,7 +351,7 @@ func _handle_reconnection(peer_id: int) -> bool:
 			ghost_player.queue_free()
 	
 	Host.peers[peer_id] = player_node
-	var success = _perform_reconnection(peer_id, best_peer_id, player_node, {}) # Replaced usage of snapshot state
+	var success = _perform_reconnection(peer_id, best_peer_id, player_node, {}) 
 	
 	if success:
 		_disconnected_players.erase(best_peer_id)
@@ -374,10 +375,17 @@ func _find_best_reconnection_candidate() -> int:
 	
 	return best_peer_id
 
-func _perform_reconnection(new_peer_id: int, _old_peer_id: int, player_node: Node, _player_state: Dictionary) -> bool:
+func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node, _player_state: Dictionary) -> bool:
 	# Capture the player's live current state, since their body remained in the world
 	# and may have been shoved, attacked, or looted while disconnected.
 	var current_state = _capture_player_state(player_node)
+	
+	# FIX: Re-link grab targets if the player was being dragged
+	for grabber_peer_id in World._grab_map:
+		var entry = World._grab_map[grabber_peer_id]
+		if entry.get("is_player", false) and entry.get("target_peer_id", -1) == old_peer_id:
+			entry["target_peer_id"] = new_peer_id
+			entry["target"] = player_node
 	
 	_restore_player_state(player_node, current_state)
 	_reassign_player_node(player_node, new_peer_id)
@@ -444,6 +452,25 @@ func _restore_player_state(player_node: Node, player_state: Dictionary) -> void:
 	if player_state.has("equipped_data") and "equipped_data" in player_node:
 		player_node.equipped_data = player_state["equipped_data"].duplicate(true)
 	
+	# Restore grab status
+	if multiplayer.is_server() and player_state.has("grabbed_by_peer"):
+		var grabber_peer = player_state["grabbed_by_peer"]
+		if grabber_peer != -1:
+			var grabber = _find_player_by_peer(grabber_peer)
+			if grabber != null and is_instance_valid(grabber):
+				# Relink references on server
+				player_node.grabbed_by = grabber
+				grabber.grabbed_target = player_node
+				
+				# Force refresh on grabber's UI
+				_rpc_force_update_grab_ui.rpc_id(grabber_peer)
+				
+				# Force grabber to update their 'grabbed_target' pointer
+				_rpc_set_grabbed_target.rpc_id(grabber_peer, player_node.get_path())
+				
+				# Sync grabbed_by to the target client
+				_rpc_set_grabbed_by.rpc_id(player_node.get_multiplayer_authority(), grabber.get_path())
+
 	var equipped_data = player_state["equipped"]
 	for slot in equipped_data:
 		var item_data = equipped_data[slot]
@@ -452,7 +479,7 @@ func _restore_player_state(player_node: Node, player_state: Dictionary) -> void:
 		elif item_data is Dictionary:
 			player_node.equipped[slot] = item_data.get("item_type", "")
 		elif item_data is String:
-			player_node.equipped[slot] = item_data
+			player_node.equipped[slot] = item_data if item_data != "" else null
 		else:
 			player_node.equipped[slot] = null
 	
@@ -548,6 +575,26 @@ func rpc_update_player_authority(player_path: NodePath, new_peer_id: int) -> voi
 		player.set_multiplayer_authority(new_peer_id)
 		if player.has_method("_on_authority_changed"):
 			player._on_authority_changed()
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_force_update_grab_ui() -> void:
+	var local_player = World.get_local_player()
+	if local_player and local_player.has_method("_update_grab_ui"):
+		local_player._update_grab_ui()
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_set_grabbed_by(grabber_path: NodePath) -> void:
+	var local_player = World.get_local_player()
+	if local_player:
+		local_player.grabbed_by = get_node_or_null(grabber_path)
+		local_player._update_grab_ui()
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_set_grabbed_target(target_path: NodePath) -> void:
+	var local_player = World.get_local_player()
+	if local_player:
+		local_player.grabbed_target = get_node_or_null(target_path)
+		local_player._update_grab_ui()
 
 @rpc("authority", "call_local", "reliable")
 func rpc_set_disconnect_indicator(player_path: NodePath, show: bool) -> void:
@@ -767,4 +814,10 @@ func client_reconnection_confirmed() -> void:
 		var main = get_node("/root/Main")
 		if main.has_method("_on_client_reconnected"):
 			main._on_client_reconnected()
-			
+
+# ----- NEW METHOD FOR HEALTH UPDATE -----
+func update_disconnected_health(peer_id: int, new_health: int) -> void:
+	if _disconnected_players.has(peer_id):
+		_disconnected_players[peer_id]["state"]["health"] = new_health
+		print("LateJoin: Updated stored health for peer ", peer_id, " to ", new_health)
+		

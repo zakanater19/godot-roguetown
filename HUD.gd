@@ -58,6 +58,10 @@ var _slot_icons: Dictionary = {}
 
 var _hand_highlights: Array =[]
 var _hand_icons:      Array =[]
+var _hand_labels:     Array =[]  # yellow "GRAB" labels, one per hand slot
+
+var _release_ctrl: Control = null
+var _resist_ctrl:  Control = null
 
 var _toggle_bg:    ColorRect   = null
 var _toggle_tex:   TextureRect = null
@@ -241,8 +245,72 @@ func _build_hand_boxes(parent: Control) -> void:
 		icon.visible  = false
 		ctrl.add_child(icon)
 		_hand_icons.append(icon)
-		
+
+		# Yellow "GRAB" label — visible only while this hand is holding a grab
+		var grab_lbl := Label.new()
+		grab_lbl.text = "GRAB"
+		grab_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0))
+		grab_lbl.add_theme_font_size_override("font_size", 12)
+		grab_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		grab_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		grab_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+		grab_lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+		grab_lbl.visible              = false
+		ctrl.add_child(grab_lbl)
+		_hand_labels.append(grab_lbl)
+
 		ctrl.gui_input.connect(_on_hand_gui_input.bind(i))
+
+	# --- Release grab button (above hand slot 0 / right hand) ---
+	# Visible only when the local player is currently grabbing something.
+	_release_ctrl = Control.new()
+	_release_ctrl.position            = Vector2(-50, -(BOX + GAP))
+	_release_ctrl.size                = Vector2(BOX, BOX)
+	_release_ctrl.custom_minimum_size = Vector2(BOX, BOX)
+	_release_ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
+	_release_ctrl.visible             = false
+	hands_ctrl.add_child(_release_ctrl)
+	_add_bg(_release_ctrl)
+	var release_lbl := Label.new()
+	release_lbl.text = "RELEASE\n[Q]"
+	release_lbl.add_theme_color_override("font_color", Color(1.0, 0.6, 0.1))
+	release_lbl.add_theme_font_size_override("font_size", 8)
+	release_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	release_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	release_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	release_lbl.autowrap_mode        = TextServer.AUTOWRAP_WORD
+	release_lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+	_release_ctrl.add_child(release_lbl)
+	_release_ctrl.gui_input.connect(_on_release_gui_input)
+
+	# --- Resist indicator (above hand slot 1 / left hand) ---
+	# Visible only when the local player is being grabbed by someone.
+	_resist_ctrl = Control.new()
+	_resist_ctrl.position            = Vector2(2, -(BOX + GAP))
+	_resist_ctrl.size                = Vector2(BOX, BOX)
+	_resist_ctrl.custom_minimum_size = Vector2(BOX, BOX)
+	_resist_ctrl.mouse_filter        = Control.MOUSE_FILTER_IGNORE
+	_resist_ctrl.visible             = false
+	hands_ctrl.add_child(_resist_ctrl)
+	_add_bg(_resist_ctrl)
+	var resist_tex_node := TextureRect.new()
+	var resist_tex := load("res://ui/resist.png") as Texture2D
+	if resist_tex != null:
+		resist_tex_node.texture      = resist_tex
+		resist_tex_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		resist_tex_node.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+		resist_tex_node.size         = Vector2(BOX, BOX)
+		resist_tex_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_resist_ctrl.add_child(resist_tex_node)
+	var resist_lbl := Label.new()
+	resist_lbl.text = "[Z]"
+	resist_lbl.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	resist_lbl.add_theme_font_size_override("font_size", 9)
+	resist_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	resist_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	resist_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM
+	resist_lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+	_resist_ctrl.add_child(resist_lbl)
 
 	# --- Intent ---
 	var intent_ctrl := Control.new()
@@ -498,19 +566,53 @@ func update_stance_display(stance: String) -> void:
 	if tex != null:
 		_stance_icon.texture = tex
 
+func update_grab_display(is_grabbing: bool, is_grabbed: bool) -> void:
+	if _release_ctrl != null:
+		_release_ctrl.visible = is_grabbing
+	if _resist_ctrl != null:
+		_resist_ctrl.visible = is_grabbed
+
+func _on_release_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
+		return
+	if player == null:
+		return
+	if player.multiplayer.is_server():
+		World.rpc_request_release_grab()
+	else:
+		World.rpc_request_release_grab.rpc_id(1)
+
 func update_hands_display(hands: Array, active_hand: int) -> void:
+	# Determine which hand (if any) is currently performing a grab
+	var grab_hand: int = -1
+	if player != null:
+		var ghi = player.get("grab_hand_idx")
+		var gt  = player.get("grabbed_target")
+		if ghi != null and ghi >= 0 and gt != null and is_instance_valid(gt):
+			grab_hand = ghi
+
 	for i in range(min(2, _hand_icons.size())):
 		_hand_highlights[i].color = Color(0.7, 0.7, 0.7, 0.25) if i == active_hand else Color(0, 0, 0, 0)
 		var icon: Sprite2D = _hand_icons[i]
-		if hands[i] != null:
-			var obj_sprite: Sprite2D = hands[i].get_node_or_null("Sprite2D")
-			if obj_sprite != null:
-				icon.texture        = obj_sprite.texture
-				icon.region_enabled = obj_sprite.region_enabled
-				icon.region_rect    = obj_sprite.region_rect
-				icon.visible        = true
+		var grab_lbl: Label = _hand_labels[i] if i < _hand_labels.size() else null
+
+		if i == grab_hand:
+			# This hand is occupied by a grab — show GRAB label, hide item icon
+			icon.visible = false
+			if grab_lbl != null:
+				grab_lbl.visible = true
+		else:
+			if grab_lbl != null:
+				grab_lbl.visible = false
+			if hands[i] != null:
+				var obj_sprite: Sprite2D = hands[i].get_node_or_null("Sprite2D")
+				if obj_sprite != null:
+					icon.texture        = obj_sprite.texture
+					icon.region_enabled = obj_sprite.region_enabled
+					icon.region_rect    = obj_sprite.region_rect
+					icon.visible        = true
+				else: icon.visible = false
 			else: icon.visible = false
-		else: icon.visible = false
 
 func update_clothing_display(equipped: Dictionary) -> void:
 	for slot_name in _slot_icons.keys():
@@ -653,3 +755,4 @@ func _on_toggle_gui_input(event: InputEvent) -> void:
 		if _toggle_label != null:
 			_toggle_label.text = "↑"
 			_toggle_label.add_theme_color_override("font_color", Color(0.15, 0.9, 0.25))
+

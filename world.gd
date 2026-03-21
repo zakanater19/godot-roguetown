@@ -1,4 +1,3 @@
-# ==============================================================================
 # file: project/world.gd
 # ==============================================================================
 # AutoLoad singleton — registered as "World" in project.godot.
@@ -40,6 +39,17 @@ const WOODEN_WALL_HITS_TO_BREAK: int = 5  # wooden wall (source 1, atlas col 7)
 var server_action_cooldowns: Dictionary = {}
 
 # ---------------------------------------------------------------------------
+# Grab System State
+# ---------------------------------------------------------------------------
+# _grab_map[grabber_peer_id] -> { "target": Node, "is_player": bool, "target_peer_id": int, "limb": String }
+var _grab_map: Dictionary = {}
+
+const GRAB_COOLDOWN_MS:   int = 1000
+const RESIST_COOLDOWN_MS: int = 1000
+var _grab_cooldown_map:   Dictionary = {}
+var _resist_cooldown_map: Dictionary = {}
+
+# ---------------------------------------------------------------------------
 # Startup — build scene-path dictionaries from ItemRegistry resources
 # ---------------------------------------------------------------------------
 
@@ -53,6 +63,23 @@ func _ready() -> void:
 		# Every item that is pickable goes into the satchel registry.
 		if entry.pickable:
 			ITEM_SCENE_PATHS[entry.item_type] = entry.scene_path
+			
+	# Hook into multiplayer disconnects to clean up grabs automatically
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+
+func _on_peer_disconnected(id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	
+	print("LateJoin: Peer disconnected - ", id)
+	
+	# Drop grab if the disconnecting player was grabbing someone
+	if _grab_map.has(id):
+		_release_grab_for_peer(id, true)
+
+	# Removed logic: Dropping grab if the disconnecting player was being grabbed.
+	# This ensures the grab persists in _grab_map so the grabber remains connected 
+	# to the rejoining target player.
 
 # ---------------------------------------------------------------------------
 # Server Validation Helpers
@@ -190,6 +217,8 @@ func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is
 	if "stamina" in defender and defender.stamina < 3.0:
 		can_defend = false
 	if "exhausted" in defender and defender.exhausted:
+		can_defend = false
+	if "grabbed_by" in defender and defender.grabbed_by != null and is_instance_valid(defender.grabbed_by):
 		can_defend = false
 
 	if can_defend:
@@ -561,15 +590,26 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 	var player := _find_player_by_peer(peer_id)
 	if player == null or player.dead:
 		return
-		
+
+	# Block movement if this player is currently being grabbed — trigger resist instead
+	for _gp_id in _grab_map:
+		var _gentry = _grab_map[_gp_id]
+		if _gentry.get("is_player", false) and _gentry.get("target_peer_id", -1) == peer_id:
+			rpc_confirm_move.rpc(peer_id, player.tile_pos, false)
+			# Exhausted players cannot struggle free via WASD either
+			if not player.exhausted:
+				_server_try_resist(peer_id)
+			return
+
 	# Update Facing
 	if not player.combat_mode:
 		if   dir.y > 0: player.facing = 0
 		elif dir.y < 0: player.facing = 1
 		elif dir.x > 0: player.facing = 2
 		elif dir.x < 0: player.facing = 3
-	
-	var next_tile = player.tile_pos + dir
+
+	var old_tile: Vector2i = player.tile_pos
+	var next_tile: Vector2i = player.tile_pos + dir
 	
 	# World Bounds
 	if next_tile.x < 0 or next_tile.x >= GRID_WIDTH or next_tile.y < 0 or next_tile.y >= GRID_HEIGHT:
@@ -586,6 +626,11 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 	var blocking_player = null
 	for ent in occupants:
 		if ent.is_in_group("player") and not ent.dead:
+			# Allow walking into our own grabbed target's tile
+			if _grab_map.has(peer_id):
+				var gentry = _grab_map[peer_id]
+				if gentry.get("is_player", false) and gentry.get("target") == ent:
+					continue
 			# Lying down or sleeping players do not block movement
 			var ent_prone: bool = ent.get("is_lying_down") == true or ent.get("sleep_state") != 0
 			if not ent_prone:
@@ -595,11 +640,11 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 	if blocking_player != null:
 		if not player.combat_mode and not blocking_player.combat_mode:
 			# Swap mechanic (both not in combat)
-			var old_pos = player.tile_pos
 			player.tile_pos = next_tile
-			blocking_player.tile_pos = old_pos
+			blocking_player.tile_pos = old_tile
+			_drag_grabbed_entity(peer_id, old_tile)
 			rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
-			rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), old_pos, false)
+			rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), old_tile, false)
 		else:
 			# Push mechanic (one or both are in combat mode)
 			var push_dest = next_tile + dir
@@ -618,6 +663,7 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 						# Successful Push
 						blocking_player.tile_pos = push_dest
 						player.tile_pos = next_tile
+						_drag_grabbed_entity(peer_id, old_tile)
 						rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), push_dest, false)
 						rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
 						return
@@ -627,6 +673,7 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 	else:
 		# Standard Move
 		player.tile_pos = next_tile
+		_drag_grabbed_entity(peer_id, old_tile)
 		rpc_confirm_move.rpc(peer_id, next_tile, is_sprinting)
 
 
@@ -1517,7 +1564,7 @@ func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 		"pickaxe": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/pickaxe.tscn"},
 		"wooden_floor": {"req": "Log", "req_amt": 1, "tile": [0, Vector2i(4, 0)]},
 		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile":[0, Vector2i(5, 0)]},
-		"stone_wall": {"req": "Pebble", "req_amt": 2, "tile": [1, Vector2i(6, 0)]}
+		"stone_wall": {"req": "Pebble", "req_amt": 2, "tile":[1, Vector2i(6, 0)]}
 	}
 	if not recipes.has(recipe_id): 
 		return
@@ -1610,6 +1657,317 @@ func rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vecto
 		tilemap.set_cell(tile_pos, source_id, atlas_coords)
 		if has_node("/root/LateJoin"):
 			LateJoin.register_tile_change(tile_pos, source_id, atlas_coords)
+
+# ---------------------------------------------------------------------------
+# Grab System
+# ---------------------------------------------------------------------------
+
+func _limb_display_name(limb: String) -> String:
+	match limb:
+		"head":  return "head"
+		"chest": return "chest"
+		"r_arm": return "right arm"
+		"l_arm": return "left arm"
+		"r_leg": return "right leg"
+		"l_leg": return "left leg"
+	return limb
+
+func _release_grab_for_peer(grabber_peer_id: int, silent: bool = false) -> void:
+	if not _grab_map.has(grabber_peer_id):
+		return
+	var entry = _grab_map[grabber_peer_id]
+	_grab_map.erase(grabber_peer_id)
+	var is_player: bool     = entry.get("is_player", false)
+	var target_peer_id: int = entry.get("target_peer_id", -1)
+
+	# Resolve names for chat messages
+	var grabber_name := ""
+	var target_name  := ""
+	var grabber_node := _find_player_by_peer(grabber_peer_id)
+	if grabber_node != null:
+		grabber_name = grabber_node.character_name
+	var target_node: Node = entry.get("target", null)
+	if target_node != null and is_instance_valid(target_node):
+		if is_player:
+			target_name = target_node.character_name if "character_name" in target_node else ""
+		else:
+			var itype = target_node.get("item_type")
+			target_name = itype if itype != null else target_node.name.get_slice("@", 0)
+
+	rpc_confirm_grab_released.rpc(grabber_peer_id, is_player, target_peer_id, grabber_name, target_name, silent)
+
+func _drag_grabbed_entity(grabber_peer_id: int, old_tile: Vector2i) -> void:
+	if not _grab_map.has(grabber_peer_id):
+		return
+	var entry = _grab_map[grabber_peer_id]
+	var target: Node = entry.get("target", null)
+	if target == null or not is_instance_valid(target):
+		var was_player: bool = entry.get("is_player", false)
+		var was_peer: int    = entry.get("target_peer_id", -1)
+		_grab_map.erase(grabber_peer_id)
+		rpc_confirm_grab_released.rpc(grabber_peer_id, was_player, was_peer, "", "", true)
+		return
+
+	if entry.get("is_player", false):
+		var target_peer_id: int = entry.get("target_peer_id", -1)
+		target.tile_pos = old_tile
+		rpc_confirm_move.rpc(target_peer_id, old_tile, false)
+	else:
+		var old_pixel := tile_to_pixel(old_tile)
+		rpc_confirm_drag_object.rpc(target.get_path(), old_pixel)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_grab(target_path: NodePath, limb: String = "chest") -> void:
+	if not multiplayer.is_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
+	var grabber := _find_player_by_peer(peer_id)
+	if grabber == null or grabber.dead:
+		return
+
+	# Grabber must have an empty active hand to grab
+	if grabber.hands[grabber.active_hand] != null:
+		return
+
+	# Grab cooldown check
+	var now_ms := Time.get_ticks_msec()
+	if _grab_cooldown_map.has(peer_id) and now_ms < _grab_cooldown_map[peer_id]:
+		return
+	_grab_cooldown_map[peer_id] = now_ms + GRAB_COOLDOWN_MS
+
+	var target := get_node_or_null(target_path)
+	if target == null or not is_instance_valid(target):
+		return
+
+	# Release any existing grab before starting a new one
+	if _grab_map.has(peer_id):
+		_release_grab_for_peer(peer_id)
+
+	# Range check
+	if not _is_within_interaction_range(grabber, target.global_position):
+		return
+
+	var is_player: bool = target.is_in_group("player")
+	var target_peer_id: int = -1
+
+	if is_player:
+		# Note: dead players CAN be grabbed (dragging corpses is allowed)
+		target_peer_id = target.get_multiplayer_authority()
+
+	# Sanitise limb value
+	var safe_limb := limb if limb in["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"] else "chest"
+
+	_grab_map[peer_id] = {
+		"target":         target,
+		"is_player":      is_player,
+		"target_peer_id": target_peer_id,
+		"limb":           safe_limb
+	}
+
+	var grabber_name: String = grabber.character_name
+	var target_name: String = ""
+	if is_player:
+		target_name = target.character_name
+	else:
+		var itype = target.get("item_type")
+		target_name = itype if itype != null else target.name.get_slice("@", 0)
+
+	var grab_hand: int = grabber.active_hand
+	rpc_confirm_grab_start.rpc(peer_id, is_player, target_peer_id, target_path, grabber_name, target_name, safe_limb, grab_hand)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_release_grab() -> void:
+	if not multiplayer.is_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
+	_release_grab_for_peer(peer_id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_resist() -> void:
+	if not multiplayer.is_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
+	var grabbed := _find_player_by_peer(peer_id)
+	if grabbed == null or grabbed.dead:
+		return
+
+	# Check if this player is actually being grabbed
+	var is_grabbed := false
+	for gp_id in _grab_map:
+		var entry = _grab_map[gp_id]
+		if entry.get("is_player", false) and entry.get("target_peer_id", -1) == peer_id:
+			is_grabbed = true
+			break
+
+	if not is_grabbed:
+		# Not actually grabbed — notify them
+		rpc_confirm_resist_result.rpc(-1, peer_id, false)
+		return
+
+	_server_try_resist(peer_id)
+
+# Internal resist logic — called from rpc_request_resist (Z key) and from
+# rpc_try_move when a grabbed player attempts to walk away.
+func _server_try_resist(peer_id: int) -> void:
+	# Resist cooldown
+	var now_ms := Time.get_ticks_msec()
+	if _resist_cooldown_map.has(peer_id) and now_ms < _resist_cooldown_map[peer_id]:
+		return
+	_resist_cooldown_map[peer_id] = now_ms + RESIST_COOLDOWN_MS
+
+	var grabbed := _find_player_by_peer(peer_id)
+	if grabbed == null or grabbed.dead:
+		return
+
+	# Find who is grabbing this player
+	var grabber_peer_id: int = -1
+	var grabber: Node        = null
+	for gp_id in _grab_map:
+		var entry = _grab_map[gp_id]
+		if entry.get("is_player", false) and entry.get("target_peer_id", -1) == peer_id:
+			grabber_peer_id = gp_id
+			grabber         = _find_player_by_peer(gp_id)
+			break
+
+	if grabber == null or grabber_peer_id == -1:
+		return
+
+	var grabbed_str: float = float(grabbed.stats.get("strength", 10))
+	var grabber_str: float = float(grabber.stats.get("strength", 10))
+	var total_str: float   = max(grabbed_str + grabber_str, 1.0)
+
+	# Exhausted player cannot resist at all — server-side hard block
+	if grabbed.exhausted:
+		return
+
+	# Stamina costs scale with relative strength
+	var resist_cost: float  = 20.0 * (grabber_str / total_str)
+	var grabber_cost: float = 20.0 * (grabbed_str / total_str)
+
+	# Break-free chance is proportional to the grabbed player's fraction of total strength
+	var break_chance: float = (grabbed_str / total_str) * 100.0
+
+	# Lying down gives a much lower chance to break free
+	if grabbed.get("is_lying_down") == true:
+		break_chance *= 0.2
+
+	# Apply stamina cost to the grabbed player
+	var tgt_peer := grabbed.get_multiplayer_authority()
+	if tgt_peer == 1 or tgt_peer in multiplayer.get_peers():
+		grabbed.rpc_consume_stamina.rpc_id(tgt_peer, resist_cost)
+
+	# Apply stamina cost to the grabber
+	var grabber_tgt_peer := grabber.get_multiplayer_authority()
+	if grabber_tgt_peer == 1 or grabber_tgt_peer in multiplayer.get_peers():
+		grabber.rpc_consume_stamina.rpc_id(grabber_tgt_peer, grabber_cost)
+
+	if randf() * 100.0 < break_chance:
+		_release_grab_for_peer(grabber_peer_id, true)
+		rpc_confirm_resist_result.rpc(grabber_peer_id, peer_id, true)
+	else:
+		rpc_confirm_resist_result.rpc(grabber_peer_id, peer_id, false)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_grab_start(grabber_peer_id: int, is_player: bool, target_peer_id: int, target_path: NodePath, grabber_name: String = "", target_name: String = "", limb: String = "chest", grab_hand: int = 0) -> void:
+	var grabber := _find_player_by_peer(grabber_peer_id)
+	if grabber == null:
+		return
+	var target := get_node_or_null(target_path)
+	if target == null:
+		return
+
+	if grabber._is_local_authority():
+		grabber.grabbed_target = target
+		grabber.grab_hand_idx  = grab_hand
+		grabber._update_grab_ui()
+
+	# Only set grabbed_by on the target if it is a living player (dead players can't respond)
+	if is_player and target_peer_id != -1:
+		var grabbed_player := _find_player_by_peer(target_peer_id)
+		if grabbed_player != null and not grabbed_player.dead and grabbed_player._is_local_authority():
+			grabbed_player.grabbed_by = grabber
+			grabbed_player._update_grab_ui()
+
+	# Chat messages — only shown for player grabs
+	if is_player and target_name != "":
+		var local_player := get_local_player()
+		if local_player == null:
+			return
+		var local_peer := local_player.get_multiplayer_authority()
+		var limb_display := _limb_display_name(limb)
+		if local_peer == grabber_peer_id:
+			Sidebar.add_message("[color=#ffcc44]You grab " + target_name + " by the " + limb_display + "![/color]")
+		elif local_peer == target_peer_id:
+			Sidebar.add_message("[color=#ff4444]" + grabber_name + " grabs you by the " + limb_display + "![/color]")
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_grab_released(grabber_peer_id: int, is_player: bool, target_peer_id: int, grabber_name: String = "", target_name: String = "", silent: bool = false) -> void:
+	var grabber := _find_player_by_peer(grabber_peer_id)
+	if grabber != null and grabber._is_local_authority():
+		grabber.grabbed_target = null
+		grabber.grab_hand_idx  = -1
+		grabber._update_grab_ui()
+
+	if is_player and target_peer_id != -1:
+		var grabbed_player := _find_player_by_peer(target_peer_id)
+		if grabbed_player != null and grabbed_player._is_local_authority():
+			grabbed_player.grabbed_by = null
+			grabbed_player._update_grab_ui()
+
+	# Chat messages — only shown for player grabs AND if not silent
+	if is_player and target_name != "" and not silent:
+		var local_player := get_local_player()
+		if local_player == null:
+			return
+		var local_peer := local_player.get_multiplayer_authority()
+		if local_peer == grabber_peer_id:
+			Sidebar.add_message("[color=#aaaaaa]You release " + target_name + ".[/color]")
+		elif local_peer == target_peer_id:
+			Sidebar.add_message("[color=#aaffaa]" + grabber_name + " releases you.[/color]")
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_resist_result(grabber_peer_id: int, grabbed_peer_id: int, broke_free: bool) -> void:
+	var local_player := get_local_player()
+	if local_player == null:
+		return
+	var local_peer := local_player.get_multiplayer_authority()
+
+	if grabber_peer_id == -1:
+		# Player pressed Z but was not being grabbed
+		if local_peer == grabbed_peer_id:
+			Sidebar.add_message("[color=#ffaaaa]You are not being grabbed.[/color]")
+		return
+
+	if broke_free:
+		var grabber := _find_player_by_peer(grabber_peer_id)
+		if grabber != null and grabber._is_local_authority():
+			grabber.grabbed_target = null
+			grabber.grab_hand_idx  = -1
+			grabber._update_grab_ui()
+		var grabbed := _find_player_by_peer(grabbed_peer_id)
+		if grabbed != null and grabbed._is_local_authority():
+			grabbed.grabbed_by = null
+			grabbed._update_grab_ui()
+
+		if local_peer == grabbed_peer_id:
+			Sidebar.add_message("[color=#aaffaa]You broke free from the grab![/color]")
+		elif local_peer == grabber_peer_id:
+			Sidebar.add_message("[color=#ffaaaa]Your target broke free![/color]")
+	else:
+		if local_peer == grabbed_peer_id:
+			Sidebar.add_message("[color=#ffaaaa]You failed to resist the grab.[/color]")
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_drag_object(obj_path: NodePath, new_pixel: Vector2) -> void:
+	var obj := get_node_or_null(obj_path)
+	if obj != null:
+		obj.global_position = new_pixel
 
 # ---------------------------------------------------------------------------
 # Satchel Insert/Extract
@@ -1790,3 +2148,4 @@ func rpc_confirm_satchel_extract(
 	# Refresh the satchel UI if it is open on this client
 	if satchel.has_method("_refresh_ui"):
 		satchel._refresh_ui()
+		

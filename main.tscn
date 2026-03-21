@@ -27,7 +27,7 @@
 [ext_resource type="PackedScene" path="res://clothing/satchel.tscn" id="25_0odxb"]
 [ext_resource type="PackedScene" path="res://clothing/king_cloak.tscn" id="26_lswn8"]
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_p0366"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ej02t"]
 resource_name = "Floor Tiles"
 texture = ExtResource("2_h2yge")
 texture_region_size = Vector2i(64, 64)
@@ -38,7 +38,7 @@ texture_region_size = Vector2i(64, 64)
 5:0/0 = 0
 8:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_hobn4"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_14fb3"]
 resource_name = "Solid Tiles"
 texture = ExtResource("2_h2yge")
 texture_region_size = Vector2i(64, 64)
@@ -46,7 +46,7 @@ texture_region_size = Vector2i(64, 64)
 6:0/0 = 0
 7:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_mjrc7"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_p0366"]
 resource_name = "Water"
 texture = ExtResource("4_2cqfq")
 texture_region_size = Vector2i(64, 64)
@@ -59,9 +59,9 @@ texture_region_size = Vector2i(64, 64)
 
 [sub_resource type="TileSet" id="TileSet_lswn8"]
 tile_size = Vector2i(64, 64)
-sources/0 = SubResource("TileSetAtlasSource_p0366")
-sources/1 = SubResource("TileSetAtlasSource_hobn4")
-sources/5 = SubResource("TileSetAtlasSource_mjrc7")
+sources/0 = SubResource("TileSetAtlasSource_ej02t")
+sources/1 = SubResource("TileSetAtlasSource_14fb3")
+sources/5 = SubResource("TileSetAtlasSource_p0366")
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")

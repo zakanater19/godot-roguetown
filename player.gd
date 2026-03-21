@@ -14,9 +14,6 @@ const FACING_NAMES: Array =["south", "north", "east", "west"]
 
 const BloodSpray = preload("res://npcs/blood_spray.gd")
 
-# CLOTHING_SCENE_PATHS has moved to World (world.gd) so there is a single
-# source of truth.  Use World.CLOTHING_SCENE_PATHS everywhere instead.
-
 const CLOTHING_TEXTURES: Dictionary = {
 	"IronHelmet":     "res://clothing/ironhelmet.png",
 	"IronChestplate": "res://clothing/ironchestplate.png",
@@ -178,6 +175,11 @@ var _drag_origin:     Vector2 = Vector2.ZERO
 const DRAG_THRESHOLD: float   = 10.0
 var _dragging_player: Node = null
 
+# --- GRAB STATE ---
+var grabbed_target: Node = null  # The entity this player is currently dragging
+var grabbed_by:     Node = null  # The player currently dragging this player
+var grab_hand_idx:  int  = -1    # Which hand is occupied by the grab (-1 = not grabbing)
+
 # ===========================================================================
 # Name / Class sync
 # ===========================================================================
@@ -262,12 +264,14 @@ func _face_toward(world_pos: Vector2) -> void:
 	if backend: backend.face_toward(world_pos)
 
 func _on_object_picked_up(object_node: Node) -> void:
+	if active_hand == grab_hand_idx: return # Block if hand is occupied by a grab
 	if backend: backend.on_object_picked_up(object_node)
 
 func _drop_held_object() -> void:
 	if backend: backend.drop_held_object()
 
 func _throw_held_object(mouse_world_pos: Vector2) -> void:
+	if active_hand == grab_hand_idx: return # Block if hand is occupied by a grab
 	if body != null and body.is_arm_broken(active_hand):
 		if _is_local_authority():
 			Sidebar.add_message("[color=#ffaaaa]Your arm is broken and cannot throw![/color]")
@@ -275,6 +279,7 @@ func _throw_held_object(mouse_world_pos: Vector2) -> void:
 	if backend: backend.throw_held_object(mouse_world_pos)
 
 func _use_held_object(mouse_world_pos: Vector2) -> void:
+	if active_hand == grab_hand_idx: return # Block if hand is occupied by a grab
 	if body != null and body.is_arm_broken(active_hand):
 		if _is_local_authority():
 			Sidebar.add_message("[color=#ffaaaa]Your arm is broken and cannot be used![/color]")
@@ -303,6 +308,12 @@ func _get_weapon_damage(item: Node) -> int:
 func receive_damage(amount: int, limb: String = "chest") -> void:
 	if body: body.receive_limb_damage(limb, amount)
 	if combat: combat.receive_damage(amount)
+	
+	# NEW: if this is the server and the player is disconnected, update the stored health in LateJoin
+	if multiplayer.is_server():
+		var peer := get_multiplayer_authority()
+		if LateJoin.is_player_disconnected(peer):
+			LateJoin.update_disconnected_health(peer, health)
 
 func _die() -> void:
 	if combat: combat.die()
@@ -522,7 +533,14 @@ func _start_move_lerp() -> void:
 	var new_pixel := World.tile_to_pixel(tile_pos)
 	if new_pixel == pixel_pos:
 		return
-		
+
+	# Dead players never enter the lerp loop (_process returns early on dead),
+	# so teleport them directly when a grabber drags their corpse.
+	if dead:
+		pixel_pos = new_pixel
+		position  = pixel_pos
+		return
+
 	if is_sprinting and _is_local_authority():
 		if stamina < 3.0:
 			exhausted = true
@@ -772,6 +790,14 @@ func _update_hands_ui() -> void:
 	if _hud != null:
 		_hud.update_hands_display(hands, active_hand)
 
+func _update_grab_ui() -> void:
+	if _hud != null:
+		_hud.update_grab_display(
+			grabbed_target != null and is_instance_valid(grabbed_target),
+			grabbed_by     != null and is_instance_valid(grabbed_by)
+		)
+	_update_hands_ui()
+
 # ===========================================================================
 # Stats/Skills display
 # ===========================================================================
@@ -938,6 +964,15 @@ func _process(delta: float) -> void:
 	if is_local and _inspect_label != null:
 		_inspect_label.visible = Input.is_key_pressed(KEY_SHIFT)
 
+	# --- GRAB VALIDITY: clear stale references if target left the tree ---
+	if is_local:
+		if grabbed_target != null and not is_instance_valid(grabbed_target):
+			grabbed_target = null
+			_update_grab_ui()
+		if grabbed_by != null and not is_instance_valid(grabbed_by):
+			grabbed_by = null
+			_update_grab_ui()
+
 	if backend:
 		for i in range(2):
 			var obj = hands[i]
@@ -975,7 +1010,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if sleep_state != SleepState.AWAKE:
 		if event is InputEventMouseButton: return
 		if event is InputEventKey and event.pressed and not event.echo:
-			if event.keycode in[KEY_C, KEY_X, KEY_R, KEY_Q, KEY_V, KEY_SHIFT, KEY_T]:
+			if event.keycode in[KEY_C, KEY_X, KEY_R, KEY_Q, KEY_V, KEY_Z, KEY_SHIFT, KEY_T]:
 				return
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
@@ -1039,7 +1074,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		throwing_mode = false
 		if _throw_label != null:
 			_throw_label.visible = false
-		_drop_held_object()
+		# If currently grabbing something, Q releases the grab instead of dropping
+		if grabbed_target != null and is_instance_valid(grabbed_target):
+			if multiplayer.is_server():
+				World.rpc_request_release_grab()
+			else:
+				World.rpc_request_release_grab.rpc_id(1)
+		else:
+			_drop_held_object()
+		return
+
+	if event is InputEventKey and event.keycode == KEY_Z and event.pressed and not event.echo:
+		if grabbed_by != null and is_instance_valid(grabbed_by):
+			if exhausted:
+				Sidebar.add_message("[color=#ffaaaa]You are too exhausted to resist the grab![/color]")
+				return
+			if multiplayer.is_server():
+				World.rpc_request_resist()
+			else:
+				World.rpc_request_resist.rpc_id(1)
 		return
 
 	if event is InputEventKey and event.keycode == KEY_V and event.pressed and not event.echo:
@@ -1081,6 +1134,36 @@ func _unhandled_input(event: InputEvent) -> void:
 		var target_tile := Vector2i(int(mouse_world.x / World.TILE_SIZE), int(mouse_world.y / World.TILE_SIZE))
 		
 		if not FOV._visible_tiles.has(target_tile):
+			return
+
+		# --- CTRL + LMB: start grabbing a player or ground object ---
+		if Input.is_key_pressed(KEY_CTRL):
+			var grab_target: Node = null
+			# Prefer nearby players
+			for p in get_tree().get_nodes_in_group("player"):
+				if p == self:
+					continue
+				if p.global_position.distance_to(mouse_world) < float(World.TILE_SIZE) * 0.7:
+					grab_target = p
+					break
+			# Fall back to ground pickable objects on that tile
+			if grab_target == null:
+				for obj in get_tree().get_nodes_in_group("pickable"):
+					if hands[0] == obj or hands[1] == obj:
+						continue
+					var obj_tile := Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE))
+					if obj_tile == target_tile:
+						grab_target = obj
+						break
+			if grab_target != null:
+				var grab_limb: String = "chest"
+				if _hud != null:
+					grab_limb = _hud.targeted_limb
+				if multiplayer.is_server():
+					World.rpc_request_grab(grab_target.get_path(), grab_limb)
+				else:
+					World.rpc_request_grab.rpc_id(1, grab_target.get_path(), grab_limb)
+			get_viewport().set_input_as_handled()
 			return
 
 		if not Input.is_key_pressed(KEY_SHIFT):
@@ -1251,6 +1334,11 @@ func _update_water_submerge() -> void:
 	var sprint_mult = (1.0 / 1.5) if is_sprinting else 1.0
 	var lying_mult = 3.0 if is_lying_down else 1.0
 	
+	# NEW LOGIC: Ignore movement penalties while being dragged so we stay perfectly synced
+	if grabbed_by != null and is_instance_valid(grabbed_by):
+		stamina_penalty = 1.0
+		lying_mult = 1.0
+	
 	if on_water:
 		current_move_duration = (MOVE_TIME * 2.0 * stamina_penalty) * sprint_mult * lying_mult
 	else:
@@ -1310,3 +1398,4 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
 		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
+		
