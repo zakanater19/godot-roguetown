@@ -92,7 +92,7 @@ func _server_check_action_cooldown(player: Node, is_attack: bool = false) -> boo
 
 func register_solid(pos: Vector2i, obj: Node) -> void:
 	if not solid_grid.has(pos):
-		solid_grid[pos] = []
+		solid_grid[pos] =[]
 	if not obj in solid_grid[pos]:
 		solid_grid[pos].append(obj)
 
@@ -126,7 +126,7 @@ func try_move(from: Vector2i, dir: Vector2i) -> Vector2i:
 # ---------------------------------------------------------------------------
 
 func get_entities_at_tile(tile: Vector2i, exclude_peer: int = 0) -> Array:
-	var result := []
+	var result :=[]
 
 	# Check NPCs
 	for npc in get_tree().get_nodes_in_group("npc"):
@@ -184,23 +184,50 @@ func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is
 	var d_stance: String = defender.get("combat_stance") if defender.get("combat_stance") != null else "dodge"
 
 	var avoidance_chance = 0.0
+	var valid_dodge_tiles =[]
+	
+	var can_defend = true
+	if "stamina" in defender and defender.stamina < 3.0:
+		can_defend = false
+	if "exhausted" in defender and defender.exhausted:
+		can_defend = false
 
-	if d_stance == "parry" and d_has_sword:
-		# --- PARRY: skill-based, only when armed ---
-		var d_skill = 0
-		if "skills" in defender:
-			d_skill = defender.skills.get("sword_fighting", 0)
-		# Changed multiplier from 19.6 to 17.0 (5 levels advantage = 85% parry chance)
-		avoidance_chance = clamp(float(d_skill - a_skill) * 17.0, 0.0, 98.0)
-		result.block_type = "parried"
-	else:
-		# --- DODGE: agility-based, always available ---
-		# Base 10 agility = 20% dodge. Each point above/below 10 adds/removes 5%.
-		var d_agility = 10
-		if "stats" in defender:
-			d_agility = defender.stats.get("agility", 10)
-		avoidance_chance = clamp((d_agility - 10) * 5.0 + 20.0, 0.0, 85.0)
-		result.block_type = "dodged"
+	if can_defend:
+		if d_stance == "parry" and d_has_sword:
+			# --- PARRY: skill-based, only when armed ---
+			var d_skill = 0
+			if "skills" in defender:
+				d_skill = defender.skills.get("sword_fighting", 0)
+			# Changed multiplier from 19.6 to 17.0 (5 levels advantage = 85% parry chance)
+			avoidance_chance = clamp(float(d_skill - a_skill) * 17.0, 0.0, 98.0)
+			result.block_type = "parried"
+		else:
+			# --- DODGE: agility-based, always available ---
+			for dir in[Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				var check_tile = defender.tile_pos + dir
+				if check_tile.x < 0 or check_tile.x >= GRID_WIDTH or check_tile.y < 0 or check_tile.y >= GRID_HEIGHT: continue
+				if is_solid(check_tile): continue
+				
+				var occupants = get_entities_at_tile(check_tile)
+				var blocked = false
+				for ent in occupants:
+					if ent.is_in_group("player") and not ent.dead:
+						if not (ent.get("is_lying_down") == true or ent.get("sleep_state") != 0):
+							blocked = true
+							break
+				if not blocked:
+					valid_dodge_tiles.append(check_tile)
+
+			if valid_dodge_tiles.is_empty():
+				avoidance_chance = 0.0
+				result.block_type = ""
+			else:
+				# Base 10 agility = 20% dodge. Each point above/below 10 adds/removes 5%.
+				var d_agility = 10
+				if "stats" in defender:
+					d_agility = defender.stats.get("agility", 10)
+				avoidance_chance = clamp((d_agility - 10) * 5.0 + 20.0, 0.0, 85.0)
+				result.block_type = "dodged"
 
 	# --- DIRECTIONAL COMBAT MODIFIERS ---
 	if attacker != null and (attacker.is_in_group("player") or attacker.is_in_group("npc")):
@@ -235,6 +262,8 @@ func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is
 	if randf() * 100.0 < avoidance_chance:
 		result.damage  = 0
 		result.blocked = true
+		if result.block_type == "dodged" and not valid_dodge_tiles.is_empty():
+			result.dodge_tile = valid_dodge_tiles.pick_random()
 	else:
 		result.block_type = ""
 
@@ -254,6 +283,13 @@ func deal_damage_at_tile(tile: Vector2i, amount: int, attacker_id: int = 0, is_s
 				entity.receive_damage.rpc(roll.damage)
 			elif entity.has_method("receive_damage"):
 				entity.receive_damage(roll.damage)
+		elif roll.blocked:
+			if entity.is_in_group("player"):
+				if entity.has_method("rpc_consume_stamina"):
+					entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), 3.0)
+				if roll.block_type == "dodged" and roll.has("dodge_tile"):
+					entity.tile_pos = roll.dodge_tile
+					rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
 
 	return results
 
@@ -332,7 +368,7 @@ func cast_throw(from_tile: Vector2i, from_pixel: Vector2, dir: Vector2, max_tile
 # ---------------------------------------------------------------------------
 
 func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
-	var open: Array[Vector2i] = [start]
+	var open: Array[Vector2i] =[start]
 	var open_set := {start: true} # O(1) lookup for checking if a node is in 'open'
 	
 	var closed := {}
@@ -347,8 +383,8 @@ func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
 	var max_iterations := 500
 
 	# Pre-allocate direction arrays WITH STRICT TYPING to fix the inference error
-	var dirs_x: Array[int] = [1, -1, 0, 0]
-	var dirs_y: Array[int] = [0, 0, 1, -1]
+	var dirs_x: Array[int] =[1, -1, 0, 0]
+	var dirs_y: Array[int] =[0, 0, 1, -1]
 
 	# Track the best node in case we hit the iteration limit
 	var best_node := start
@@ -427,10 +463,10 @@ func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
 					open.append(neighbor)
 					open_set[neighbor] = true
 
-	return []
+	return[]
 
 func _reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array[Vector2i]:
-	var path: Array[Vector2i] = []
+	var path: Array[Vector2i] =[]
 	path.append(current)
 	while came_from.has(current):
 		current = came_from[current]
@@ -700,6 +736,12 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 			target_name = entity.character_name
 			if roll.damage > 0:
 				entity.receive_damage.rpc(roll.damage)
+			elif roll.blocked:
+				if entity.has_method("rpc_consume_stamina"):
+					entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), 3.0)
+				if roll.block_type == "dodged" and roll.has("dodge_tile"):
+					entity.tile_pos = roll.dodge_tile
+					rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
 		elif entity.has_method("receive_damage"):
 			target_name = entity.name.get_slice("@", 0)
 			if roll.damage > 0:
@@ -831,7 +873,7 @@ func rpc_request_hit_rock(rock_path: NodePath) -> void:
 		if randf() < 0.20: drops.append("coal")
 		if randf() < 0.10: drops.append("ironore")
 
-		var drop_data = []
+		var drop_data =[]
 		for d in drops:
 			drop_data.append({"type": d, "name": "Drop_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)})
 		rpc_confirm_break_rock.rpc(rock_path, drop_data)
@@ -878,7 +920,7 @@ func rpc_request_hit_tree(tree_path: NodePath) -> void:
 		LateJoin.register_object_state(tree_path, {"hits": tree.hits, "type": "tree"})
 	
 	if tree.hits >= tree.HITS_TO_BREAK:
-		var log_names = []
+		var log_names =[]
 		for i in range(3):
 			log_names.append("Log_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
 		rpc_confirm_break_tree.rpc(tree_path, log_names)
@@ -1084,13 +1126,13 @@ func rpc_request_furnace_action(furnace_path: NodePath, action: String, hand_idx
 		return
 
 	if action == "eject":
-		var names  = []
+		var names  =[]
 		var total  = furnace._coal_count + furnace._ironore_count
 		for i in total:
 			names.append("Eject_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
 		rpc_confirm_furnace_action.rpc(peer_id, furnace_path, action, hand_idx, names)
 	else:
-		rpc_confirm_furnace_action.rpc(peer_id, furnace_path, action, hand_idx, [])
+		rpc_confirm_furnace_action.rpc(peer_id, furnace_path, action, hand_idx,[])
 
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_furnace_action(peer_id: int, furnace_path: NodePath, action: String, hand_idx: int, generated_names: Array) -> void:
@@ -1470,14 +1512,14 @@ func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 		"sword": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/sword.tscn"},
 		"pickaxe": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/pickaxe.tscn"},
 		"wooden_floor": {"req": "Log", "req_amt": 1, "tile": [0, Vector2i(4, 0)]},
-		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile": [0, Vector2i(5, 0)]},
+		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile":[0, Vector2i(5, 0)]},
 		"stone_wall": {"req": "Pebble", "req_amt": 2, "tile": [1, Vector2i(6, 0)]}
 	}
 	if not recipes.has(recipe_id): 
 		return
 	var recipe = recipes[recipe_id]
 	
-	var avail = []
+	var avail =[]
 	for i in range(2):
 		if player.hands[i] != null: 
 			avail.append(player.hands[i])
@@ -1490,7 +1532,7 @@ func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 		if diff.x <= 1 and diff.y <= 1:
 			avail.append(obj)
 			
-	var matched_nodes = []
+	var matched_nodes =[]
 	var req_type = recipe["req"]
 	var req_amt  = recipe["req_amt"]
 	
@@ -1506,7 +1548,7 @@ func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 		
 	var result_name = "Craft_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
 	
-	var consumed_paths = []
+	var consumed_paths =[]
 	for n in matched_nodes:
 		consumed_paths.append(n.get_path())
 		
@@ -1744,4 +1786,4 @@ func rpc_confirm_satchel_extract(
 	# Refresh the satchel UI if it is open on this client
 	if satchel.has_method("_refresh_ui"):
 		satchel._refresh_ui()
-
+		

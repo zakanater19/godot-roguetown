@@ -222,6 +222,14 @@ func _apply_class_defaults() -> void:
 func _spend_stamina(amount: float) -> void:
 	if backend: backend.spend_stamina(amount)
 
+@rpc("any_peer", "call_local", "reliable")
+func rpc_consume_stamina(amount: float) -> void:
+	if _is_local_authority():
+		if stamina < amount:
+			exhausted = true
+			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself defending![/color]")
+		_spend_stamina(amount)
+
 func _check_stamina_regen(delta: float) -> void:
 	if backend: backend.check_stamina_regen(delta)
 
@@ -557,8 +565,7 @@ func sync_hands(hand_names: Array) -> void:
 
 func _setup_clothing_sprites() -> void:
 	var layers = [["TrousersSprite", 1], 
-		["ClothingSprite", 2],["BackpackSprite", 2],
-		["ChestSprite", 3], 
+		["ClothingSprite", 2],["BackpackSprite", 2],["ChestSprite", 3], 
 		["WaistSprite", 4],["BootsSprite", 5],
 		["HelmetSprite", 6],["CloakSprite", 7]
 	]
@@ -590,9 +597,7 @@ func _update_clothing_sprites() -> void:
 		target_rot = 90.0
 
 	var slots := [["HelmetSprite", "head"],
-		["CloakSprite", "cloak"],["ChestSprite", "armor"],
-		["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],
-		["BootsSprite", "feet"],
+		["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],["BootsSprite", "feet"],
 		["ClothingSprite", "clothing"],["WaistSprite", "waist"]
 	]
 
@@ -1264,3 +1269,4 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
 		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
+		

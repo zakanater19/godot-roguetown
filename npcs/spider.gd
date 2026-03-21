@@ -160,9 +160,15 @@ func _attack_player(player: Node) -> void:
 	if roll.damage > 0:
 		if player.has_method("receive_damage"):
 			player.receive_damage.rpc(roll.damage)
+	elif roll.blocked:
+		if player.has_method("rpc_consume_stamina"):
+			player.rpc_consume_stamina.rpc_id(player.get_multiplayer_authority(), 3.0)
+		if roll.block_type == "dodged" and roll.has("dodge_tile"):
+			player.tile_pos = roll.dodge_tile
+			World.rpc_confirm_move.rpc(player.get_multiplayer_authority(), roll.dodge_tile, false)
 			
 	var target_name: String = player.character_name
-	World.rpc_broadcast_damage_log.rpc("Spider", target_name, roll.damage, tile_pos, roll.blocked, false)
+	World.rpc_broadcast_damage_log.rpc("Spider", target_name, roll.damage, tile_pos, roll.blocked, false, "", roll.get("block_type", ""))
 
 
 func _move_toward_player(player: Node) -> void:
@@ -221,3 +227,4 @@ func _update_sprite() -> void:
 	if sprite == null:
 		return
 	sprite.region_rect = Rect2(facing * 64, 0, 64, 64)
+	
