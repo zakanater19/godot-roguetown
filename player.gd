@@ -77,6 +77,7 @@ var camera:          Camera2D = null
 
 var intent: String = "help"
 var combat_mode: bool = false
+var combat_stance: String = "dodge"
 var _awaiting_move_confirm: bool = false
 
 # --- SPRINT & EXHAUSTION ---
@@ -109,7 +110,8 @@ var prices_shown: bool = false
 
 # --- STATS ---
 var stats: Dictionary = {
-	"strength": 10
+	"strength": 10,
+	"agility": 10
 }
 
 # --- HEALTH & STAMINA ---
@@ -268,6 +270,9 @@ func toggle_crafting_menu() -> void:
 func toggle_combat_mode() -> void:
 	if combat: combat.toggle_combat_mode()
 
+func toggle_combat_stance() -> void:
+	if combat: combat.toggle_combat_stance()
+
 func show_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 	if misc: misc.show_loot_warning(looter_peer_id, item_desc)
 
@@ -299,6 +304,19 @@ func _sync_combat_mode(mode: bool) -> void:
 	else:
 		if sender_id == 1:
 			if combat: combat.set_combat_mode_local(mode)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _sync_combat_stance(stance: String) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+
+	if multiplayer.is_server():
+		if sender_id == get_multiplayer_authority():
+			if combat: combat.set_combat_stance_local(stance)
+			rpc("_sync_combat_stance", stance)
+	else:
+		if sender_id == 1:
+			if combat: combat.set_combat_stance_local(stance)
 
 # ===========================================================================
 # Sleep Mechanics
@@ -725,6 +743,7 @@ func _build_ui() -> void:
 	_hud.setup(self)
 	_hud.update_clothing_display(equipped)
 	_hud.update_combat_display(combat_mode)
+	_hud.update_stance_display(combat_stance)
 
 	_update_hands_ui()
 
@@ -1245,4 +1264,3 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
 		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
-		

@@ -3,7 +3,8 @@ class_name Classes
 const DATA: Dictionary = {
 	"peasant": {
 		"stats": {
-			"strength": 7
+			"strength": 7,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 0,
@@ -17,7 +18,8 @@ const DATA: Dictionary = {
 	},
 	"merchant": {
 		"stats": {
-			"strength": 10
+			"strength": 10,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 2,
@@ -33,7 +35,8 @@ const DATA: Dictionary = {
 	},
 	"bandit": {
 		"stats": {
-			"strength": 11
+			"strength": 11,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 2,
@@ -49,7 +52,8 @@ const DATA: Dictionary = {
 	},
 	"adventurer": {
 		"stats": {
-			"strength": 10
+			"strength": 10,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 0,
@@ -63,7 +67,8 @@ const DATA: Dictionary = {
 	},
 	"swordsman": {
 		"stats": {
-			"strength": 12
+			"strength": 12,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 3,
@@ -78,7 +83,8 @@ const DATA: Dictionary = {
 	},
 	"miner": {
 		"stats": {
-			"strength": 12
+			"strength": 12,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 1,
@@ -93,7 +99,8 @@ const DATA: Dictionary = {
 	},
 	"debug": {
 		"stats": {
-			"strength": 20
+			"strength": 20,
+			"agility": 10
 		},
 		"skills": {
 			"sword_fighting": 5,

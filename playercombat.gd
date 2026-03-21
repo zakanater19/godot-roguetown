@@ -54,6 +54,25 @@ func set_combat_mode_local(mode: bool) -> void:
 		player._hud.update_combat_display(player.combat_mode)
 
 # ===========================================================================
+# Combat Stance Toggling (dodge <-> parry)
+# ===========================================================================
+
+func toggle_combat_stance() -> void:
+	var new_stance: String = "parry" if player.combat_stance == "dodge" else "dodge"
+	set_combat_stance_local(new_stance)
+
+	if player.multiplayer.has_multiplayer_peer():
+		if player.multiplayer.is_server():
+			player.rpc("_sync_combat_stance", new_stance)
+		else:
+			player.rpc_id(1, "_sync_combat_stance", new_stance)
+
+func set_combat_stance_local(stance: String) -> void:
+	player.combat_stance = stance
+	if player._hud != null and player._is_local_authority():
+		player._hud.update_stance_display(stance)
+
+# ===========================================================================
 # Taking Damage & Death
 # ===========================================================================
 

@@ -71,6 +71,9 @@ var _stamina_bar: ColorRect = null
 var targeted_limb: String     = "chest"
 var _limb_highlights: Dictionary = {}  # limb_name -> TextureRect
 
+# Combat stance icon
+var _stance_icon: TextureRect = null
+
 const LIMB_REGIONS: Dictionary = {
 	"chest": [Vector2(4,  8),  Vector2(57, 35)],
 	"r_arm": [Vector2(12, 25), Vector2(11, 23)],
@@ -97,6 +100,7 @@ func _build() -> void:
 	_build_clothing_panel(root)
 	_build_hand_boxes(root)
 	_build_limb_panel(root)
+	_build_stance_icon(root)
 
 # ── Clothing panel (shifted left: -140 to center in 1000px game area) ────────
 
@@ -406,6 +410,48 @@ func _on_limb_gui_input(event: InputEvent, limb_name: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		_select_limb(limb_name)
 
+# ── Combat stance icon ────────────────────────────────────────────────────────
+
+func _build_stance_icon(parent: Control) -> void:
+	# Sits immediately to the left of the limb panel.
+	# Limb panel: offset_right = -388, offset_left = -452.
+	# We place this panel 8px to the left of that: offset_right = -460, offset_left = -524.
+	var panel := Control.new()
+	panel.anchor_left   = 0.5
+	panel.anchor_right  = 0.5
+	panel.anchor_top    = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_right  = -460
+	panel.offset_left   = -524          # 64px wide
+	panel.offset_bottom = -16
+	panel.offset_top    = -16 - 64      # 64px tall
+	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
+	parent.add_child(panel)
+
+	# Dark background
+	var bg := ColorRect.new()
+	bg.color        = Color(0.1, 0.1, 0.1, 0.7)
+	bg.size         = Vector2(64, 64)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(bg)
+
+	# Stance icon — default dodge
+	var dodge_tex := load("res://ui/dodge.png") as Texture2D
+	_stance_icon = TextureRect.new()
+	_stance_icon.texture      = dodge_tex
+	_stance_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_stance_icon.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	_stance_icon.size         = Vector2(64, 64)
+	_stance_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(_stance_icon)
+
+	panel.gui_input.connect(_on_stance_gui_input)
+
+func _on_stance_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if player != null and player.has_method("toggle_combat_stance"):
+			player.toggle_combat_stance()
+
 # ── Stats Update ─────────────────────────────────────────────────────────────
 
 func update_stats(health: int, stamina: float) -> void:
@@ -442,6 +488,14 @@ func update_combat_display(is_combat: bool) -> void:
 	if _intent_label == null: return
 	if is_combat: _intent_label.add_theme_color_override("font_color", Color(0.9, 0.15, 0.15))
 	else:         _intent_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.3))
+
+func update_stance_display(stance: String) -> void:
+	if _stance_icon == null:
+		return
+	var tex_path: String = "res://ui/dodge.png" if stance == "dodge" else "res://ui/parry.png"
+	var tex := load(tex_path) as Texture2D
+	if tex != null:
+		_stance_icon.texture = tex
 
 func update_hands_display(hands: Array, active_hand: int) -> void:
 	for i in range(min(2, _hand_icons.size())):
@@ -547,4 +601,3 @@ func _on_toggle_gui_input(event: InputEvent) -> void:
 		if _toggle_label != null:
 			_toggle_label.text = "↑"
 			_toggle_label.add_theme_color_override("font_color", Color(0.15, 0.9, 0.25))
-			

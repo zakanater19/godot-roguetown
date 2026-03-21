@@ -162,7 +162,7 @@ func get_entities_at_tile(tile: Vector2i, exclude_peer: int = 0) -> Array:
 
 
 func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_sword_attack: bool) -> Dictionary:
-	var result = {"damage": base_amount, "blocked": false}
+	var result = {"damage": base_amount, "blocked": false, "block_type": ""}
 	if not defender.is_in_group("player"):
 		return result
 
@@ -180,16 +180,28 @@ func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is
 		if "skills" in attacker:
 			a_skill = attacker.skills.get("sword_fighting", 0)
 
-	var d_skill = 0
-	if d_has_sword:
+	# Determine the defender's combat stance ("dodge" is the default if not set)
+	var d_stance: String = defender.get("combat_stance") if defender.get("combat_stance") != null else "dodge"
+
+	var avoidance_chance = 0.0
+
+	if d_stance == "parry" and d_has_sword:
+		# --- PARRY: skill-based, only when armed ---
+		var d_skill = 0
 		if "skills" in defender:
 			d_skill = defender.skills.get("sword_fighting", 0)
+		# Changed multiplier from 19.6 to 17.0 (5 levels advantage = 85% parry chance)
+		avoidance_chance = clamp(float(d_skill - a_skill) * 17.0, 0.0, 98.0)
+		result.block_type = "parried"
+	else:
+		# --- DODGE: agility-based, always available ---
+		# Base 10 agility = 20% dodge. Each point above/below 10 adds/removes 5%.
+		var d_agility = 10
+		if "stats" in defender:
+			d_agility = defender.stats.get("agility", 10)
+		avoidance_chance = clamp((d_agility - 10) * 5.0 + 20.0, 0.0, 85.0)
+		result.block_type = "dodged"
 
-	var block_chance = 0.0
-	if d_has_sword:
-		# Changed multiplier from 19.6 to 17.0 (5 levels advantage = 85% block chance)
-		block_chance = clamp(float(d_skill - a_skill) * 17.0, 0.0, 98.0)
-		
 	# --- DIRECTIONAL COMBAT MODIFIERS ---
 	if attacker != null and (attacker.is_in_group("player") or attacker.is_in_group("npc")):
 		var diff = attacker.tile_pos - defender.tile_pos
@@ -198,31 +210,33 @@ func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is
 			attack_dir = 2 if diff.x > 0 else 3
 		elif abs(diff.x) < abs(diff.y) or diff.y != 0:
 			attack_dir = 0 if diff.y > 0 else 1
-		
+
 		if attack_dir != -1:
 			var d_facing = defender.facing
 			if attack_dir == d_facing:
-				# Attack from the Front
-				block_chance *= 1.0
+				# Attack from the Front — full avoidance chance
+				avoidance_chance *= 1.0
 			else:
 				var is_back = false
 				if d_facing == 0 and attack_dir == 1: is_back = true
 				elif d_facing == 1 and attack_dir == 0: is_back = true
 				elif d_facing == 2 and attack_dir == 3: is_back = true
 				elif d_facing == 3 and attack_dir == 2: is_back = true
-				
+
 				if is_back:
 					if not defender.combat_mode:
-						block_chance = 0.0
+						avoidance_chance = 0.0
 					else:
-						block_chance *= 0.1
+						avoidance_chance *= 0.1
 				else:
 					# Attack from Side
-					block_chance *= 0.5
+					avoidance_chance *= 0.5
 
-	if randf() * 100.0 < block_chance:
+	if randf() * 100.0 < avoidance_chance:
 		result.damage  = 0
 		result.blocked = true
+	else:
+		result.block_type = ""
 
 	return result
 
@@ -693,7 +707,7 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 		else:
 			continue
 
-		rpc_broadcast_damage_log.rpc(attacker.character_name, target_name, roll.damage, source_tile, roll.blocked, false, targeted_limb)
+		rpc_broadcast_damage_log.rpc(attacker.character_name, target_name, roll.damage, source_tile, roll.blocked, false, targeted_limb, roll.get("block_type", ""))
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_damage_wall(pos: Vector2i) -> void:
@@ -1244,7 +1258,7 @@ func rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int, land_
 
 				if target_name != "":
 					var roll = hit_results.get(entity, {"damage": dmg, "blocked": false})
-					rpc_broadcast_damage_log.rpc(attacker_p.character_name, target_name, roll.damage, src_tile, roll.blocked)
+					rpc_broadcast_damage_log.rpc(attacker_p.character_name, target_name, roll.damage, src_tile, roll.blocked, false, "", roll.get("block_type", ""))
 	)
 
 # ---------------------------------------------------------------------------
@@ -1295,7 +1309,7 @@ func rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vecto
 # ---------------------------------------------------------------------------
 
 @rpc("authority", "call_local", "reliable")
-func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "") -> void:
+func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "", block_type: String = "") -> void:
 	var local_player := get_local_player()
 	if local_player == null:
 		return
@@ -1326,7 +1340,8 @@ func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount
 	if is_shove:
 		log_text = "[color=#ffcc00][font_size=14]" + disp_attacker + " shoved " + disp_target + "![/font_size][/color]"
 	elif blocked:
-		log_text = "[color=#aaaaaa][font_size=14]" + disp_target + " blocked " + disp_attacker + "'s attack![/font_size][/color]"
+		var block_word: String = "parried" if block_type == "parried" else "dodged"
+		log_text = "[color=#aaaaaa][font_size=14]" + disp_target + " " + block_word + " " + disp_attacker + "'s attack![/font_size][/color]"
 	else:
 		if limb_str != "":
 			log_text = "[color=#ff4444][font_size=14]" + disp_attacker + " hit " + disp_target + " in the " + limb_str + " for " + str(amount) + " damage[/font_size][/color]"
@@ -1729,3 +1744,4 @@ func rpc_confirm_satchel_extract(
 	# Refresh the satchel UI if it is open on this client
 	if satchel.has_method("_refresh_ui"):
 		satchel._refresh_ui()
+
