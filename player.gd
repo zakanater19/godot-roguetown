@@ -539,8 +539,7 @@ func sync_hands(hand_names: Array) -> void:
 
 func _setup_clothing_sprites() -> void:
 	var layers = [["TrousersSprite", 1], 
-		["ClothingSprite", 2], 
-		["BackpackSprite", 2],
+		["ClothingSprite", 2],["BackpackSprite", 2],
 		["ChestSprite", 3], 
 		["WaistSprite", 4],["BootsSprite", 5],
 		["HelmetSprite", 6],["CloakSprite", 7]
@@ -572,8 +571,7 @@ func _update_clothing_sprites() -> void:
 	elif is_lying_down:
 		target_rot = 90.0
 
-	var slots := [
-		["HelmetSprite", "head"],
+	var slots := [["HelmetSprite", "head"],
 		["CloakSprite", "cloak"],["ChestSprite", "armor"],
 		["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],
 		["BootsSprite", "feet"],
@@ -710,15 +708,6 @@ func _build_ui() -> void:
 	you_died_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_dead_container.add_child(you_died_label)
 
-	var death_image := TextureRect.new()
-	var death_tex   := load("res://deathscreen.png") as Texture2D
-	if death_tex != null:
-		death_image.texture             = death_tex
-		death_image.expand_mode         = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		death_image.stretch_mode        = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		death_image.custom_minimum_size = Vector2(0, 300)
-		_dead_container.add_child(death_image)
-
 	_chat_input = LineEdit.new()
 	_chat_input.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_chat_input.offset_left      = 12
@@ -748,7 +737,7 @@ func _update_hands_ui() -> void:
 # ===========================================================================
 
 func show_stats_skills() -> void:
-	var lines: Array[String] = []
+	var lines: Array[String] =[]
 	lines.append("[color=#aaccff][b]--- Stats ---[/b][/color]")
 	for stat_name in stats:
 		var val = stats[stat_name]
@@ -1256,3 +1245,4 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
 		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
+		
