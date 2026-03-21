@@ -1,0 +1,550 @@
+# res://HUD.gd
+extends CanvasLayer
+
+var player: Node = null
+
+const BOX:  int = 48
+const GAP:  int = 4
+const STEP: int = BOX + GAP   
+
+const SLOT_LAYOUT: Array = [
+	["head",      1, 0],
+	["cloak",     2, 0],
+	["armor",     1, 1],["backpack",  2, 1],
+	["clothing",  1, 2],
+	["trousers",  2, 2],["feet",      1, 3],
+	["waist",     0, 3],
+]
+
+const CLOTHING_SCENES: Dictionary = {
+	"IronHelmet":     "res://clothing/ironhelmet.tscn",
+	"IronChestplate": "res://clothing/ironchestplate.tscn",
+	"LeatherBoots":   "res://clothing/leatherboots.tscn",
+	"LeatherTrousers": "res://clothing/leathertrousers.tscn",
+	"Apothshirt": "res://clothing/apothshirt.tscn",
+	"Blackshirt": "res://clothing/blackshirt.tscn",
+	"Undershirt": "res://clothing/undershirt.tscn",
+	"Merchantrobe": "res://clothing/merchantrobe.tscn",
+	"Plate": "res://clothing/plate.tscn",
+	"Satchel": "res://clothing/satchel.tscn",
+	"KingCloak": "res://clothing/king_cloak.tscn",
+	"Pickaxe": "res://objects/pickaxe.tscn",
+	"Sword": "res://objects/sword.tscn"
+}
+
+const CLOTHING_TEXTURES: Dictionary = {
+	"IronHelmet":     "res://clothing/ironhelmet.png",
+	"IronChestplate": "res://clothing/ironchestplate.png",
+	"LeatherBoots":   "res://clothing/leatherboots.png",
+	"LeatherTrousers": "res://clothing/leathertrousers.png",
+	"Apothshirt":     "res://clothing/apothshirt.png",
+	"Blackshirt":     "res://clothing/blackshirt.png",
+	"Undershirt":     "res://clothing/undershirt.png",
+	"Merchantrobe":   "res://clothing/merchantrobe.png",
+	"Plate": "res://clothing/plate.png",
+	"Satchel": "res://clothing/satchel.png",
+	"KingCloak": "res://clothing/king_cloak.png",
+	"Pickaxe": "res://objects/objects.png",
+	"Sword": "res://objects/objects.png"
+}
+
+var _hud_tex:          Texture2D = null
+var _clothing_visible: bool      = false
+var _clothing_panel:   Control   = null
+
+var _slot_boxes: Dictionary = {}
+var _slot_icons: Dictionary = {}
+
+var _hand_highlights: Array =[]
+var _hand_icons:      Array =[]
+
+var _toggle_bg:    ColorRect   = null
+var _toggle_tex:   TextureRect = null
+var _toggle_label: Label       = null
+var _intent_label: Label       = null
+
+# Vertical Bars
+var _health_bar:  ColorRect = null
+var _stamina_bar: ColorRect = null
+
+# Limb targeting
+var targeted_limb: String     = "chest"
+var _limb_highlights: Dictionary = {}  # limb_name -> TextureRect
+
+const LIMB_REGIONS: Dictionary = {
+	"chest": [Vector2(4,  8),  Vector2(57, 35)],
+	"r_arm": [Vector2(12, 25), Vector2(11, 23)],
+	"l_arm": [Vector2(42, 25), Vector2(11, 23)],
+	"r_leg": [Vector2(17, 39), Vector2(14, 25)],
+	"l_leg": [Vector2(34, 39), Vector2(14, 25)],
+	"head":  [Vector2(23, 9),  Vector2(19, 18)],
+}
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+
+func setup(p: Node) -> void:
+	player   = p
+	layer    = 10
+	_hud_tex = load("res://HUDicon.jpg") as Texture2D
+	_build()
+
+func _build() -> void:
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter  = Control.MOUSE_FILTER_IGNORE
+	add_child(root)
+
+	_build_clothing_panel(root)
+	_build_hand_boxes(root)
+	_build_limb_panel(root)
+
+# ── Clothing panel (shifted left: -140 to center in 1000px game area) ────────
+
+func _build_clothing_panel(parent: Control) -> void:
+	var panel_w: int = 3 * STEP
+	var panel_h: int = 4 * STEP
+
+	_clothing_panel = Control.new()
+	_clothing_panel.anchor_left   = 0.5
+	_clothing_panel.anchor_right  = 0.5
+	_clothing_panel.anchor_top    = 1.0
+	_clothing_panel.anchor_bottom = 1.0
+	_clothing_panel.offset_left   = -(50 + 8 + panel_w) - 166
+	_clothing_panel.offset_right  = -(50 + 8) - 166
+	_clothing_panel.offset_bottom = -16
+	_clothing_panel.offset_top    = -16 - panel_h
+	_clothing_panel.mouse_filter  = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(_clothing_panel)
+
+	for slot_data in SLOT_LAYOUT:
+		var slot_name: String = slot_data[0]
+		var col:       int    = slot_data[1]
+		var row:       int    = slot_data[2]
+		_create_slot_box(slot_name, col, row)
+
+	_create_toggle_box(2, 3)
+
+func _create_slot_box(slot_name: String, col: int, row: int) -> void:
+	var ctrl := Control.new()
+	ctrl.position            = Vector2(col * STEP, row * STEP)
+	ctrl.size                = Vector2(BOX, BOX)
+	ctrl.custom_minimum_size = Vector2(BOX, BOX)
+	ctrl.clip_contents       = true
+	ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
+	ctrl.visible             = true if slot_name == "waist" else _clothing_visible
+	_clothing_panel.add_child(ctrl)
+
+	_add_bg(ctrl)
+
+	var label_text := slot_name
+	if slot_name == "clothing": label_text = "clothing\n/torso"
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75, 0.5))
+	lbl.add_theme_font_size_override("font_size", 9)
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	lbl.autowrap_mode        = TextServer.AUTOWRAP_WORD
+	lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+	ctrl.add_child(lbl)
+
+	var icon := Sprite2D.new()
+	icon.position = Vector2(BOX / 2.0, BOX / 2.0)
+	icon.scale    = Vector2(0.75, 0.75)
+	icon.visible  = false
+	ctrl.add_child(icon)
+
+	_slot_boxes[slot_name] = ctrl
+	_slot_icons[slot_name] = icon
+	ctrl.gui_input.connect(func(event: InputEvent): _on_slot_gui_input(event, slot_name))
+
+func _create_toggle_box(col: int, row: int) -> void:
+	var ctrl := Control.new()
+	ctrl.position            = Vector2(col * STEP, row * STEP)
+	ctrl.size                = Vector2(BOX, BOX)
+	ctrl.custom_minimum_size = Vector2(BOX, BOX)
+	ctrl.clip_contents       = true
+	ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
+	_clothing_panel.add_child(ctrl)
+
+	var tex := TextureRect.new()
+	tex.texture      = _hud_tex
+	tex.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_SCALE
+	tex.size         = Vector2(BOX, BOX)
+	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tex.visible      = true
+	ctrl.add_child(tex)
+	_toggle_tex = tex
+
+	var bg := ColorRect.new()
+	bg.color        = Color(0.25, 0.05, 0.05, 0.85)
+	bg.size         = Vector2(BOX, BOX)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.visible      = false
+	ctrl.add_child(bg)
+	_toggle_bg = bg
+
+	var lbl := Label.new()
+	lbl.text = "↑"
+	lbl.add_theme_color_override("font_color", Color(0.15, 0.9, 0.25))
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+	ctrl.add_child(lbl)
+	_toggle_label = lbl
+	ctrl.gui_input.connect(_on_toggle_gui_input)
+
+# ── Hand boxes, Intent & Bars ─────────────────────
+
+func _build_hand_boxes(parent: Control) -> void:
+	var hands_ctrl := Control.new()
+	hands_ctrl.anchor_left   = 0.5
+	hands_ctrl.anchor_right  = 0.5
+	hands_ctrl.anchor_top    = 1.0
+	hands_ctrl.anchor_bottom = 1.0
+	hands_ctrl.offset_left   = -166
+	hands_ctrl.offset_right  = -166
+	hands_ctrl.offset_top    = -(BOX + 16)
+	hands_ctrl.offset_bottom = -16
+	hands_ctrl.mouse_filter  = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(hands_ctrl)
+
+	# --- Hand slots ---
+	for i in range(2):
+		var ctrl := Control.new()
+		ctrl.position            = Vector2(-50 + i * STEP, 0)
+		ctrl.size                = Vector2(BOX, BOX)
+		ctrl.custom_minimum_size = Vector2(BOX, BOX)
+		ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
+		hands_ctrl.add_child(ctrl)
+		_add_bg(ctrl)
+		
+		var highlight := ColorRect.new()
+		highlight.size         = Vector2(BOX, BOX)
+		highlight.color        = Color(0.7, 0.7, 0.7, 0.25) if i == 0 else Color(0, 0, 0, 0)
+		highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ctrl.add_child(highlight)
+		_hand_highlights.append(highlight)
+		
+		var icon := Sprite2D.new()
+		icon.position = Vector2(BOX / 2.0, BOX / 2.0)
+		icon.scale    = Vector2(0.6, 0.6)
+		icon.visible  = false
+		ctrl.add_child(icon)
+		_hand_icons.append(icon)
+		
+		ctrl.gui_input.connect(_on_hand_gui_input.bind(i))
+
+	# --- Intent ---
+	var intent_ctrl := Control.new()
+	intent_ctrl.position            = Vector2(54, 0)
+	intent_ctrl.size                = Vector2(BOX, BOX)
+	hands_ctrl.add_child(intent_ctrl)
+	_add_bg(intent_ctrl)
+	_intent_label = Label.new()
+	_intent_label.text = "COMBAT\nMODE"
+	_intent_label.add_theme_font_size_override("font_size", 9)
+	_intent_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_intent_label.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	intent_ctrl.add_child(_intent_label)
+	intent_ctrl.gui_input.connect(_on_intent_gui_input)
+
+	# --- Crafting ---
+	var craft_ctrl := Control.new()
+	craft_ctrl.position            = Vector2(106, 0)
+	craft_ctrl.size                = Vector2(BOX, BOX)
+	hands_ctrl.add_child(craft_ctrl)
+	_add_bg(craft_ctrl)
+	var craft_lbl := Label.new()
+	craft_lbl.text = "CRAFT"
+	craft_lbl.add_theme_font_size_override("font_size", 11)
+	craft_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	craft_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	craft_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	craft_ctrl.add_child(craft_lbl)
+	craft_ctrl.gui_input.connect(_on_craft_gui_input)
+
+	# --- Stats/Skills ---
+	var stats_ctrl := Control.new()
+	stats_ctrl.position            = Vector2(158, 0)
+	stats_ctrl.size                = Vector2(BOX, BOX)
+	hands_ctrl.add_child(stats_ctrl)
+	_add_bg(stats_ctrl)
+	var stats_lbl := Label.new()
+	stats_lbl.text = "STATS"
+	stats_lbl.add_theme_font_size_override("font_size", 10)
+	stats_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stats_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	stats_ctrl.add_child(stats_lbl)
+	stats_ctrl.gui_input.connect(_on_stats_gui_input)
+
+	# --- Sleep ---
+	var sleep_ctrl := Control.new()
+	sleep_ctrl.position            = Vector2(210, 0)
+	sleep_ctrl.size                = Vector2(BOX, BOX)
+	hands_ctrl.add_child(sleep_ctrl)
+	_add_bg(sleep_ctrl)
+	var sleep_lbl := Label.new()
+	sleep_lbl.text = "SLEEP"
+	sleep_lbl.add_theme_font_size_override("font_size", 10)
+	sleep_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sleep_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sleep_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	sleep_ctrl.add_child(sleep_lbl)
+	sleep_ctrl.gui_input.connect(_on_sleep_gui_input)
+
+	# --- Vertical Bars ---
+	var bar_container := HBoxContainer.new()
+	bar_container.position = Vector2(264, -32)
+	bar_container.add_theme_constant_override("separation", 6)
+	hands_ctrl.add_child(bar_container)
+	
+	# Health Bar
+	var hb_cont := Control.new()
+	hb_cont.custom_minimum_size = Vector2(10, 80)
+	bar_container.add_child(hb_cont)
+	var hb_bg := ColorRect.new()
+	hb_bg.color = Color(0.2, 0.2, 0.2)
+	hb_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hb_cont.add_child(hb_bg)
+	_health_bar = ColorRect.new()
+	_health_bar.color = Color(0.8, 0.1, 0.1)
+	_health_bar.size = Vector2(10, 80)
+	hb_cont.add_child(_health_bar)
+	
+	# Stamina Bar
+	var sb_cont := Control.new()
+	sb_cont.custom_minimum_size = Vector2(10, 80)
+	bar_container.add_child(sb_cont)
+	var sb_bg := ColorRect.new()
+	sb_bg.color = Color(0.2, 0.2, 0.2)
+	sb_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sb_cont.add_child(sb_bg)
+	_stamina_bar = ColorRect.new()
+	_stamina_bar.color = Color(0.1, 0.8, 0.1)
+	_stamina_bar.size = Vector2(10, 80)
+	sb_cont.add_child(_stamina_bar)
+
+# ── Limb targeting panel ──────────────────────────────────────────────────────
+
+func _build_limb_panel(parent: Control) -> void:
+	# Positioned to the left of the hand row.
+	# Hand row left edge is at anchor_center - 166 + (-50) = center - 216.
+	# We sit 8px further left, panel is 64x64.
+	var panel := Control.new()
+	panel.anchor_left   = 0.5
+	panel.anchor_right  = 0.5
+	panel.anchor_top    = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_right  = -388          # 8px gap left of clothing panel (clothing panel left = center-380)
+	panel.offset_left   = -388 - 64     # 64px wide
+	panel.offset_bottom = -16
+	panel.offset_top    = -16 - 64      # 64px tall
+	panel.mouse_filter  = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(panel)
+
+	# Base gargoyle — always visible
+	var base_tex := load("res://ui/m-zone_sel.png") as Texture2D
+	if base_tex != null:
+		var base := TextureRect.new()
+		base.texture      = base_tex
+		base.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		base.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+		base.size         = Vector2(64, 64)
+		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(base)
+
+	# Highlight overlays — one per limb, blue modulate, only selected is visible
+	var limb_tex_names := {
+		"head":  "res://ui/m-head.png",
+		"chest": "res://ui/m-chest.png",
+		"r_arm": "res://ui/m-r_arm.png",
+		"l_arm": "res://ui/m-l_arm.png",
+		"r_leg": "res://ui/m-r_leg.png",
+		"l_leg": "res://ui/m-l_leg.png",
+	}
+	for limb_name in limb_tex_names:
+		var hl_tex := load(limb_tex_names[limb_name]) as Texture2D
+		if hl_tex == null:
+			continue
+		var hl := TextureRect.new()
+		hl.texture      = hl_tex
+		hl.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hl.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+		hl.size         = Vector2(64, 64)
+		hl.modulate     = Color(1.0, 0.2, 0.2)
+		hl.visible      = (limb_name == targeted_limb)
+		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(hl)
+		_limb_highlights[limb_name] = hl
+
+	# Invisible click regions — each covers the limb's pixel bounding box
+	for limb_name in LIMB_REGIONS:
+		var region: Array = LIMB_REGIONS[limb_name]
+		var click := Control.new()
+		click.position   = region[0]
+		click.size       = region[1]
+		click.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.add_child(click)
+		click.gui_input.connect(func(event: InputEvent): _on_limb_gui_input(event, limb_name))
+
+	# Apply default selection
+	_select_limb(targeted_limb)
+
+func _select_limb(limb_name: String) -> void:
+	targeted_limb = limb_name
+	for limb_key in _limb_highlights:
+		_limb_highlights[limb_key].visible = (limb_key == limb_name)
+
+func _on_limb_gui_input(event: InputEvent, limb_name: String) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_select_limb(limb_name)
+
+# ── Stats Update ─────────────────────────────────────────────────────────────
+
+func update_stats(health: int, stamina: float) -> void:
+	if _health_bar:
+		var h = (clamp(health, 0, 100) / 100.0) * 80.0
+		_health_bar.size.y = h
+		_health_bar.position.y = 80 - h
+	if _stamina_bar:
+		var s = (clamp(stamina, 0, 100) / 100.0) * 80.0
+		_stamina_bar.size.y = s
+		_stamina_bar.position.y = 80 - s
+
+# ── Helper ──────────────────────────────────────────────────────────────────
+
+func _add_bg(ctrl: Control) -> void:
+	if _hud_tex != null:
+		var tex := TextureRect.new()
+		tex.texture      = _hud_tex
+		tex.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_SCALE
+		tex.size         = Vector2(BOX, BOX)
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ctrl.add_child(tex)
+	else:
+		var bg := ColorRect.new()
+		bg.color        = Color(0.15, 0.15, 0.15, 0.75)
+		bg.size         = Vector2(BOX, BOX)
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ctrl.add_child(bg)
+
+# ── Public update API ─────────────────────────────────────────────────────────
+
+func update_combat_display(is_combat: bool) -> void:
+	if _intent_label == null: return
+	if is_combat: _intent_label.add_theme_color_override("font_color", Color(0.9, 0.15, 0.15))
+	else:         _intent_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.3))
+
+func update_hands_display(hands: Array, active_hand: int) -> void:
+	for i in range(min(2, _hand_icons.size())):
+		_hand_highlights[i].color = Color(0.7, 0.7, 0.7, 0.25) if i == active_hand else Color(0, 0, 0, 0)
+		var icon: Sprite2D = _hand_icons[i]
+		if hands[i] != null:
+			var obj_sprite: Sprite2D = hands[i].get_node_or_null("Sprite2D")
+			if obj_sprite != null:
+				icon.texture        = obj_sprite.texture
+				icon.region_enabled = obj_sprite.region_enabled
+				icon.region_rect    = obj_sprite.region_rect
+				icon.visible        = true
+			else: icon.visible = false
+		else: icon.visible = false
+
+func update_clothing_display(equipped: Dictionary) -> void:
+	for slot_name in _slot_icons.keys():
+		var icon: Sprite2D = _slot_icons[slot_name]
+		var item_name      = equipped.get(slot_name, null)
+		if item_name != null and CLOTHING_TEXTURES.has(item_name):
+			var tex := load(CLOTHING_TEXTURES[item_name]) as Texture2D
+			if tex != null:
+				icon.texture        = tex
+				icon.region_enabled = true
+				
+				var region_set = false
+				if CLOTHING_SCENES.has(item_name):
+					var scene = load(CLOTHING_SCENES[item_name]) as PackedScene
+					if scene != null:
+						var state = scene.get_state()
+						for i in range(state.get_node_count()):
+							if state.get_node_name(i) == "Sprite2D":
+								for j in range(state.get_node_property_count(i)):
+									if state.get_node_property_name(i, j) == "region_rect":
+										icon.region_rect = state.get_node_property_value(i, j)
+										region_set = true
+										break
+								if region_set:
+									break
+				
+				if not region_set:
+					icon.region_rect = Rect2(0, 0, 32, 32)
+					
+				icon.scale          = Vector2(1.0, 1.0)
+				icon.visible        = true
+				continue
+		icon.visible = false
+
+# ── Input handlers ────────────────────────────────────────────────────────────
+
+func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT): return
+	if player == null: return
+	
+	var clicked_item: Node = player.hands[hand_idx]
+	if clicked_item == null: return
+	
+	# Forward the click to the item's standard interaction pipeline
+	if clicked_item.has_method("_input_event"):
+		clicked_item._input_event(get_viewport(), event, 0)
+
+func _on_intent_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+	if player != null and player.has_method("toggle_combat_mode"): player.toggle_combat_mode()
+
+func _on_craft_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+	if player != null and player.has_method("toggle_crafting_menu"): player.toggle_crafting_menu()
+
+func _on_stats_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+	if player != null and player.has_method("show_stats_skills"): player.show_stats_skills()
+
+func _on_sleep_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+	if player != null and player.has_method("toggle_sleep"): player.toggle_sleep()
+
+func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+	if player == null: return
+	var held: Node         = player.hands[player.active_hand]
+	var currently_equipped = player.equipped.get(slot_name, null)
+	if held != null:
+		var item_slot = held.get("slot")
+		if item_slot == slot_name and currently_equipped == null: player._equip_clothing_to_slot(held, slot_name)
+	elif held == null and currently_equipped != null: player._unequip_clothing_from_slot(slot_name)
+
+func _on_toggle_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+	_clothing_visible = not _clothing_visible
+	for slot_name in _slot_boxes.keys():
+		if slot_name != "waist":
+			_slot_boxes[slot_name].visible = _clothing_visible
+	if _clothing_visible:
+		if _toggle_bg    != null: _toggle_bg.visible    = true
+		if _toggle_tex   != null: _toggle_tex.visible   = false
+		if _toggle_label != null:
+			_toggle_label.text = "X"
+			_toggle_label.add_theme_color_override("font_color", Color(0.9, 0.15, 0.15))
+	else:
+		if _toggle_bg    != null: _toggle_bg.visible    = false
+		if _toggle_tex   != null: _toggle_tex.visible   = true
+		if _toggle_label != null:
+			_toggle_label.text = "↑"
+			_toggle_label.add_theme_color_override("font_color", Color(0.15, 0.9, 0.25))
+			

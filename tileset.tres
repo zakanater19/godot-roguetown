@@ -1,0 +1,40 @@
+[gd_resource type="TileSet" load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://tiles.png" id="1_ej02t"]
+[ext_resource type="Texture2D" path="res://animated/water_sheet.png" id="2_14fb3"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_p0366"]
+resource_name = "Floor Tiles"
+texture = ExtResource("1_ej02t")
+texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+4:0/0 = 0
+5:0/0 = 0
+8:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_hobn4"]
+resource_name = "Solid Tiles"
+texture = ExtResource("1_ej02t")
+texture_region_size = Vector2i(64, 64)
+3:0/0 = 0
+6:0/0 = 0
+7:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_mjrc7"]
+resource_name = "Water"
+texture = ExtResource("2_14fb3")
+texture_region_size = Vector2i(64, 64)
+0:0/animation_columns = 3
+0:0/animation_speed = 4.0
+0:0/animation_frame_0/duration = 1.0
+0:0/animation_frame_1/duration = 1.0
+0:0/animation_frame_2/duration = 1.0
+0:0/0 = 0
+
+[resource]
+tile_size = Vector2i(64, 64)
+sources/0 = SubResource("TileSetAtlasSource_p0366")
+sources/1 = SubResource("TileSetAtlasSource_hobn4")
+sources/5 = SubResource("TileSetAtlasSource_mjrc7")
