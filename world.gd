@@ -286,7 +286,9 @@ func deal_damage_at_tile(tile: Vector2i, amount: int, attacker_id: int = 0, is_s
 		elif roll.blocked:
 			if entity.is_in_group("player"):
 				if entity.has_method("rpc_consume_stamina"):
-					entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), 3.0)
+					var tgt_peer = entity.get_multiplayer_authority()
+					if tgt_peer == 1 or tgt_peer in multiplayer.get_peers():
+						entity.rpc_consume_stamina.rpc_id(tgt_peer, 3.0)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):
 					entity.tile_pos = roll.dodge_tile
 					rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
@@ -738,7 +740,9 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 				entity.receive_damage.rpc(roll.damage)
 			elif roll.blocked:
 				if entity.has_method("rpc_consume_stamina"):
-					entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), 3.0)
+					var tgt_peer = entity.get_multiplayer_authority()
+					if tgt_peer == 1 or tgt_peer in multiplayer.get_peers():
+						entity.rpc_consume_stamina.rpc_id(tgt_peer, 3.0)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):
 					entity.tile_pos = roll.dodge_tile
 					rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
@@ -1406,7 +1410,7 @@ func rpc_notify_loot_warning(target_peer_id: int, looter_peer_id: int, item_desc
 		
 	if target_peer_id == 1:
 		rpc_deliver_loot_warning(looter_peer_id, item_desc)
-	else:
+	elif target_peer_id in multiplayer.get_peers():
 		rpc_deliver_loot_warning.rpc_id(target_peer_id, looter_peer_id, item_desc)
 
 @rpc("authority", "call_remote", "reliable")

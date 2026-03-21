@@ -162,7 +162,9 @@ func _attack_player(player: Node) -> void:
 			player.receive_damage.rpc(roll.damage)
 	elif roll.blocked:
 		if player.has_method("rpc_consume_stamina"):
-			player.rpc_consume_stamina.rpc_id(player.get_multiplayer_authority(), 3.0)
+			var tgt_peer = player.get_multiplayer_authority()
+			if tgt_peer == 1 or tgt_peer in multiplayer.get_peers():
+				player.rpc_consume_stamina.rpc_id(tgt_peer, 3.0)
 		if roll.block_type == "dodged" and roll.has("dodge_tile"):
 			player.tile_pos = roll.dodge_tile
 			World.rpc_confirm_move.rpc(player.get_multiplayer_authority(), roll.dodge_tile, false)

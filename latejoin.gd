@@ -334,7 +334,6 @@ func _handle_reconnection(peer_id: int) -> bool:
 	
 	var disconnected_data = _disconnected_players[best_peer_id]
 	var player_node_path = disconnected_data["node_path"]
-	var player_state = disconnected_data["state"]
 	
 	var player_node = get_node_or_null(player_node_path)
 	if player_node == null or not is_instance_valid(player_node):
@@ -351,7 +350,7 @@ func _handle_reconnection(peer_id: int) -> bool:
 			ghost_player.queue_free()
 	
 	Host.peers[peer_id] = player_node
-	var success = _perform_reconnection(peer_id, best_peer_id, player_node, player_state)
+	var success = _perform_reconnection(peer_id, best_peer_id, player_node, {}) # Replaced usage of snapshot state
 	
 	if success:
 		_disconnected_players.erase(best_peer_id)
@@ -375,8 +374,12 @@ func _find_best_reconnection_candidate() -> int:
 	
 	return best_peer_id
 
-func _perform_reconnection(new_peer_id: int, _old_peer_id: int, player_node: Node, player_state: Dictionary) -> bool:
-	_restore_player_state(player_node, player_state)
+func _perform_reconnection(new_peer_id: int, _old_peer_id: int, player_node: Node, _player_state: Dictionary) -> bool:
+	# Capture the player's live current state, since their body remained in the world
+	# and may have been shoved, attacked, or looted while disconnected.
+	var current_state = _capture_player_state(player_node)
+	
+	_restore_player_state(player_node, current_state)
 	_reassign_player_node(player_node, new_peer_id)
 	
 	if multiplayer.is_server():
@@ -399,7 +402,7 @@ func _perform_reconnection(new_peer_id: int, _old_peer_id: int, player_node: Nod
 	if has_node("/root/Lobby"):
 		get_node("/root/Lobby").rpc_hide_lobby.rpc_id(new_peer_id)
 		
-	receive_reconnect_state.rpc_id(new_peer_id, player_node.get_path(), player_state)
+	receive_reconnect_state.rpc_id(new_peer_id, player_node.get_path(), current_state)
 	
 	return true
 
@@ -764,3 +767,4 @@ func client_reconnection_confirmed() -> void:
 		var main = get_node("/root/Main")
 		if main.has_method("_on_client_reconnected"):
 			main._on_client_reconnected()
+			
