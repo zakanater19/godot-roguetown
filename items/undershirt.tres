@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_undsh1"]
+
+[resource]
+script = ExtResource("1_undsh1")
+item_type = "Undershirt"
+scene_path = "res://clothing/undershirt.tscn"
+sprite_col = -1
+description = "a short undershirt"
+slot = "clothing"
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true

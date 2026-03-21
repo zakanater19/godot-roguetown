@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_ichst1"]
+
+[resource]
+script = ExtResource("1_ichst1")
+item_type = "IronChestplate"
+scene_path = "res://clothing/ironchestplate.tscn"
+sprite_col = -1
+description = "an iron chestplate, heavy torso armour"
+slot = "armor"
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true

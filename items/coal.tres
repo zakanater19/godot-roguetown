@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_coal01"]
+
+[resource]
+script = ExtResource("1_coal01")
+item_type = "Coal"
+scene_path = "res://objects/coal.tscn"
+sprite_col = 4
+description = "a lump of coal, black and brittle"
+slot = ""
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true
+has_inventory = false
+inventory_slots = 0
+is_fuel = true
+is_smeltable_ore = false

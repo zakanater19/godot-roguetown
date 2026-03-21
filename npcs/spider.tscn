@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=4 uid="uid://cspider001sc"][ext_resource type="Script" path="res://npcs/spider.gd" id="1_spidergd"][ext_resource type="Texture2D" path="res://npcs/spider.png" id="2_spiderpng"][sub_resource type="RectangleShape2D" id="RectangleShape2D_spider"]
+size = Vector2(64, 64)[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_spider"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:tile_pos")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:facing")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:dead")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:health")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+
+[node name="Spider" type="Area2D"]
+z_index = 6
+script = ExtResource("1_spidergd")[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_spiderpng")
+region_enabled = true
+region_rect = Rect2(0, 0, 64, 64)[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_spider")
+
+[node name="StateSync" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_spider")

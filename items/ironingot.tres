@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_iing01"]
+
+[resource]
+script = ExtResource("1_iing01")
+item_type = "IronIngot"
+scene_path = "res://objects/ironingot.tscn"
+sprite_col = 6
+description = "an iron ingot, smelted and solid"
+slot = ""
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true

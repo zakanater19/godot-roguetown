@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_ihelm1"]
+
+[resource]
+script = ExtResource("1_ihelm1")
+item_type = "IronHelmet"
+scene_path = "res://clothing/ironhelmet.tscn"
+sprite_col = -1
+description = "an iron helmet, sturdy head protection"
+slot = "head"
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true

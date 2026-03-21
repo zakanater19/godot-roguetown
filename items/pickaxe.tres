@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_pick01"]
+
+[resource]
+script = ExtResource("1_pick01")
+item_type = "Pickaxe"
+scene_path = "res://objects/pickaxe.tscn"
+sprite_col = 0
+description = "a pickaxe, used for mining"
+slot = "waist"
+base_damage = 25
+use_delay = 0.6
+weaponizable = false
+too_large_for_satchel = true
+pickable = true

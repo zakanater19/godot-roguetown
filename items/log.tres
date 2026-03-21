@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_log001"]
+
+[resource]
+script = ExtResource("1_log001")
+item_type = "Log"
+scene_path = "res://objects/log.tscn"
+sprite_col = 9
+description = "a wooden log, raw and heavy"
+slot = ""
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true
+has_inventory = false
+inventory_slots = 0
+is_fuel = true
+is_smeltable_ore = false
