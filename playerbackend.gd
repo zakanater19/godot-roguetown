@@ -1,4 +1,3 @@
-
 # res://playerbackend.gd
 extends RefCounted
 
@@ -60,7 +59,35 @@ func get_detailed_description() -> String:
 		if item != null and item is String and item != "":
 			desc += "\n[color=gray]" + slot + ":[/color] " + item
 
+	if is_me and player.body != null:
+		var limb_display: Array = [
+			["head",  "head"],
+			["chest", "chest"],
+			["r_arm", "right arm"],
+			["l_arm", "left arm"],
+			["r_leg", "right leg"],
+			["l_leg", "left leg"],
+		]
+		for entry in limb_display:
+			var limb_key: String    = entry[0]
+			var limb_label: String  = entry[1]
+			var damage_taken: int   = 70 - player.body.limb_hp[limb_key]
+			if damage_taken > 0:
+				desc += "\n[color=gray]" + limb_label + ":[/color] " + _get_limb_status(damage_taken)
+
 	return desc
+
+func _get_limb_status(damage_taken: int) -> String:
+	if damage_taken >= 70:
+		return "[color=#cc0000]broken[/color]"
+	elif damage_taken >= 60:
+		return "[color=#ff2200]mangled[/color]"
+	elif damage_taken >= 40:
+		return "[color=#ff6600]severely injured[/color]"
+	elif damage_taken >= 20:
+		return "[color=#ffaa00]injured[/color]"
+	else:
+		return "[color=#ffdd44]a little injured[/color]"
 
 func get_inspect_color() -> Color:
 	if player.dead:
@@ -620,5 +647,3 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				World.rpc_damage_wall(target_tile)
 			else:
 				World.rpc_damage_wall.rpc_id(1, target_tile)
-
-
