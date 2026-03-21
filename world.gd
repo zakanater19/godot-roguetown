@@ -737,7 +737,7 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 		if entity.is_in_group("player"):
 			target_name = entity.character_name
 			if roll.damage > 0:
-				entity.receive_damage.rpc(roll.damage)
+				entity.receive_damage.rpc(roll.damage, targeted_limb)
 			elif roll.blocked:
 				if entity.has_method("rpc_consume_stamina"):
 					var tgt_peer = entity.get_multiplayer_authority()
@@ -1790,4 +1790,3 @@ func rpc_confirm_satchel_extract(
 	# Refresh the satchel UI if it is open on this client
 	if satchel.has_method("_refresh_ui"):
 		satchel._refresh_ui()
-		

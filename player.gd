@@ -1,4 +1,3 @@
-
 # res://player.gd
 extends Node2D
 
@@ -38,6 +37,7 @@ var backend = null
 var misc = null
 var combat = null
 var crafting = null
+var body = null
 
 # --- SLEEP MECHANICS ---
 enum SleepState { AWAKE, FALLING_ASLEEP, ASLEEP, WAKING_UP }
@@ -268,9 +268,17 @@ func _drop_held_object() -> void:
 	if backend: backend.drop_held_object()
 
 func _throw_held_object(mouse_world_pos: Vector2) -> void:
+	if body != null and body.is_arm_broken(active_hand):
+		if _is_local_authority():
+			Sidebar.add_message("[color=#ffaaaa]Your arm is broken and cannot throw![/color]")
+		return
 	if backend: backend.throw_held_object(mouse_world_pos)
 
 func _use_held_object(mouse_world_pos: Vector2) -> void:
+	if body != null and body.is_arm_broken(active_hand):
+		if _is_local_authority():
+			Sidebar.add_message("[color=#ffaaaa]Your arm is broken and cannot be used![/color]")
+		return
 	if backend: backend.use_held_object(mouse_world_pos)
 
 func toggle_crafting_menu() -> void:
@@ -292,7 +300,8 @@ func _get_weapon_damage(item: Node) -> int:
 	return combat.get_weapon_damage(item) if combat else 5
 
 @rpc("any_peer", "call_local", "reliable")
-func receive_damage(amount: int) -> void:
+func receive_damage(amount: int, limb: String = "chest") -> void:
+	if body: body.receive_limb_damage(limb, amount)
 	if combat: combat.receive_damage(amount)
 
 func _die() -> void:
@@ -430,6 +439,11 @@ func _create_stand_up_label() -> Label:
 	return lbl
 
 func _complete_stand_up() -> void:
+	if body != null and body.are_legs_broken():
+		_cancel_stand_up()
+		if _is_local_authority():
+			Sidebar.add_message("[color=#ffaaaa]Your broken legs won't let you stand.[/color]")
+		return
 	_cancel_stand_up()
 	is_lying_down = false
 	_update_sprite()
@@ -470,6 +484,7 @@ func _ready() -> void:
 	misc = preload("res://playermisc.gd").new(self)
 	combat = preload("res://playercombat.gd").new(self)
 	crafting = preload("res://playercrafting.gd").new(self)
+	body = preload("res://body.gd").new(self)
 	
 	add_to_group("player")
 	z_index = 6
@@ -1203,7 +1218,7 @@ func _try_move(dir: Vector2i) -> void:
 		_update_sprite()
 
 	_awaiting_move_confirm = true
-	var sprint_intent = Input.is_key_pressed(KEY_SPACE) and not exhausted
+	var sprint_intent = Input.is_key_pressed(KEY_SPACE) and not exhausted and not (body != null and body.are_legs_broken())
 
 	if multiplayer.is_server():
 		World.rpc_try_move(dir, sprint_intent)
@@ -1295,6 +1310,3 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
 		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
-		
-
-
