@@ -38,6 +38,12 @@ const WOODEN_WALL_HITS_TO_BREAK: int = 5  # wooden wall (source 1, atlas col 7)
 
 var server_action_cooldowns: Dictionary = {}
 
+# --- LAWS ---
+var current_laws: Array =[
+	"1. You may not injure a king or, through inaction, allow a king to come to harm.",
+	"2. You must obey orders given to you by a king, except where such orders would conflict with the First Law.",
+]
+
 # ---------------------------------------------------------------------------
 # Grab System State
 # ---------------------------------------------------------------------------
@@ -76,10 +82,6 @@ func _on_peer_disconnected(id: int) -> void:
 	# Drop grab if the disconnecting player was grabbing someone
 	if _grab_map.has(id):
 		_release_grab_for_peer(id, true)
-
-	# Removed logic: Dropping grab if the disconnecting player was being grabbed.
-	# This ensures the grab persists in _grab_map so the grabber remains connected 
-	# to the rejoining target player.
 
 # ---------------------------------------------------------------------------
 # Server Validation Helpers
@@ -575,6 +577,30 @@ func _find_player_by_peer(peer_id: int) -> Node:
 		if p.get_multiplayer_authority() == peer_id:
 			return p
 	return null
+
+# ---------------------------------------------------------------------------
+# Laws
+# ---------------------------------------------------------------------------
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_update_laws(new_laws: Array) -> void:
+	if not multiplayer.is_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
+
+	var player = _find_player_by_peer(peer_id)
+	if player == null or player.character_class != "king":
+		return # Only the king can edit laws
+
+	rpc_update_laws.rpc(new_laws)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_update_laws(new_laws: Array) -> void:
+	current_laws = new_laws
+	if Sidebar.has_method("refresh_laws_ui"):
+		Sidebar.refresh_laws_ui()
 
 # ---------------------------------------------------------------------------
 # Movement

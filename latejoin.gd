@@ -107,6 +107,9 @@ func _send_world_state_to_peer(peer_id: int) -> void:
 	
 	if not player_states.is_empty():
 		rpc_id(peer_id, "receive_player_states", player_states)
+		
+	# Send Laws
+	rpc_id(peer_id, "receive_laws", World.current_laws)
 
 func _sync_objects_for_late_joiner(peer_id: int) -> void:
 	var main_node = get_tree().root.get_node_or_null("Main")
@@ -769,6 +772,12 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			
 		if obj.has_method("_set_sprite") and obj_data.has("is_on"):
 			obj._set_sprite(obj_data["is_on"])
+
+@rpc("authority", "call_remote", "reliable")
+func receive_laws(laws: Array) -> void:
+	World.current_laws = laws
+	if Sidebar.has_method("refresh_laws_ui"):
+		Sidebar.refresh_laws_ui()
 
 @rpc("authority", "call_remote", "reliable")
 func reconnection_confirmed(player_path: NodePath) -> void:
