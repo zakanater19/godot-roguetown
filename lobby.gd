@@ -86,6 +86,7 @@ func _build_ui() -> void:
 	_class_option.add_item("merchant")
 	_class_option.add_item("bandit")
 	_class_option.add_item("adventurer")
+	_class_option.add_item("king")
 	_class_option.add_item("debug")
 	_class_option.add_theme_font_size_override("font_size", 24)
 	_class_option.custom_minimum_size = Vector2(250, 60)
@@ -146,6 +147,7 @@ func _build_ui() -> void:
 	_lj_class_option.add_item("merchant")
 	_lj_class_option.add_item("bandit")
 	_lj_class_option.add_item("adventurer")
+	_lj_class_option.add_item("king")
 	_lj_class_option.add_item("debug")
 	_lj_class_option.add_theme_font_size_override("font_size", 20)
 	lj_vbox.add_child(_lj_class_option)
@@ -233,6 +235,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_chat_input.visible = true
 			_chat_input.grab_focus()
 			get_viewport().set_input_as_handled()
+			return
 
 func _on_chat_submitted(text: String) -> void:
 	_chat_input.visible = false
@@ -516,3 +519,4 @@ func _on_peer_connected(id: int) -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
 		ready_players.erase(id)
+		

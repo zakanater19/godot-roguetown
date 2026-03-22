@@ -1,4 +1,3 @@
-
 # res://HUD.gd
 extends CanvasLayer
 
@@ -29,6 +28,7 @@ const CLOTHING_SCENES: Dictionary = {
 	"Plate": "res://clothing/plate.tscn",
 	"Satchel": "res://clothing/satchel.tscn",
 	"KingCloak": "res://clothing/king_cloak.tscn",
+	"Crown": "res://clothing/crown.tscn",
 	"Pickaxe": "res://objects/pickaxe.tscn",
 	"Sword": "res://objects/sword.tscn"
 }
@@ -45,6 +45,7 @@ const CLOTHING_TEXTURES: Dictionary = {
 	"Plate": "res://clothing/plate.png",
 	"Satchel": "res://clothing/satchel.png",
 	"KingCloak": "res://clothing/king_cloak.png",
+	"Crown": "res://clothing/crownonmob.png",
 	"Pickaxe": "res://objects/objects.png",
 	"Sword": "res://objects/objects.png"
 }
@@ -755,4 +756,4 @@ func _on_toggle_gui_input(event: InputEvent) -> void:
 		if _toggle_label != null:
 			_toggle_label.text = "↑"
 			_toggle_label.add_theme_color_override("font_color", Color(0.15, 0.9, 0.25))
-
+			

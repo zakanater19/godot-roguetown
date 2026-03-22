@@ -26,9 +26,11 @@ const CLOTHING_TEXTURES: Dictionary = {
 	"Plate":          "res://clothing/plate.png",
 	"Satchel":        "res://clothing/satchelonmob.png",
 	"KingCloak":      "res://clothing/king_cloak_onmob.png",
+	"Crown":          "res://clothing/crownonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png"
 }
+
 
 var backend = null
 var misc = null

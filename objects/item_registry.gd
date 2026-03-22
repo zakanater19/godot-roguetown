@@ -32,6 +32,7 @@ const ALL_ITEMS: Array = [
 	preload("res://items/plate.tres"),
 	preload("res://items/satchel.tres"),
 	preload("res://items/king_cloak.tres"),
+	preload("res://items/crown.tres"),
 ]
 
 # Returns the ItemData resource for a given item_type string, or null if not found.

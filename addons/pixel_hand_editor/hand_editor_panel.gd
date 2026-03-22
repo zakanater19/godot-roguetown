@@ -29,6 +29,7 @@ const CLOTHING_ITEMS: Dictionary = {
 	"Plate": "res://clothing/plate.png",
 	"Satchel": "res://clothing/satchelonmob.png",
 	"KingCloak": "res://clothing/king_cloak_onmob.png",
+	"Crown": "res://clothing/crownonmob.png",
 }
 
 const DEFAULT_RIGHT: Dictionary = {

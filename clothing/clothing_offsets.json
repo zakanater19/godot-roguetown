@@ -59,6 +59,36 @@
 			"scale": 1.2
 		}
 	},
+	"Crown": {
+		"east": {
+			"offset": [
+				-1.0,
+				-32.0
+			],
+			"scale": 0.4
+		},
+		"north": {
+			"offset": [
+				-2.0,
+				-30.0
+			],
+			"scale": 0.4
+		},
+		"south": {
+			"offset": [
+				-2.0,
+				-33.0
+			],
+			"scale": 0.4
+		},
+		"west": {
+			"offset": [
+				1.0,
+				-32.0
+			],
+			"scale": 0.4
+		}
+	},
 	"IronChestplate": {
 		"east": {
 			"offset": [
