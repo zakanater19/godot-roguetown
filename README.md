@@ -21,7 +21,7 @@ R - throw
 
 hold left shift + left click - inspect
 
-C - combat mode toggle
+C - combat mode toggle - Right mouse shoves other players with empty hand in combat mode
 
 hold SPACEBAR to run
 
