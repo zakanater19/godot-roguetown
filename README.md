@@ -10,11 +10,19 @@ the project will come with the .godot folder inside the project root, that's jus
 
 Keybinds;
 Q - drop item
+
 Z - resist
+
 X - swap hands
+
 V - lay down / stand up
+
 R - throw
+
 hold left shift + left click - inspect
+
 C - combat mode toggle
+
 hold SPACEBAR to run
+
 rest are UI buttons
