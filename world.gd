@@ -200,7 +200,7 @@ func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is
 		for h in defender.hands:
 			if h != null:
 				var i_type = h.get("item_type")
-				if (i_type != null and i_type == "Sword") or ("Sword" in h.name) or ("sword" in h.name.to_lower()):
+				if (i_type != null and (i_type == "Sword" or i_type == "Dirk")) or ("Sword" in h.name) or ("sword" in h.name.to_lower()) or ("Dirk" in h.name) or ("dirk" in h.name.to_lower()):
 					d_has_sword = true
 					break
 
@@ -797,7 +797,7 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 	var is_sword_attack: bool = false
 	if held_item != null:
 		var i_type = held_item.get("item_type")
-		is_sword_attack = (i_type == "Sword") or ("Sword" in held_item.name) or ("sword" in held_item.name.to_lower())
+		is_sword_attack = (i_type == "Sword") or ("Sword" in held_item.name) or ("sword" in held_item.name.to_lower()) or (i_type == "Dirk") or ("Dirk" in held_item.name) or ("dirk" in held_item.name.to_lower())
 
 	var source_tile: Vector2i = attacker.tile_pos
 	
@@ -850,7 +850,7 @@ func rpc_damage_wall(pos: Vector2i) -> void:
 	if attacker.hands[attacker.active_hand] != null:
 		var h = attacker.hands[attacker.active_hand]
 		var i_type = h.get("item_type")
-		if (i_type == "Sword") or ("Sword" in h.name) or ("sword" in h.name.to_lower()):
+		if (i_type == "Sword") or ("Sword" in h.name) or ("sword" in h.name.to_lower()) or (i_type == "Dirk") or ("Dirk" in h.name) or ("dirk" in h.name.to_lower()):
 			holding_sword = true
 		elif (i_type == "Pickaxe") or ("Pickaxe" in h.name) or ("pickaxe" in h.name.to_lower()):
 			holding_pickaxe = true
@@ -1088,7 +1088,7 @@ func rpc_request_hit_door(door_path: NodePath) -> void:
 			rpc_confirm_toggle_door.rpc(door_path)
 	else:
 		var i_type = held_item.get("item_type")
-		var is_sword = (i_type == "Sword") or ("Sword" in held_item.name) or ("sword" in held_item.name.to_lower())
+		var is_sword = (i_type == "Sword") or ("Sword" in held_item.name) or ("sword" in held_item.name.to_lower()) or (i_type == "Dirk") or ("Dirk" in held_item.name) or ("dirk" in held_item.name.to_lower())
 		var is_pickaxe = (i_type == "Pickaxe") or ("Pickaxe" in held_item.name) or ("pickaxe" in held_item.name.to_lower())
 		
 		if is_sword or (is_pickaxe and player.combat_mode):

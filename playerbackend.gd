@@ -61,10 +61,8 @@ func get_detailed_description() -> String:
 
 	if is_me and player.body != null:
 		var limb_display: Array = [
-			["head",  "head"],
-			["chest", "chest"],
-			["r_arm", "right arm"],
-			["l_arm", "left arm"],
+			["head",  "head"],["chest", "chest"],
+			["r_arm", "right arm"],["l_arm", "left arm"],
 			["r_leg", "right leg"],
 			["l_leg", "left leg"],
 		]
@@ -494,11 +492,11 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var is_pickaxe:  bool = false
 	var is_sword:    bool = false
 	var is_clothing: bool = false
-	
+
 	if held_item != null:
 		var i_type = held_item.get("item_type")
 		is_pickaxe = (i_type == "Pickaxe" or "Pickaxe" in held_item.name or "pickaxe" in held_item.name.to_lower())
-		is_sword = (i_type == "Sword" or "Sword" in held_item.name or "sword" in held_item.name.to_lower())
+		is_sword = (i_type == "Sword" or "Sword" in held_item.name or "sword" in held_item.name.to_lower()) or (i_type == "Dirk" or "Dirk" in held_item.name or "dirk" in held_item.name.to_lower())
 		is_clothing = held_item.get("slot") != null
 
 	var can_attack: bool = false
@@ -647,3 +645,4 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				World.rpc_damage_wall(target_tile)
 			else:
 				World.rpc_damage_wall.rpc_id(1, target_tile)
+				
