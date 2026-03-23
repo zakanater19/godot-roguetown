@@ -15,6 +15,7 @@ const HOLDABLE_ITEMS: Dictionary = {
 	"Coal":      {"col": 4, "game_scale": 0.45},
 	"IronOre":   {"col": 5, "game_scale": 0.45},
 	"IronIngot": {"col": 6, "game_scale": 0.75},
+	"Dirk":      {"col": -1, "game_scale": 0.75, "custom_tex": "res://objects/dirk.png"},
 }
 
 const CLOTHING_ITEMS: Dictionary = {
@@ -34,10 +35,10 @@ const CLOTHING_ITEMS: Dictionary = {
 
 const DEFAULT_RIGHT: Dictionary = {
 	"Pickaxe":   {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-	"Pebble":    {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west": [-16.0,  8.0]},
-	"Sword":     {"south":[20.0, -2.0], "north":[20.0, -20.0], "east": [16.0, -2.0], "west":[-16.0, -2.0]},
-	"Coal":      {"south":[20.0,  8.0], "north": [20.0, -10.0], "east":[16.0,  8.0], "west": [-16.0,  8.0]},
-	"IronOre":   {"south": [20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
+	"Pebble":    {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
+	"Sword":     {"south":[20.0, -2.0], "north":[20.0, -20.0], "east":[16.0, -2.0], "west":[-16.0, -2.0]},
+	"Coal":      {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
+	"IronOre":   {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
 	"IronIngot": {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
 }
 
@@ -52,11 +53,11 @@ const DEFAULT_LEFT: Dictionary = {
 
 const DEFAULT_WAIST: Dictionary = {
 	"Pickaxe":   {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"Pebble":    {"south":[12.0, 4.0], "north": [-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"Sword":     {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east": [0.0, 4.0], "west":[0.0, 4.0]},
+	"Pebble":    {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
+	"Sword":     {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
 	"Coal":      {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"IronOre":   {"south":[12.0, 4.0], "north": [-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"IronIngot": {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east": [0.0, 4.0], "west":[0.0, 4.0]},
+	"IronOre":   {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
+	"IronIngot": {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
 }
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ var _mode: int = 0
 var _canvas:            Control      = null
 var _item_option:       OptionButton = null
 var _clothing_option:   OptionButton = null
-var _facing_btns:       Array[Button] = []
+var _facing_btns:       Array[Button] =[]
 var _hand_btns:         Array[Button] =[]
 
 var _x_spin:            SpinBox      = null
@@ -123,7 +124,7 @@ func _build_ui() -> void:
 	mode_lbl.text = "Mode:"
 	mode_row.add_child(mode_lbl)
 
-	var mode_labels := ["Hand Items", "Clothing"]
+	var mode_labels :=["Hand Items", "Clothing"]
 	for i in range(2):
 		var btn := Button.new()
 		btn.text           = mode_labels[i]
@@ -531,7 +532,13 @@ func _refresh_canvas() -> void:
 	_canvas.clothing_mode = false
 	var info: Dictionary = HOLDABLE_ITEMS[_selected_item]
 	_canvas.item_col        = info["col"]
-	_canvas.item_game_scale = info["game_scale"]
+	_canvas.item_game_scale = info.get("game_scale", 1.0)
+	
+	if info.has("custom_tex"):
+		_canvas.item_custom_tex = load(info["custom_tex"])
+	else:
+		_canvas.item_custom_tex = null
+
 	_canvas.facing          = _selected_facing
 	_canvas.active_hand     = _active_hand
 
@@ -544,7 +551,7 @@ func _refresh_canvas() -> void:
 	var active_off   = _read_offset(_selected_item, facing_name, ah_key)
 	var active_flip  = _read_flipped(_selected_item, facing_name, ah_flip_key)
 	var active_rot   = _read_rotation(_selected_item, facing_name, ah_rot_key)
-	var active_scale = _read_scale(_selected_item, facing_name, ah_scale_key, info["game_scale"])
+	var active_scale = _read_scale(_selected_item, facing_name, ah_scale_key, info.get("game_scale", 1.0))
 
 	_canvas.offset          = active_off
 	_canvas.flipped         = active_flip
@@ -636,7 +643,7 @@ func _read_clothing_data(item: String, facing: String) -> Dictionary:
 	if _clothing_offsets.has(item) and _clothing_offsets[item].has(facing):
 		var entry = _clothing_offsets[item][facing]
 		return {
-			"offset": Vector2(float(entry.get("offset", [0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
+			"offset": Vector2(float(entry.get("offset",[0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
 			"scale": float(entry.get("scale", 1.0))
 		}
 	return {"offset": Vector2.ZERO, "scale": 1.0}
@@ -715,4 +722,3 @@ func _write_clothing_offsets() -> void:
 func _set_status(msg: String) -> void:
 	if _status_lbl != null:
 		_status_lbl.text = msg
-		

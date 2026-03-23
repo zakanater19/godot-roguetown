@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_dirk"]
+
+[resource]
+script = ExtResource("1_dirk")
+item_type = "Dirk"
+scene_path = "res://objects/dirk.tscn"
+sprite_col = -1
+description = "a short dirk, sharp and easy to conceal"
+slot = "waist"
+base_damage = 30
+use_delay = 0.3
+weaponizable = true
+too_large_for_satchel = false
+pickable = true

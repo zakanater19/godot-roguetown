@@ -275,6 +275,7 @@ func _capture_equipped_state(player_node: Node) -> Dictionary:
 		"Undershirt":      "res://clothing/undershirt.tscn",
 		"Pickaxe":         "res://objects/pickaxe.tscn",
 		"Sword":           "res://objects/sword.tscn",
+		"Dirk":            "res://objects/dirk.tscn",
 		"KingCloak":       "res://clothing/king_cloak.tscn",
 	}
 	var equipped_state = {}

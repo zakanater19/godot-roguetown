@@ -28,9 +28,9 @@ const CLOTHING_TEXTURES: Dictionary = {
 	"KingCloak":      "res://clothing/king_cloak_onmob.png",
 	"Crown":          "res://clothing/crownonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
-	"Sword":          "res://objects/objects.png"
+	"Sword":          "res://objects/objects.png",
+	"Dirk":           "res://objects/dirk.png"
 }
-
 
 var backend = null
 var misc = null
@@ -311,7 +311,6 @@ func receive_damage(amount: int, limb: String = "chest") -> void:
 	if body: body.receive_limb_damage(limb, amount)
 	if combat: combat.receive_damage(amount)
 	
-	# NEW: if this is the server and the player is disconnected, update the stored health in LateJoin
 	if multiplayer.is_server():
 		var peer := get_multiplayer_authority()
 		if LateJoin.is_player_disconnected(peer):
@@ -536,8 +535,6 @@ func _start_move_lerp() -> void:
 	if new_pixel == pixel_pos:
 		return
 
-	# Dead players never enter the lerp loop (_process returns early on dead),
-	# so teleport them directly when a grabber drags their corpse.
 	if dead:
 		pixel_pos = new_pixel
 		position  = pixel_pos
@@ -646,7 +643,11 @@ func _update_clothing_sprites() -> void:
 		
 		if slot[1] == "waist":
 			if item_name != null and item_name != "":
-				sprite.texture = load("res://objects/objects.png")
+				if CLOTHING_TEXTURES.has(item_name):
+					sprite.texture = load(CLOTHING_TEXTURES[item_name])
+				else:
+					sprite.texture = load("res://objects/objects.png")
+				
 				var w_transform = backend.get_hand_transform(item_name, facing_name, "waist")
 				sprite.position = w_transform.offset
 				
@@ -666,6 +667,9 @@ func _update_clothing_sprites() -> void:
 					final_scale *= 0.75
 				elif item_name == "Sword":
 					region = Rect2(192, 0, 64, 64)
+				elif CLOTHING_TEXTURES.has(item_name) and CLOTHING_TEXTURES[item_name] != "res://objects/objects.png":
+					if sprite.texture != null:
+						region = Rect2(0, 0, sprite.texture.get_width(), sprite.texture.get_height())
 					
 				sprite.region_rect = region
 				sprite.rotation_degrees = w_transform.rotation + target_rot

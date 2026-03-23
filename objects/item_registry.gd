@@ -20,6 +20,7 @@ const ALL_ITEMS: Array = [
 	preload("res://items/furnace.tres"),
 	preload("res://items/tree1.tres"),
 	preload("res://items/tree2.tres"),
+	preload("res://items/dirk.tres"),
 	# --- Clothing ---
 	preload("res://items/ironhelmet.tres"),
 	preload("res://items/ironchestplate.tres"),
@@ -35,14 +36,12 @@ const ALL_ITEMS: Array = [
 	preload("res://items/crown.tres"),
 ]
 
-# Returns the ItemData resource for a given item_type string, or null if not found.
 func get_by_type(item_type: String) -> ItemData:
 	for entry: ItemData in ALL_ITEMS:
 		if entry.item_type == item_type:
 			return entry
 	return null
 
-# Convenience: returns the scene_path string directly, or "" if not found.
 func get_scene_path(item_type: String) -> String:
 	var entry := get_by_type(item_type)
 	return entry.scene_path if entry != null else ""

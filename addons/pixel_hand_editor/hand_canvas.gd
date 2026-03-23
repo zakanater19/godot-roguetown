@@ -13,12 +13,13 @@ signal clothing_offset_changed(new_offset: Vector2)
 const CANVAS_SCALE: int     = 3
 const CANVAS_PX:    int     = 320
 const CENTER:       Vector2 = Vector2(160.0, 160.0)
-const PLAYER_DISP:  float   = 192.0   # 64 world-units * 3 screen-px-per-world-unit
+const PLAYER_DISP:  float   = 192.0
 
 # ── Properties set by the panel ───────────────────────────────────────────────
 var player_tex:       Texture2D = null
 var objects_tex:      Texture2D = null
 var item_col:         int       = 0
+var item_custom_tex:  Texture2D = null # New: Support for standalone textures
 var item_game_scale:  float     = 1.0
 var facing:           int       = 0
 
@@ -38,7 +39,6 @@ var flipped:       bool    = false
 var other_flipped: bool    = false
 
 # ── Clothing preview mode ─────────────────────────────────────────────────────
-# When true the canvas shows the player sprite + clothing overlay only.
 var clothing_mode:   bool      = false
 var clothing_tex:    Texture2D = null
 var clothing_offset: Vector2   = Vector2.ZERO
@@ -71,9 +71,8 @@ func _draw() -> void:
 		return
 
 	# Ghost hand (behind player)
-	if objects_tex != null:
-		# Ghost is not interactive/scale-mutable, keeping basic
-		_draw_item(other_offset, other_rotation, Color(0.40, 0.70, 1.00, 0.55), false, other_flipped, 1.0)
+	if objects_tex != null or item_custom_tex != null:
+		_draw_item(other_offset, other_rotation, Color(0.40, 0.70, 1.00, 0.55), false, other_flipped, 1.0, item_custom_tex)
 
 	# Player sprite
 	if player_tex != null:
@@ -86,8 +85,8 @@ func _draw() -> void:
 		draw_texture_rect_region(player_tex, dest, src)
 
 	# Active hand item (over player)
-	if objects_tex != null:
-		_draw_item(offset, active_rotation, Color(1.00, 0.95, 0.35, 0.92), true, flipped, item_game_scale)
+	if objects_tex != null or item_custom_tex != null:
+		_draw_item(offset, active_rotation, Color(1.00, 0.95, 0.35, 0.92), true, flipped, item_game_scale, item_custom_tex)
 
 	# Player-centre crosshair
 	draw_line(Vector2(CENTER.x - 6, CENTER.y), Vector2(CENTER.x + 6, CENTER.y),
@@ -98,15 +97,10 @@ func _draw() -> void:
 	# Coordinate readout
 	var font       := ThemeDB.fallback_font
 	var hand_label := "R" if active_hand == 0 else "L" if active_hand == 1 else "W"
-	var other_lbl  := "L" if active_hand == 0 else "R"
 	draw_string(font, Vector2(4, CANVAS_PX - 20),
-				"%s: (%d, %d)%s [rot: %.1f] [scale: %.2f]" %[hand_label, int(offset.x), int(offset.y),
-				"  [flipped]" if flipped else "", active_rotation, item_game_scale],
+				"%s: (%d, %d)%s[rot: %.1f]" %[hand_label, int(offset.x), int(offset.y),
+				" [flipped]" if flipped else "", active_rotation],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.YELLOW)
-	draw_string(font, Vector2(4, CANVAS_PX - 6),
-				"%s: (%d, %d)%s[rot: %.1f]" %[other_lbl, int(other_offset.x), int(other_offset.y),
-				"  [flipped]" if other_flipped else "", other_rotation],
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.75, 1.0))
 
 
 func _draw_clothing_preview() -> void:
@@ -141,8 +135,8 @@ func _draw_clothing_preview() -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.9, 0.9))
 
 
-func _draw_item(item_offset: Vector2, rot: float, tint: Color, show_border: bool, flip_h: bool, scale_val: float) -> void:
-	if objects_tex == null:
+func _draw_item(item_offset: Vector2, rot: float, tint: Color, show_border: bool, flip_h: bool, scale_val: float, custom_tex: Texture2D) -> void:
+	if objects_tex == null and custom_tex == null:
 		return
 	
 	var draw_flip = flip_h
@@ -152,20 +146,19 @@ func _draw_item(item_offset: Vector2, rot: float, tint: Color, show_border: bool
 	var center       := CENTER + item_offset * float(CANVAS_SCALE)
 	var display_size := 64.0 * scale_val * float(CANVAS_SCALE)
 	var half         := display_size * 0.5
+	var dest         := Rect2(-half, -half, display_size, display_size)
 
-	var src  := Rect2(item_col * 64.0, 0.0, 64.0, 64.0)
-	var dest := Rect2(-half, -half, display_size, display_size)
-
-	if draw_flip:
-		draw_set_transform(center, deg_to_rad(rot), Vector2(-1.0, 1.0))
+	draw_set_transform(center, deg_to_rad(rot), Vector2(-1.0 if draw_flip else 1.0, 1.0))
+	
+	if custom_tex != null:
+		draw_texture_rect(custom_tex, dest, false, tint)
 	else:
-		draw_set_transform(center, deg_to_rad(rot), Vector2.ONE)
-		
-	draw_texture_rect_region(objects_tex, dest, src, tint)
+		var src := Rect2(item_col * 64.0, 0.0, 64.0, 64.0)
+		draw_texture_rect_region(objects_tex, dest, src, tint)
 	
 	if show_border:
 		draw_rect(dest, Color(1.0, 1.0, 0.2, 0.5), false, 1.0)
-		
+	
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -220,4 +213,3 @@ func _gui_input(event: InputEvent) -> void:
 			emit_signal("offset_changed", offset)
 			queue_redraw()
 			accept_event()
-			

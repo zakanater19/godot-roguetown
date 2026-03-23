@@ -30,7 +30,8 @@ const CLOTHING_SCENES: Dictionary = {
 	"KingCloak": "res://clothing/king_cloak.tscn",
 	"Crown": "res://clothing/crown.tscn",
 	"Pickaxe": "res://objects/pickaxe.tscn",
-	"Sword": "res://objects/sword.tscn"
+	"Sword": "res://objects/sword.tscn",
+	"Dirk": "res://objects/dirk.tscn"
 }
 
 const CLOTHING_TEXTURES: Dictionary = {
@@ -47,7 +48,8 @@ const CLOTHING_TEXTURES: Dictionary = {
 	"KingCloak": "res://clothing/king_cloak.png",
 	"Crown": "res://clothing/crownonmob.png",
 	"Pickaxe": "res://objects/objects.png",
-	"Sword": "res://objects/objects.png"
+	"Sword": "res://objects/objects.png",
+	"Dirk": "res://objects/dirk.png"
 }
 
 var _hud_tex:          Texture2D = null

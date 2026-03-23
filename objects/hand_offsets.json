@@ -85,6 +85,97 @@
 			"waist_scale": 1.0
 		}
 	},
+	"Dirk": {
+		"east": {
+			"left": [
+				0.0,
+				0.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				11.0,
+				-2.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 0.75,
+			"waist": [
+				-1.0,
+				5.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 180.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				0.0,
+				0.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-2.0,
+				-8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 0.75,
+			"waist": [
+				-8.0,
+				5.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 180.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-4.0,
+				-1.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"left_scale": 0.75,
+			"right": [
+				21.0,
+				-7.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 0.75,
+			"waist": [
+				-4.0,
+				5.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 180.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				0.0,
+				0.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-9.0,
+				-1.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 0.75,
+			"waist": [
+				9.0,
+				9.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 180.0,
+			"waist_scale": 1.0
+		}
+	},
 	"IronIngot": {
 		"east": {
 			"left": [
