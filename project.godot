@@ -27,6 +27,7 @@ LateJoin="*res://latejoin.gd"
 Lobby="*res://lobby.gd"
 Trade="*res://trade.gd"
 ServerBrowser="*res://serverbrowser.gd"
+Lighting="*res://lighting.gd"
 
 [display]
 

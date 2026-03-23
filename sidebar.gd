@@ -11,13 +11,17 @@ var _messages: Array[String] =[]
 
 # Stats & Laws Menu Variables
 var _stats_time_label: Label = null
+var _stats_day_label: Label = null
 var _stats_view: VBoxContainer = null
+
 var _laws_view: VBoxContainer = null
 var _laws_list_vbox: VBoxContainer = null
 var _edit_laws_btn: Button = null
 
 var _edit_laws_view: VBoxContainer = null
 var _edit_list_vbox: VBoxContainer = null
+
+var _debug_view: VBoxContainer = null
 
 
 func _ready() -> void:
@@ -36,6 +40,9 @@ func _process(_delta: float) -> void:
 	else:
 		# Keep it zeroed out while in the Lobby
 		_stats_time_label.text = "round time: 00:00"
+		
+	if _stats_day_label != null:
+		_stats_day_label.text = "day: " + str(Lighting.current_day)
 
 
 func set_visible(is_visible: bool) -> void:
@@ -130,6 +137,12 @@ func _build() -> void:
 	btn_laws.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn_laws.pressed.connect(_on_tab_laws_pressed)
 	tabs_hbox.add_child(btn_laws)
+	
+	var btn_debug := Button.new()
+	btn_debug.text = "DEBUG"
+	btn_debug.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn_debug.pressed.connect(_on_tab_debug_pressed)
+	tabs_hbox.add_child(btn_debug)
 
 	# --- View Containers ---
 	
@@ -144,6 +157,13 @@ func _build() -> void:
 	_stats_time_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
 	_stats_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_stats_view.add_child(_stats_time_label)
+
+	_stats_day_label = Label.new()
+	_stats_day_label.text = "day: 1"
+	_stats_day_label.add_theme_font_size_override("font_size", 12)
+	_stats_day_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	_stats_day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_stats_view.add_child(_stats_day_label)
 
 	# 2. Laws View (Read Only)
 	_laws_view = VBoxContainer.new()
@@ -199,6 +219,18 @@ func _build() -> void:
 	cancel_laws_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cancel_laws_btn.pressed.connect(_on_cancel_laws_pressed)
 	edit_actions_hbox.add_child(cancel_laws_btn)
+	
+	# 4. Debug View
+	_debug_view = VBoxContainer.new()
+	_debug_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_debug_view.visible = false
+	stats_inner.add_child(_debug_view)
+
+	# Lighting Toggle Button
+	var btn_time_toggle := Button.new()
+	btn_time_toggle.text = "Toggle Midnight/Midday"
+	btn_time_toggle.pressed.connect(_on_toggle_time_pressed)
+	_debug_view.add_child(btn_time_toggle)
 
 	# === NEW: Thin separator line at the bottom of the top section ===
 	var separator := HSeparator.new()
@@ -230,18 +262,30 @@ func _build() -> void:
 
 # --- Tab Logic ---
 
+func _on_toggle_time_pressed() -> void:
+	Lighting.toggle_time_of_day()
+
 func _on_tab_stats_pressed() -> void:
 	if _stats_view == null: return
 	_stats_view.visible = true
 	_laws_view.visible = false
 	_edit_laws_view.visible = false
+	if _debug_view: _debug_view.visible = false
 
 func _on_tab_laws_pressed() -> void:
 	if _laws_view == null: return
 	_stats_view.visible = false
 	_laws_view.visible = true
 	_edit_laws_view.visible = false
+	if _debug_view: _debug_view.visible = false
 	refresh_laws_ui()
+
+func _on_tab_debug_pressed() -> void:
+	if _debug_view == null: return
+	_stats_view.visible = false
+	_laws_view.visible = false
+	_edit_laws_view.visible = false
+	_debug_view.visible = true
 
 func refresh_laws_ui() -> void:
 	if _laws_list_vbox == null: return
@@ -306,13 +350,13 @@ func _on_add_law_pressed() -> void:
 	_add_edit_law_row()
 
 func _on_save_laws_pressed() -> void:
-	var new_laws: Array = []
+	var new_laws: Array =[]
 	for child in _edit_list_vbox.get_children():
 		var le = child.get_node_or_null("LawInput")
 		if le and le.text.strip_edges() != "":
 			new_laws.append(le.text.strip_edges())
 	
-	var formatted_laws = []
+	var formatted_laws =[]
 	for i in range(new_laws.size()):
 		formatted_laws.append("LAW " + str(i + 1) + ": " + new_laws[i])
 		

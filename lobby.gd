@@ -405,9 +405,6 @@ func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
 		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
 		return
 	
-	# FIX: When the server calls this RPC locally (call_local), get_remote_sender_id()
-	# returns 0 instead of the server's peer ID of 1. Normalize to ensure the server
-	# player's name is stored under the correct peer ID.
 	var peer_id = multiplayer.get_remote_sender_id()
 	if peer_id == 0:
 		peer_id = multiplayer.get_unique_id()
@@ -417,9 +414,6 @@ func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func sync_ready_state(peer_id: int, is_ready: bool, p_name: String, p_class: String) -> void:
-	# FIX: Same normalization — when the server calls this via call_local from
-	# request_set_ready, peer_id arrives as 0. Normalize so the server player's
-	# own UI updates correctly (ready button, name/class field locking).
 	if peer_id == 0:
 		peer_id = multiplayer.get_unique_id()
 	
@@ -492,11 +486,12 @@ func rpc_hide_lobby() -> void:
 		_ui_layer.visible = false
 
 @rpc("authority", "call_remote", "reliable")
-func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dictionary, r_time: float = 0.0) -> void:
+func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dictionary, r_time: float = 0.0, lighting_offset: float = 0.0) -> void:
 	countdown = time_left
 	game_started = is_started
 	ready_players = ready_dict
 	round_time = r_time
+	Lighting.time_offset = lighting_offset
 	
 	if game_started:
 		if _time_label != null: _time_label.text = "Game in progress"
@@ -514,7 +509,7 @@ func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dicti
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
 		ready_players[id] = {"ready": false, "name": "noob", "class": "peasant"}
-		sync_full_lobby_state.rpc_id(id, countdown, game_started, ready_players, round_time)
+		sync_full_lobby_state.rpc_id(id, countdown, game_started, ready_players, round_time, Lighting.time_offset)
 
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
