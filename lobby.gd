@@ -295,7 +295,7 @@ func _process(delta: float) -> void:
 		_time_label.text = str(max(0, int(countdown))) + "s"
 
 	if game_started:
-		round_time += delta
+		round_time += delta * Lighting.time_multiplier
 
 func _on_ready_pressed() -> void:
 	if not game_started:
@@ -486,12 +486,13 @@ func rpc_hide_lobby() -> void:
 		_ui_layer.visible = false
 
 @rpc("authority", "call_remote", "reliable")
-func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dictionary, r_time: float = 0.0, lighting_offset: float = 0.0) -> void:
+func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dictionary, r_time: float = 0.0, lighting_offset: float = 0.0, time_multiplier: float = 1.0) -> void:
 	countdown = time_left
 	game_started = is_started
 	ready_players = ready_dict
 	round_time = r_time
 	Lighting.time_offset = lighting_offset
+	Lighting.time_multiplier = time_multiplier
 	
 	if game_started:
 		if _time_label != null: _time_label.text = "Game in progress"
@@ -509,7 +510,7 @@ func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dicti
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
 		ready_players[id] = {"ready": false, "name": "noob", "class": "peasant"}
-		sync_full_lobby_state.rpc_id(id, countdown, game_started, ready_players, round_time, Lighting.time_offset)
+		sync_full_lobby_state.rpc_id(id, countdown, game_started, ready_players, round_time, Lighting.time_offset, Lighting.time_multiplier)
 
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():

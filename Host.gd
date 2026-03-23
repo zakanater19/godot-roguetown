@@ -41,6 +41,10 @@ func start_host() -> void:
 		session_ids[1] = 1.0
 		ServerBrowser.start_broadcasting()
 		_setup_spawner()
+		
+		# Refresh debug UI now that we are hosting
+		if has_node("/root/Sidebar"):
+			get_node("/root/Sidebar").refresh_debug_visibility()
 	else:
 		push_error("Host: failed to start server (error %d)" % err)
 
@@ -52,6 +56,10 @@ func start_client_custom(ip: String, port: int) -> void:
 		multiplayer.multiplayer_peer = enet
 		print("Host: joined as client to %s:%d" % [ip, port])
 		_setup_spawner()
+		
+		# Ensure debug UI is hidden for clients
+		if has_node("/root/Sidebar"):
+			get_node("/root/Sidebar").refresh_debug_visibility()
 	else:
 		push_error("Host: failed to start client (error %d)" % err)
 
@@ -257,3 +265,4 @@ func _despawn_player_for_peer(peer_id: int) -> void:
 
 func get_player_for_peer(peer_id: int) -> Node:
 	return peers.get(peer_id, null)
+	

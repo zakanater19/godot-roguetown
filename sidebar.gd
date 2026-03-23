@@ -22,6 +22,7 @@ var _edit_laws_view: VBoxContainer = null
 var _edit_list_vbox: VBoxContainer = null
 
 var _debug_view: VBoxContainer = null
+var _btn_debug: Button = null
 
 
 func _ready() -> void:
@@ -138,11 +139,12 @@ func _build() -> void:
 	btn_laws.pressed.connect(_on_tab_laws_pressed)
 	tabs_hbox.add_child(btn_laws)
 	
-	var btn_debug := Button.new()
-	btn_debug.text = "DEBUG"
-	btn_debug.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn_debug.pressed.connect(_on_tab_debug_pressed)
-	tabs_hbox.add_child(btn_debug)
+	_btn_debug = Button.new()
+	_btn_debug.text = "DEBUG"
+	_btn_debug.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_debug.pressed.connect(_on_tab_debug_pressed)
+	_btn_debug.visible = multiplayer.is_server()
+	tabs_hbox.add_child(_btn_debug)
 
 	# --- View Containers ---
 	
@@ -231,6 +233,20 @@ func _build() -> void:
 	btn_time_toggle.text = "Toggle Midnight/Midday"
 	btn_time_toggle.pressed.connect(_on_toggle_time_pressed)
 	_debug_view.add_child(btn_time_toggle)
+	
+	# Multiplier SpinBox
+	var mult_row := HBoxContainer.new()
+	_debug_view.add_child(mult_row)
+	mult_row.add_child(Label.new())
+	mult_row.get_child(0).text = "Time Speed:"
+	
+	var mult_spin := SpinBox.new()
+	mult_spin.min_value = 1.0
+	mult_spin.max_value = 50.0
+	mult_spin.step = 0.5
+	mult_spin.value = Lighting.time_multiplier
+	mult_spin.value_changed.connect(_on_time_multiplier_changed)
+	mult_row.add_child(mult_spin)
 
 	# === NEW: Thin separator line at the bottom of the top section ===
 	var separator := HSeparator.new()
@@ -262,8 +278,19 @@ func _build() -> void:
 
 # --- Tab Logic ---
 
+func refresh_debug_visibility() -> void:
+	if _btn_debug:
+		_btn_debug.visible = multiplayer.is_server()
+
 func _on_toggle_time_pressed() -> void:
 	Lighting.toggle_time_of_day()
+
+func _on_time_multiplier_changed(value: float) -> void:
+	var player = World.get_local_player()
+	if player != null and player.multiplayer.is_server():
+		Lighting.sync_time_multiplier.rpc(value)
+	elif player != null:
+		Lighting.sync_time_multiplier.rpc_id(1, value)
 
 func _on_tab_stats_pressed() -> void:
 	if _stats_view == null: return

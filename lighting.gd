@@ -4,9 +4,14 @@
 extends Node
 
 var canvas_mod: CanvasModulate
-var is_midnight: bool = false
 var current_day: int = 1
 var time_offset: float = 0.0
+var time_multiplier: float = 1.0
+
+# 20 min day (1200s) + 20 min night (1200s) = 2400s cycle
+# Transition is 5 minutes (300s)
+const CYCLE_DURATION: float = 2400.0
+const TRANSITION_DURATION: float = 300.0
 
 var light_texture: GradientTexture2D
 
@@ -32,20 +37,31 @@ func _ready() -> void:
 	light_texture.height = 384
 
 func _process(_delta: float) -> void:
-	# Calculate current time in the cycle.
-	# Day = 30 mins (1800s), Night = 30 mins (1800s). Full cycle = 3600s.
 	var total_time = Lobby.round_time + time_offset
-	current_day = 1 + int(total_time / 3600.0)
+	current_day = 1 + int(total_time / CYCLE_DURATION)
 	
-	# If the current 1800s block is odd, it's night time
-	is_midnight = (int(total_time / 1800.0) % 2 != 0)
+	var cycle_time = fmod(total_time, CYCLE_DURATION)
 	
-	if is_midnight:
-		# Dark blueish-gray tint for midnight
-		canvas_mod.color = Color(0.1, 0.1, 0.15, 1.0)
+	# Weight determines brightness (1.0 = Day, 0.0 = Night)
+	var sun_weight: float = 1.0
+	
+	# 0 to 900: Full Day (weight 1.0)
+	# 900 to 1200: Transition Day -> Night (weight 1.0 down to 0.0)
+	# 1200 to 2100: Full Night (weight 0.0)
+	# 2100 to 2400: Transition Night -> Day (weight 0.0 up to 1.0)
+	
+	if cycle_time >= 900.0 and cycle_time < 1200.0:
+		sun_weight = 1.0 - ((cycle_time - 900.0) / TRANSITION_DURATION)
+	elif cycle_time >= 1200.0 and cycle_time < 2100.0:
+		sun_weight = 0.0
+	elif cycle_time >= 2100.0:
+		sun_weight = (cycle_time - 2100.0) / TRANSITION_DURATION
 	else:
-		# Pure white for midday
-		canvas_mod.color = Color.WHITE
+		sun_weight = 1.0
+
+	# Apply visual color
+	var night_color = Color(0.1, 0.1, 0.15, 1.0)
+	canvas_mod.color = night_color.lerp(Color.WHITE, sun_weight)
 
 	# Continually ensure all players have a weak test light attached
 	var players = get_tree().get_nodes_in_group("player")
@@ -58,28 +74,32 @@ func _process(_delta: float) -> void:
 			# Use MIX blend mode so lights don't blow out into pure white when stacked
 			light.blend_mode = PointLight2D.BLEND_MODE_MIX
 			light.energy = 0.8
-			light.z_index = 15 # Render above most player sprites
+			light.z_index = 15
 			p.add_child(light)
 			
-		# Hide the player light during the day
-		light.enabled = is_midnight
+		# Enable lights only when sun_weight drops below 50%
+		light.enabled = (sun_weight < 0.5)
 
 # Called by the UI button
 func toggle_time_of_day() -> void:
 	if multiplayer.has_multiplayer_peer():
 		if multiplayer.is_server():
-			rpc_add_time_offset.rpc(1800.0)
+			rpc_add_time_offset.rpc(1200.0)
 		else:
 			request_toggle_time.rpc_id(1)
 	else:
-		time_offset += 1800.0
+		time_offset += 1200.0
 
 @rpc("any_peer", "call_local", "reliable")
 func request_toggle_time() -> void:
 	if multiplayer.is_server():
-		rpc_add_time_offset.rpc(1800.0)
+		rpc_add_time_offset.rpc(1200.0)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_add_time_offset(amount: float) -> void:
 	time_offset += amount
+
+@rpc("authority", "call_local", "reliable")
+func sync_time_multiplier(val: float) -> void:
+	time_multiplier = val
 	
