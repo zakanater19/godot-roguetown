@@ -18,6 +18,7 @@ const ALL_ITEMS: Array = [
 	preload("res://items/log.tres"),
 	preload("res://items/rock.tres"),
 	preload("res://items/furnace.tres"),
+	preload("res://items/merchantvendor.tres"),
 	preload("res://items/tree1.tres"),
 	preload("res://items/tree2.tres"),
 	preload("res://items/dirk.tres"),

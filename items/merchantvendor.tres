@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_mvendor"]
+
+[resource]
+script = ExtResource("1_mvendor")
+item_type = "MerchantVendor"
+scene_path = "res://objects/merchantvendor.tscn"
+sprite_col = -1
+description = "a merchant vendor, ready to trade"
+slot = ""
+base_damage = 0
+use_delay = 0.5
+weaponizable = false
+too_large_for_satchel = false
+pickable = false
+has_inventory = false
+inventory_slots = 0
+is_fuel = false
+is_smeltable_ore = false
