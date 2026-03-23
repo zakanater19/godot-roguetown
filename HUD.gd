@@ -11,46 +11,8 @@ const SLOT_LAYOUT: Array = [
 	["head",      1, 0],
 	["cloak",     2, 0],
 	["armor",     1, 1],["backpack",  2, 1],
-	["clothing",  1, 2],
-	["trousers",  2, 2],["feet",      1, 3],
-	["waist",     0, 3],
+	["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
 ]
-
-const CLOTHING_SCENES: Dictionary = {
-	"IronHelmet":     "res://clothing/ironhelmet.tscn",
-	"IronChestplate": "res://clothing/ironchestplate.tscn",
-	"LeatherBoots":   "res://clothing/leatherboots.tscn",
-	"LeatherTrousers": "res://clothing/leathertrousers.tscn",
-	"Apothshirt": "res://clothing/apothshirt.tscn",
-	"Blackshirt": "res://clothing/blackshirt.tscn",
-	"Undershirt": "res://clothing/undershirt.tscn",
-	"Merchantrobe": "res://clothing/merchantrobe.tscn",
-	"Plate": "res://clothing/plate.tscn",
-	"Satchel": "res://clothing/satchel.tscn",
-	"KingCloak": "res://clothing/king_cloak.tscn",
-	"Crown": "res://clothing/crown.tscn",
-	"Pickaxe": "res://objects/pickaxe.tscn",
-	"Sword": "res://objects/sword.tscn",
-	"Dirk": "res://objects/dirk.tscn"
-}
-
-const CLOTHING_TEXTURES: Dictionary = {
-	"IronHelmet":     "res://clothing/ironhelmet.png",
-	"IronChestplate": "res://clothing/ironchestplate.png",
-	"LeatherBoots":   "res://clothing/leatherboots.png",
-	"LeatherTrousers": "res://clothing/leathertrousers.png",
-	"Apothshirt":     "res://clothing/apothshirt.png",
-	"Blackshirt":     "res://clothing/blackshirt.png",
-	"Undershirt":     "res://clothing/undershirt.png",
-	"Merchantrobe":   "res://clothing/merchantrobe.png",
-	"Plate": "res://clothing/plate.png",
-	"Satchel": "res://clothing/satchel.png",
-	"KingCloak": "res://clothing/king_cloak.png",
-	"Crown": "res://clothing/crownonmob.png",
-	"Pickaxe": "res://objects/objects.png",
-	"Sword": "res://objects/objects.png",
-	"Dirk": "res://objects/dirk.png"
-}
 
 var _hud_tex:          Texture2D = null
 var _clothing_visible: bool      = false
@@ -85,10 +47,10 @@ var _stance_icon: TextureRect = null
 const LIMB_REGIONS: Dictionary = {
 	"chest": [Vector2(4,  8),  Vector2(57, 35)],
 	"r_arm": [Vector2(12, 25), Vector2(11, 23)],
-	"l_arm": [Vector2(42, 25), Vector2(11, 23)],
-	"r_leg": [Vector2(17, 39), Vector2(14, 25)],
-	"l_leg": [Vector2(34, 39), Vector2(14, 25)],
-	"head":  [Vector2(23, 9),  Vector2(19, 18)],
+	"l_arm":[Vector2(42, 25), Vector2(11, 23)],
+	"r_leg":[Vector2(17, 39), Vector2(14, 25)],
+	"l_leg":[Vector2(34, 39), Vector2(14, 25)],
+	"head":[Vector2(23, 9),  Vector2(19, 18)],
 }
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
@@ -621,15 +583,16 @@ func update_clothing_display(equipped: Dictionary) -> void:
 	for slot_name in _slot_icons.keys():
 		var icon: Sprite2D = _slot_icons[slot_name]
 		var item_name      = equipped.get(slot_name, null)
-		if item_name != null and CLOTHING_TEXTURES.has(item_name):
-			var tex := load(CLOTHING_TEXTURES[item_name]) as Texture2D
+		if item_name != null and ItemRegistry.HUD_TEXTURES.has(item_name):
+			var tex := load(ItemRegistry.HUD_TEXTURES[item_name]) as Texture2D
 			if tex != null:
 				icon.texture        = tex
 				icon.region_enabled = true
 				
 				var region_set = false
-				if CLOTHING_SCENES.has(item_name):
-					var scene = load(CLOTHING_SCENES[item_name]) as PackedScene
+				var scene_path = ItemRegistry.get_scene_path(item_name)
+				if scene_path != "":
+					var scene = load(scene_path) as PackedScene
 					if scene != null:
 						var state = scene.get_state()
 						for i in range(state.get_node_count()):

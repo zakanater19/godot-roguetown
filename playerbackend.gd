@@ -374,10 +374,12 @@ func perform_unequip(slot_name: String, new_node_name: String, hand_index: int) 
 	var item_name: String = player.equipped.get(slot_name, "")
 	if item_name == "":
 		return
-	# Use the single authoritative registry in World instead of a local copy.
-	if not World.CLOTHING_SCENE_PATHS.has(item_name):
+		
+	var scene_path = ItemRegistry.get_scene_path(item_name)
+	if scene_path == "":
 		return
-	var scene := load(World.CLOTHING_SCENE_PATHS[item_name]) as PackedScene
+		
+	var scene := load(scene_path) as PackedScene
 	if scene == null:
 		return
 

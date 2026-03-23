@@ -7,7 +7,7 @@
 
 extends Node
 
-const ALL_ITEMS: Array = [
+const ALL_ITEMS: Array =[
 	# --- Objects ---
 	preload("res://items/sword.tres"),
 	preload("res://items/pickaxe.tres"),
@@ -37,12 +37,58 @@ const ALL_ITEMS: Array = [
 	preload("res://items/crown.tres"),
 ]
 
+# Centralized texture lists for UI rendering
+const HUD_TEXTURES: Dictionary = {
+	"IronHelmet":     "res://clothing/ironhelmet.png",
+	"IronChestplate": "res://clothing/ironchestplate.png",
+	"LeatherBoots":   "res://clothing/leatherboots.png",
+	"LeatherTrousers": "res://clothing/leathertrousers.png",
+	"Apothshirt":     "res://clothing/apothshirt.png",
+	"Blackshirt":     "res://clothing/blackshirt.png",
+	"Undershirt":     "res://clothing/undershirt.png",
+	"Merchantrobe":   "res://clothing/merchantrobe.png",
+	"Plate":          "res://clothing/plate.png",
+	"Satchel":        "res://clothing/satchel.png",
+	"KingCloak":      "res://clothing/king_cloak.png",
+	"Crown":          "res://clothing/crownonmob.png",
+	"Pickaxe":        "res://objects/objects.png",
+	"Sword":          "res://objects/objects.png",
+	"Dirk":           "res://objects/dirk.png"
+}
+
+# Centralized texture lists for on-mob sprite rendering
+const MOB_TEXTURES: Dictionary = {
+	"IronHelmet":     "res://clothing/ironhelmet.png",
+	"IronChestplate": "res://clothing/ironchestplate.png",
+	"LeatherBoots":   "res://clothing/leatherboots.png",
+	"LeatherTrousers": "res://clothing/leathertrousers.png",
+	"Apothshirt":     "res://clothing/apothshirt.png",
+	"Blackshirt":     "res://clothing/blackshirt.png",
+	"Undershirt":     "res://clothing/undershirt.png",
+	"Merchantrobe":   "res://clothing/merchantrobe.png",
+	"Plate":          "res://clothing/plate.png",
+	"Satchel":        "res://clothing/satchelonmob.png",
+	"KingCloak":      "res://clothing/king_cloak_onmob.png",
+	"Crown":          "res://clothing/crownonmob.png",
+	"Pickaxe":        "res://objects/objects.png",
+	"Sword":          "res://objects/objects.png",
+	"Dirk":           "res://objects/dirk.png"
+}
+
+var _scene_paths_cache: Dictionary = {}
+var _item_data_cache: Dictionary = {}
+
+func _ready() -> void:
+	# Build fast lookup caches for O(1) retrieval
+	for entry in ALL_ITEMS:
+		if entry != null:
+			_item_data_cache[entry.item_type] = entry
+			if entry.scene_path != "":
+				_scene_paths_cache[entry.item_type] = entry.scene_path
+
 func get_by_type(item_type: String) -> ItemData:
-	for entry: ItemData in ALL_ITEMS:
-		if entry.item_type == item_type:
-			return entry
-	return null
+	return _item_data_cache.get(item_type, null)
 
 func get_scene_path(item_type: String) -> String:
-	var entry := get_by_type(item_type)
-	return entry.scene_path if entry != null else ""
+	return _scene_paths_cache.get(item_type, "")
+	

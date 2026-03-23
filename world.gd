@@ -17,18 +17,6 @@ const GRID_HEIGHT: int = 1000
 # Set by main.gd in _ready() once the TileMapLayer node exists
 var tilemap: TileMapLayer = null
 
-# --- ITEM / CLOTHING REGISTRIES ---
-# Populated in _ready() from ItemRegistry.ALL_ITEMS.
-# Kept as plain Dictionaries so all existing call-sites (playerbackend.gd, etc.)
-# continue to work without any changes — only the source of truth has moved.
-
-# Wearable items (clothing, armour, waist-slot weapons).
-# Used by playerbackend.gd (unequip) and world.gd (loot-unequip-drop).
-var CLOTHING_SCENE_PATHS: Dictionary = {}
-
-# Pickable / satchel items (used by the satchel insert/extract RPCs below).
-var ITEM_SCENE_PATHS: Dictionary = {}
-
 # --- STATE ---
 var solid_grid: Dictionary = {}
 var tile_hit_counts: Dictionary = {}
@@ -56,20 +44,10 @@ var _grab_cooldown_map:   Dictionary = {}
 var _resist_cooldown_map: Dictionary = {}
 
 # ---------------------------------------------------------------------------
-# Startup — build scene-path dictionaries from ItemRegistry resources
+# Startup
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	for entry: ItemData in ItemRegistry.ALL_ITEMS:
-		if entry.scene_path == "":
-			continue
-		# Every item with a slot is a wearable (clothing / waist weapon).
-		if entry.slot != "":
-			CLOTHING_SCENE_PATHS[entry.item_type] = entry.scene_path
-		# Every item that is pickable goes into the satchel registry.
-		if entry.pickable:
-			ITEM_SCENE_PATHS[entry.item_type] = entry.scene_path
-			
 	# Hook into multiplayer disconnects to clean up grabs automatically
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
@@ -946,7 +924,7 @@ func rpc_request_hit_rock(rock_path: NodePath) -> void:
 		LateJoin.register_object_state(rock_path, {"hits": rock.hits, "type": "rock"})
 	
 	if rock.hits >= rock.HITS_TO_BREAK:
-		var drops = ["pebble", "pebble"]
+		var drops =["pebble", "pebble"]
 		if randf() < 0.20: drops.append("coal")
 		if randf() < 0.10: drops.append("ironore")
 
@@ -1536,10 +1514,14 @@ func rpc_confirm_loot_unequip_drop(target_peer_id: int, equip_slot: String, new_
 		return
 
 	var item_name: String = target.equipped.get(equip_slot, "")
-	if item_name == "" or not CLOTHING_SCENE_PATHS.has(item_name):
+	if item_name == "":
+		return
+		
+	var scene_path = ItemRegistry.get_scene_path(item_name)
+	if scene_path == "":
 		return
 
-	var scene := load(CLOTHING_SCENE_PATHS[item_name]) as PackedScene
+	var scene := load(scene_path) as PackedScene
 	if scene == null:
 		return
 
@@ -1588,7 +1570,7 @@ func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 	var recipes = {
 		"sword": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/sword.tscn"},
 		"pickaxe": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/pickaxe.tscn"},
-		"wooden_floor": {"req": "Log", "req_amt": 1, "tile": [0, Vector2i(4, 0)]},
+		"wooden_floor": {"req": "Log", "req_amt": 1, "tile":[0, Vector2i(4, 0)]},
 		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile":[0, Vector2i(5, 0)]},
 		"stone_wall": {"req": "Pebble", "req_amt": 2, "tile":[1, Vector2i(6, 0)]}
 	}
@@ -2030,8 +2012,8 @@ func rpc_request_satchel_insert(satchel_path: NodePath, hand_idx: int) -> void:
 	# Resolve item_type — use the item's own property if present, else strip @
 	var itype: String = item.get("item_type") if item.get("item_type") != null else item.name.get_slice("@", 0)
 
-	# Only allow items whose scene we know how to restore
-	if not ITEM_SCENE_PATHS.has(itype):
+	var scene_path: String = ItemRegistry.get_scene_path(itype)
+	if scene_path == "":
 		return
 
 	# Find a free slot
@@ -2044,8 +2026,6 @@ func rpc_request_satchel_insert(satchel_path: NodePath, hand_idx: int) -> void:
 	if slot_index == -1:
 		# Satchel is full — do nothing
 		return
-
-	var scene_path: String = ITEM_SCENE_PATHS[itype]
 
 	rpc_confirm_satchel_insert.rpc(peer_id, satchel_path, item.get_path(), hand_idx, slot_index, scene_path, itype)
 
