@@ -7,10 +7,8 @@ const BOX:  int = 48
 const GAP:  int = 4
 const STEP: int = BOX + GAP   
 
-const SLOT_LAYOUT: Array = [
-	["head",      1, 0],
-	["cloak",     2, 0],
-	["armor",     1, 1],["backpack",  2, 1],
+const SLOT_LAYOUT: Array = [["head",      1, 0],
+	["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],
 	["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
 ]
 
@@ -21,9 +19,10 @@ var _clothing_panel:   Control   = null
 var _slot_boxes: Dictionary = {}
 var _slot_icons: Dictionary = {}
 
-var _hand_highlights: Array =[]
-var _hand_icons:      Array =[]
-var _hand_labels:     Array =[]  # yellow "GRAB" labels, one per hand slot
+var _hand_highlights:    Array = []
+var _hand_icons:         Array = []
+var _hand_labels:        Array =[]  # yellow "GRAB" labels, one per hand slot
+var _hand_broken_labels: Array =[]  # red "X" for broken hands
 
 var _release_ctrl: Control = null
 var _resist_ctrl:  Control = null
@@ -40,13 +39,14 @@ var _stamina_bar: ColorRect = null
 # Limb targeting
 var targeted_limb: String     = "chest"
 var _limb_highlights: Dictionary = {}  # limb_name -> TextureRect
+var _limb_broken_overlays: Dictionary = {} # limb_name -> TextureRect (Fishnet)
 
 # Combat stance icon
 var _stance_icon: TextureRect = null
 
 const LIMB_REGIONS: Dictionary = {
-	"chest": [Vector2(4,  8),  Vector2(57, 35)],
-	"r_arm": [Vector2(12, 25), Vector2(11, 23)],
+	"chest":[Vector2(4,  8),  Vector2(57, 35)],
+	"r_arm":[Vector2(12, 25), Vector2(11, 23)],
 	"l_arm":[Vector2(42, 25), Vector2(11, 23)],
 	"r_leg":[Vector2(17, 39), Vector2(14, 25)],
 	"l_leg":[Vector2(34, 39), Vector2(14, 25)],
@@ -223,6 +223,19 @@ func _build_hand_boxes(parent: Control) -> void:
 		grab_lbl.visible              = false
 		ctrl.add_child(grab_lbl)
 		_hand_labels.append(grab_lbl)
+		
+		# Red "X" label for broken hands
+		var broken_lbl := Label.new()
+		broken_lbl.text = "X"
+		broken_lbl.add_theme_color_override("font_color", Color(0.9, 0.1, 0.1, 0.85))
+		broken_lbl.add_theme_font_size_override("font_size", 40)
+		broken_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		broken_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		broken_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+		broken_lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+		broken_lbl.visible              = false
+		ctrl.add_child(broken_lbl)
+		_hand_broken_labels.append(broken_lbl)
 
 		ctrl.gui_input.connect(_on_hand_gui_input.bind(i))
 
@@ -398,6 +411,22 @@ func _build_limb_panel(parent: Control) -> void:
 		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(base)
 
+	# Shader for drawing fishnet lines on broken limbs
+	var fishnet_shader = Shader.new()
+	fishnet_shader.code = """
+	shader_type canvas_item;
+	void fragment() {
+		vec4 tex = texture(TEXTURE, UV);
+		float u = UV.x * 64.0;
+		float v = UV.y * 64.0;
+		if (tex.a > 0.1 && (mod(u + v, 5.0) < 1.0 || mod(u - v, 5.0) < 1.0)) {
+			COLOR = vec4(0.9, 0.1, 0.1, 0.9);
+		} else {
+			COLOR = vec4(0.0, 0.0, 0.0, 0.0);
+		}
+	}
+	"""
+
 	# Highlight overlays — one per limb, blue modulate, only selected is visible
 	var limb_tex_names := {
 		"head":  "res://ui/m-head.png",
@@ -421,6 +450,22 @@ func _build_limb_panel(parent: Control) -> void:
 		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(hl)
 		_limb_highlights[limb_name] = hl
+		
+		# Broken overlays — fishnet shader
+		var broken_hl := TextureRect.new()
+		broken_hl.texture      = hl_tex
+		broken_hl.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		broken_hl.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+		broken_hl.size         = Vector2(64, 64)
+		broken_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		broken_hl.visible      = false
+		
+		var mat = ShaderMaterial.new()
+		mat.shader = fishnet_shader
+		broken_hl.material = mat
+		
+		panel.add_child(broken_hl)
+		_limb_broken_overlays[limb_name] = broken_hl
 
 	# Invisible click regions — each covers the limb's pixel bounding box
 	for limb_name in LIMB_REGIONS:
@@ -497,6 +542,11 @@ func update_stats(health: int, stamina: float) -> void:
 		var s = (clamp(stamina, 0, 100) / 100.0) * 80.0
 		_stamina_bar.size.y = s
 		_stamina_bar.position.y = 80 - s
+		
+	# Update broken limbs indicators on the doll targeting UI
+	if player != null and player.body != null:
+		for limb_name in _limb_broken_overlays.keys():
+			_limb_broken_overlays[limb_name].visible = player.body.limb_broken.get(limb_name, false)
 
 # ── Helper ──────────────────────────────────────────────────────────────────
 
@@ -560,6 +610,13 @@ func update_hands_display(hands: Array, active_hand: int) -> void:
 		_hand_highlights[i].color = Color(0.7, 0.7, 0.7, 0.25) if i == active_hand else Color(0, 0, 0, 0)
 		var icon: Sprite2D = _hand_icons[i]
 		var grab_lbl: Label = _hand_labels[i] if i < _hand_labels.size() else null
+		
+		# Check if the hand is broken and display the 'X'
+		var is_broken = false
+		if player != null and player.body != null:
+			is_broken = player.body.is_arm_broken(i)
+		if i < _hand_broken_labels.size():
+			_hand_broken_labels[i].visible = is_broken
 
 		if i == grab_hand:
 			# This hand is occupied by a grab — show GRAB label, hide item icon
