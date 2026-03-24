@@ -16,6 +16,7 @@ const HOLDABLE_ITEMS: Dictionary = {
 	"IronOre":   {"col": 5, "game_scale": 0.45},
 	"IronIngot": {"col": 6, "game_scale": 0.75},
 	"Dirk":      {"col": -1, "game_scale": 0.75, "custom_tex": "res://objects/dirk.png"},
+	"Lamp":      {"col": -1, "game_scale": 1.00, "custom_tex": "res://objects/lampoff.png"},
 }
 
 const CLOTHING_ITEMS: Dictionary = {
@@ -40,6 +41,7 @@ const DEFAULT_RIGHT: Dictionary = {
 	"Coal":      {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
 	"IronOre":   {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
 	"IronIngot": {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
+	"Lamp":      {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
 }
 
 const DEFAULT_LEFT: Dictionary = {
@@ -49,6 +51,7 @@ const DEFAULT_LEFT: Dictionary = {
 	"Coal":      {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
 	"IronOre":   {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
 	"IronIngot": {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
+	"Lamp":      {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
 }
 
 const DEFAULT_WAIST: Dictionary = {
@@ -58,6 +61,7 @@ const DEFAULT_WAIST: Dictionary = {
 	"Coal":      {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
 	"IronOre":   {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
 	"IronIngot": {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
+	"Lamp":      {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
 }
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -280,7 +284,6 @@ func _build_ui() -> void:
 	_rot_spin.value_changed.connect(_on_spin_changed)
 	rot_row.add_child(_rot_spin)
 
-	# --- Added Waist Scale spinbox ---
 	var scale_row := HBoxContainer.new()
 	_sidebar_items.add_child(scale_row)
 	var scalel := Label.new()
@@ -722,3 +725,4 @@ func _write_clothing_offsets() -> void:
 func _set_status(msg: String) -> void:
 	if _status_lbl != null:
 		_status_lbl.text = msg
+		

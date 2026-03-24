@@ -477,6 +477,15 @@ func throw_held_object(mouse_world_pos: Vector2) -> void:
 	else:
 		World.rpc_request_throw.rpc_id(1, obj.get_path(), player.active_hand, dir, throw_range)
 
+func interact_held_object() -> void:
+	if player.hands[player.active_hand] != null:
+		var item = player.hands[player.active_hand]
+		if item.has_method("interact_in_hand"):
+			if player.multiplayer.is_server():
+				World.rpc_request_interact_hand_item(player.active_hand)
+			else:
+				World.rpc_request_interact_hand_item.rpc_id(1, player.active_hand)
+
 func use_held_object(mouse_world_pos: Vector2) -> void:
 	if World.tilemap == null:
 		return

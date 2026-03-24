@@ -7,6 +7,7 @@ var canvas_mod: CanvasModulate
 var current_day: int = 1
 var time_offset: float = 0.0
 var time_multiplier: float = 1.0
+var sun_weight: float = 1.0  # Added for global access
 
 # 20 min day (1200s) + 20 min night (1200s) = 2400s cycle
 # Transition is 5 minutes (300s)
@@ -43,7 +44,7 @@ func _process(_delta: float) -> void:
 	var cycle_time = fmod(total_time, CYCLE_DURATION)
 	
 	# Weight determines brightness (1.0 = Day, 0.0 = Night)
-	var sun_weight: float = 1.0
+	sun_weight = 1.0
 	
 	# 0 to 900: Full Day (weight 1.0)
 	# 900 to 1200: Transition Day -> Night (weight 1.0 down to 0.0)

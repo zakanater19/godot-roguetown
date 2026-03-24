@@ -22,6 +22,7 @@ const ALL_ITEMS: Array =[
 	preload("res://items/tree1.tres"),
 	preload("res://items/tree2.tres"),
 	preload("res://items/dirk.tres"),
+	preload("res://items/lamp.tres"),
 	# --- Clothing ---
 	preload("res://items/ironhelmet.tres"),
 	preload("res://items/ironchestplate.tres"),
@@ -53,7 +54,8 @@ const HUD_TEXTURES: Dictionary = {
 	"Crown":          "res://clothing/crownonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
-	"Dirk":           "res://objects/dirk.png"
+	"Dirk":           "res://objects/dirk.png",
+	"Lamp":           "res://objects/lampoff.png"
 }
 
 # Centralized texture lists for on-mob sprite rendering
@@ -72,7 +74,8 @@ const MOB_TEXTURES: Dictionary = {
 	"Crown":          "res://clothing/crownonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
-	"Dirk":           "res://objects/dirk.png"
+	"Dirk":           "res://objects/dirk.png",
+	"Lamp":           "res://objects/lampoff.png"
 }
 
 var _scene_paths_cache: Dictionary = {}

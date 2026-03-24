@@ -810,7 +810,7 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 		else:
 			continue
 
-		rpc_broadcast_damage_log.rpc(attacker.character_name, target_name, roll.damage, source_tile, roll.blocked, false, targeted_limb, roll.get("block_type", ""))
+		rpc_broadcast_damage_log.rpc(attacker.character_name, target_name, roll.damage, source_tile, roll.blocked, false, "", roll.get("block_type", ""))
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_damage_wall(pos: Vector2i) -> void:
@@ -1126,6 +1126,46 @@ func rpc_confirm_remove_door(door_path: NodePath) -> void:
 		var main = get_tree().root.get_node_or_null("Main")
 		door.perform_hit(main)
 		door.remove_completely()
+
+# ---------------------------------------------------------------------------
+# Hand Item Interaction
+# ---------------------------------------------------------------------------
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_interact_hand_item(hand_idx: int) -> void:
+	if not multiplayer.is_server():
+		return
+	if hand_idx < 0 or hand_idx > 1:
+		return
+
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
+
+	var player := _find_player_by_peer(peer_id)
+	if player == null or player.dead:
+		return
+
+	if player.body != null and player.body.is_arm_broken(hand_idx):
+		return
+
+	var item = player.hands[hand_idx]
+	if item == null or not is_instance_valid(item) or not item.has_method("interact_in_hand"):
+		return
+
+	# Apply an action cooldown to prevent spamming interactions
+	if not _server_check_action_cooldown(player):
+		return
+
+	rpc_confirm_interact_hand_item.rpc(peer_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
+	var player := _find_player_by_peer(peer_id)
+	if player != null:
+		var item = player.hands[hand_idx]
+		if item != null and is_instance_valid(item) and item.has_method("interact_in_hand"):
+			item.interact_in_hand(player)
 
 # ---------------------------------------------------------------------------
 # Clothing (own equip/unequip)

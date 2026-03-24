@@ -292,6 +292,9 @@ func _use_held_object(mouse_world_pos: Vector2) -> void:
 		return
 	if backend: backend.use_held_object(mouse_world_pos)
 
+func _interact_held_object() -> void:
+	if backend: backend.interact_held_object()
+
 func toggle_crafting_menu() -> void:
 	if crafting: crafting.toggle_crafting_menu()
 
@@ -632,8 +635,7 @@ func _update_clothing_sprites() -> void:
 	elif is_lying_down:
 		target_rot = 90.0
 
-	var slots := [["HelmetSprite", "head"],
-		["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["WaistSprite", "waist"]
+	var slots := [["HelmetSprite", "head"],["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["WaistSprite", "waist"]
 	]
 
 	for slot in slots:
@@ -1101,6 +1103,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				World.rpc_request_resist()
 			else:
 				World.rpc_request_resist.rpc_id(1)
+		else:
+			_interact_held_object()
 		return
 
 	if event is InputEventKey and event.keycode == KEY_V and event.pressed and not event.echo:

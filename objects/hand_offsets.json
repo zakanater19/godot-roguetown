@@ -348,6 +348,100 @@
 			"waist_scale": 1.0
 		}
 	},
+	"Lamp": {
+		"east": {
+			"left": [
+				-9.0,
+				13.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"left_scale": 1.0,
+			"right": [
+				11.0,
+				13.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 1.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				1.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"left_scale": 1.0,
+			"right": [
+				20.0,
+				1.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 1.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				14.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"left_scale": 1.0,
+			"right": [
+				16.0,
+				12.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 1.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				11.0,
+				13.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"left_scale": 1.0,
+			"right": [
+				-7.0,
+				13.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"right_scale": 1.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
 	"Pebble": {
 		"east": {
 			"left": [

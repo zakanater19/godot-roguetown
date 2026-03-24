@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_lamp"]
+
+[resource]
+script = ExtResource("1_lamp")
+item_type = "Lamp"
+scene_path = "res://objects/lamp.tscn"
+sprite_col = -1
+description = "a portable lamp"
+slot = ""
+base_damage = 5
+use_delay = 0.3
+weaponizable = true
+too_large_for_satchel = false
+pickable = true
+has_inventory = false
+inventory_slots = 0
+is_fuel = false
+is_smeltable_ore = false
