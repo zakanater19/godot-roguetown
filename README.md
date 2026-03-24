@@ -11,7 +11,7 @@ the project will come with the .godot folder inside the project root, that's jus
 Keybinds;
 Q - drop item
 
-Z - resist
+Z - resist AND active hand item object interaction
 
 X - swap hands
 
