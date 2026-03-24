@@ -3,7 +3,7 @@
 extends Node
 
 const PORT:        int = 9904
-const MAX_CLIENTS: int = 200
+var max_clients: int = 200
 
 # peer_id (int) → player Node2D
 var peers: Dictionary = {}
@@ -23,20 +23,21 @@ var session_ids: Dictionary = {}
 var _next_session_id: float = 2.0
 
 # IPs that are treated as local connections and are never IP-blocked.
-const LOCAL_IPS: Array = ["127.0.0.1", "::1", "localhost", ""]
+const LOCAL_IPS: Array =["127.0.0.1", "::1", "localhost", ""]
 
 func _ready() -> void:
 	# ── Peer lifecycle ───────────────────────────────────────────────────────
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
-func start_host() -> void:
+func start_host(custom_max_clients: int = 200) -> void:
+	max_clients = custom_max_clients
 	var enet := ENetMultiplayerPeer.new()
-	var err: int = enet.create_server(PORT, MAX_CLIENTS)
+	var err: int = enet.create_server(PORT, max_clients)
 	
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
-		print("Host: server listening on port %d" % PORT)
+		print("Host: server listening on port %d with max players %d" % [PORT, max_clients])
 		# The host/server is always session ID 1.
 		session_ids[1] = 1.0
 		ServerBrowser.start_broadcasting()
@@ -134,7 +135,7 @@ func _assign_session_id(peer_id: int) -> void:
 		var session: Dictionary = _ip_sessions[ip]
 		if session["active_peer_id"] != -1:
 			# A client from this public IP is already connected — refuse.
-			print("Host: refusing peer %d — IP %s already has an active session (session %.0f)" % [peer_id, ip, session["session_id"]])
+			print("Host: refusing peer %d — IP %s already has an active session (session %.0f)" %[peer_id, ip, session["session_id"]])
 			var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
 			if enet != null:
 				var ep := enet.get_peer(peer_id)
@@ -195,7 +196,7 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 	player.character_class = p_class
 	
 	# SPAWNER LOGIC (Priority Arrays)
-	var preferred_spawns: Array[String] = []
+	var preferred_spawns: Array[String] =[]
 	
 	if is_latejoin:
 		if p_class in["swordsman", "miner", "adventurer"]:
