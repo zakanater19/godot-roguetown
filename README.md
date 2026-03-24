@@ -26,3 +26,13 @@ C - combat mode toggle - Right mouse shoves other players with empty hand in com
 hold SPACEBAR to run
 
 rest are UI buttons
+
+
+
+
+https://github.com/user-attachments/assets/c61d9990-c50c-418d-8632-b1f75064401c
+
+
+
+https://github.com/user-attachments/assets/b6efb39a-5b96-4016-9e50-c416db0a85af
+
