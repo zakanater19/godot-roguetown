@@ -267,6 +267,10 @@ func _face_toward(world_pos: Vector2) -> void:
 
 func _on_object_picked_up(object_node: Node) -> void:
 	if active_hand == grab_hand_idx: return # Block if hand is occupied by a grab
+	if body != null and body.is_arm_broken(active_hand):
+		if _is_local_authority():
+			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+		return
 	if backend: backend.on_object_picked_up(object_node)
 
 func _drop_held_object() -> void:
@@ -276,7 +280,7 @@ func _throw_held_object(mouse_world_pos: Vector2) -> void:
 	if active_hand == grab_hand_idx: return # Block if hand is occupied by a grab
 	if body != null and body.is_arm_broken(active_hand):
 		if _is_local_authority():
-			Sidebar.add_message("[color=#ffaaaa]Your arm is broken and cannot throw![/color]")
+			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
 		return
 	if backend: backend.throw_held_object(mouse_world_pos)
 
@@ -284,7 +288,7 @@ func _use_held_object(mouse_world_pos: Vector2) -> void:
 	if active_hand == grab_hand_idx: return # Block if hand is occupied by a grab
 	if body != null and body.is_arm_broken(active_hand):
 		if _is_local_authority():
-			Sidebar.add_message("[color=#ffaaaa]Your arm is broken and cannot be used![/color]")
+			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
 		return
 	if backend: backend.use_held_object(mouse_world_pos)
 
@@ -599,8 +603,7 @@ func sync_hands(hand_names: Array) -> void:
 func _setup_clothing_sprites() -> void:
 	var layers = [["TrousersSprite", 1], 
 		["ClothingSprite", 2],["ChestSprite", 3],["BackpackSprite", 4], 
-		["WaistSprite", 5],["BootsSprite", 5],
-		["HelmetSprite", 6],["CloakSprite", 7]
+		["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["CloakSprite", 7]
 	]
 	
 	for spec in layers:
@@ -630,8 +633,7 @@ func _update_clothing_sprites() -> void:
 		target_rot = 90.0
 
 	var slots := [["HelmetSprite", "head"],
-		["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],["BootsSprite", "feet"],
-		["ClothingSprite", "clothing"],["WaistSprite", "waist"]
+		["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["WaistSprite", "waist"]
 	]
 
 	for slot in slots:
@@ -1116,6 +1118,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		
 		if diff.x <= 1 and diff.y <= 1 and target_tile != tile_pos:
 			if combat_mode and hands[active_hand] == null:
+				if body != null and body.is_arm_broken(active_hand):
+					Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+					get_viewport().set_input_as_handled()
+					return
 				if action_cooldown > 0.0:
 					return
 
@@ -1144,6 +1150,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		# --- CTRL + LMB: start grabbing a player or ground object ---
 		if Input.is_key_pressed(KEY_CTRL):
+			if body != null and body.is_arm_broken(active_hand):
+				Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+				get_viewport().set_input_as_handled()
+				return
+
 			var grab_target: Node = null
 			# Prefer nearby players
 			for p in get_tree().get_nodes_in_group("player"):
@@ -1227,6 +1238,8 @@ func rpc_transfer_to_hand(from_idx: int, to_idx: int) -> void:
 		if sender_id != get_multiplayer_authority():
 			return
 		if hands[to_idx] != null or hands[from_idx] == null:
+			return
+		if body != null and body.is_arm_broken(to_idx):
 			return
 		hands[to_idx]   = hands[from_idx]
 		hands[from_idx] = null

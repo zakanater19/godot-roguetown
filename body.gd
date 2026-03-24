@@ -83,10 +83,18 @@ func _on_limb_broken(limb: String) -> void:
 		"r_arm":
 			if is_local:
 				Sidebar.add_message("[color=#ffaaaa]Your right arm is broken and can no longer be used![/color]")
+				if player.hands[0] != null:
+					Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+					if player.backend:
+						player.backend.drop_item_from_hand(0)
 
 		"l_arm":
 			if is_local:
 				Sidebar.add_message("[color=#ffaaaa]Your left arm is broken and can no longer be used![/color]")
+				if player.hands[1] != null:
+					Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+					if player.backend:
+						player.backend.drop_item_from_hand(1)
 
 		"r_leg", "l_leg":
 			if is_local:
@@ -111,3 +119,4 @@ func is_arm_broken(hand_idx: int) -> bool:
 	if hand_idx == 0:
 		return limb_broken["r_arm"]
 	return limb_broken["l_arm"]
+	

@@ -99,6 +99,8 @@ func _send_world_state_to_peer(peer_id: int) -> void:
 			"position": p.position,
 			"disconnected": false,
 			"health": p.health,
+			"limb_hp": p.body.limb_hp.duplicate() if p.body != null else {},
+			"limb_broken": p.body.limb_broken.duplicate() if p.body != null else {},
 			"hands": hand_names,
 			"equipped": equipped_data,
 			"equipped_data": eq_data_state,
@@ -239,6 +241,8 @@ func _capture_player_state(player_node: Node) -> Dictionary:
 		"tile_pos": player_node.tile_pos,
 		"facing": player_node.facing,
 		"health": player_node.health,
+		"limb_hp": player_node.body.limb_hp.duplicate() if player_node.body != null else {},
+		"limb_broken": player_node.body.limb_broken.duplicate() if player_node.body != null else {},
 		"stamina": player_node.stamina,
 		"dead": player_node.dead,
 		"combat_mode": player_node.combat_mode,
@@ -425,6 +429,12 @@ func _restore_player_state(player_node: Node, player_state: Dictionary) -> void:
 	player_node.tile_pos = player_state["tile_pos"]
 	player_node.facing = player_state["facing"]
 	player_node.health = player_state["health"]
+	
+	if player_state.has("limb_hp") and player_node.body != null:
+		player_node.body.limb_hp = player_state["limb_hp"].duplicate()
+	if player_state.has("limb_broken") and player_node.body != null:
+		player_node.body.limb_broken = player_state["limb_broken"].duplicate()
+		
 	player_node.stamina = player_state["stamina"]
 	player_node.dead = player_state["dead"]
 	player_node.combat_mode = player_state["combat_mode"]
@@ -661,6 +671,11 @@ func receive_player_states(player_states: Dictionary) -> void:
 				if distance > 1000:
 					player_node.position = player_data["position"]
 			
+			if player_data.has("limb_hp") and player_node.body != null:
+				player_node.body.limb_hp = player_data["limb_hp"].duplicate()
+			if player_data.has("limb_broken") and player_node.body != null:
+				player_node.body.limb_broken = player_data["limb_broken"].duplicate()
+			
 			if player_data.has("hands"):
 				if player_node.has_method("sync_hands"):
 					player_node.sync_hands(player_data["hands"])
@@ -693,6 +708,11 @@ func receive_player_states(player_states: Dictionary) -> void:
 					player_node._update_sprite()
 				if player_node.has_method("_update_water_submerge"):
 					player_node._update_water_submerge()
+			
+			if player_node.has_method("_update_hands_ui"):
+				player_node._update_hands_ui()
+			if player_node.get("_hud") != null:
+				player_node._hud.update_stats(player_node.health, player_node.stamina)
 
 @rpc("authority", "call_remote", "reliable")
 func purge_missing_objects(valid_names: Array) -> void:
@@ -817,7 +837,7 @@ func get_world_state() -> Dictionary:
 func is_player_disconnected(peer_id: int) -> bool:
 	return _disconnected_players.has(peer_id)
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func client_reconnection_confirmed() -> void:
 	print("LateJoin: Reconnection confirmed on client")
 	if has_node("/root/Main"):

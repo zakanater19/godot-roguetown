@@ -7,9 +7,7 @@ const BOX:  int = 48
 const GAP:  int = 4
 const STEP: int = BOX + GAP   
 
-const SLOT_LAYOUT: Array = [["head",      1, 0],
-	["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],
-	["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
+const SLOT_LAYOUT: Array = [["head",      1, 0],["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
 ]
 
 var _hud_tex:          Texture2D = null
@@ -20,7 +18,7 @@ var _slot_boxes: Dictionary = {}
 var _slot_icons: Dictionary = {}
 
 var _hand_highlights:    Array = []
-var _hand_icons:         Array = []
+var _hand_icons:         Array =[]
 var _hand_labels:        Array =[]  # yellow "GRAB" labels, one per hand slot
 var _hand_broken_labels: Array =[]  # red "X" for broken hands
 
@@ -711,6 +709,11 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 			else:
 				clicked_item._open_ui()
 			return
+            
+		if player.body != null and player.body.is_arm_broken(player.active_hand):
+			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+			return
+            
 		if player.multiplayer.has_multiplayer_peer():
 			if player.multiplayer.is_server():
 				player.rpc_transfer_to_hand(hand_idx, player.active_hand)
@@ -758,7 +761,11 @@ func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
 	if held != null:
 		var item_slot = held.get("slot")
 		if item_slot == slot_name and currently_equipped == null: player._equip_clothing_to_slot(held, slot_name)
-	elif held == null and currently_equipped != null: player._unequip_clothing_from_slot(slot_name)
+	elif held == null and currently_equipped != null: 
+		if player.body != null and player.body.is_arm_broken(player.active_hand):
+			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+			return
+		player._unequip_clothing_from_slot(slot_name)
 
 func _on_toggle_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return

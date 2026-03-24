@@ -707,6 +707,9 @@ func rpc_request_shove(target_tile: Vector2i) -> void:
 	
 	var attacker = _find_player_by_peer(peer_id)
 	if attacker == null or not attacker.combat_mode or attacker.dead: return
+	
+	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand):
+		return
 
 	var diff = (target_tile - attacker.tile_pos).abs()
 	if diff.x > 1 or diff.y > 1: return
@@ -759,6 +762,9 @@ func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") ->
 
 	var attacker = _find_player_by_peer(peer_id)
 	if attacker == null or attacker.dead:
+		return
+		
+	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand):
 		return
 		
 	# Security Check: Ensure the player is actually close enough to melee attack this tile
@@ -817,6 +823,9 @@ func rpc_damage_wall(pos: Vector2i) -> void:
 	if peer_id == 0: peer_id = multiplayer.get_unique_id()
 	var attacker = _find_player_by_peer(peer_id)
 	if attacker == null or attacker.dead: return
+	
+	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand):
+		return
 	
 	var diff = (pos - attacker.tile_pos).abs()
 	if diff.x > 1 or diff.y > 1: return
@@ -915,6 +924,8 @@ func rpc_request_hit_rock(rock_path: NodePath) -> void:
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
 	
+	if player.body != null and player.body.is_arm_broken(player.active_hand): return
+	
 	if not _is_within_interaction_range(player, rock.global_position): return
 	if not _server_check_action_cooldown(player): return
 
@@ -966,6 +977,8 @@ func rpc_request_hit_tree(tree_path: NodePath) -> void:
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
 	
+	if player.body != null and player.body.is_arm_broken(player.active_hand): return
+	
 	if not _is_within_interaction_range(player, tree.global_position): return
 	if not _server_check_action_cooldown(player): return
 
@@ -1013,6 +1026,8 @@ func rpc_request_hit_breakable(obj_path: NodePath) -> void:
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
 	
+	if player.body != null and player.body.is_arm_broken(player.active_hand): return
+	
 	if not _is_within_interaction_range(player, obj.global_position): return
 	if not _server_check_action_cooldown(player): return
 
@@ -1056,6 +1071,8 @@ func rpc_request_hit_door(door_path: NodePath) -> void:
 	if peer_id == 0: peer_id = multiplayer.get_unique_id()
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
+	
+	if player.body != null and player.body.is_arm_broken(player.active_hand): return
 	
 	if not _is_within_interaction_range(player, door.global_position): return
 	
@@ -1125,6 +1142,8 @@ func rpc_request_equip(item_path: NodePath, slot_name: String, hand_index: int) 
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
 	
+	if player.body != null and player.body.is_arm_broken(hand_index): return
+	
 	var item = get_node_or_null(item_path)
 	if item == null or player.hands[hand_index] != item: return
 	
@@ -1147,6 +1166,9 @@ func rpc_request_unequip(slot_name: String, hand_index: int) -> void:
 	
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
+	
+	if player.body != null and player.body.is_arm_broken(hand_index):
+		return
 	
 	var unique_name = "Unequip_" + slot_name + "_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
 	rpc_confirm_unequip.rpc(peer_id, slot_name, unique_name, hand_index)
@@ -1174,6 +1196,8 @@ func rpc_request_furnace_action(furnace_path: NodePath, action: String, hand_idx
 	
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
+	
+	if player.body != null and player.body.is_arm_broken(hand_idx): return
 	
 	if not _is_within_interaction_range(player, furnace.global_position): return
 	
@@ -1212,6 +1236,9 @@ func rpc_request_pickup(item_path: NodePath, hand_index: int) -> void:
 		
 	var player = _find_player_by_peer(peer_id)
 	if player == null or player.dead: return
+
+	if player.body != null and player.body.is_arm_broken(hand_index):
+		return
 	
 	var item = get_node_or_null(item_path)
 	if item == null: return
@@ -1292,6 +1319,8 @@ func rpc_request_throw(item_path: NodePath, hand_index: int, dir: Vector2, throw
 	
 	var item = get_node_or_null(item_path)
 	if item == null or player.hands[hand_index] != item: return
+
+	if player.body != null and player.body.is_arm_broken(hand_index): return
 	
 	if not _server_check_action_cooldown(player, true): return
 	
@@ -1739,6 +1768,9 @@ func rpc_request_grab(target_path: NodePath, limb: String = "chest") -> void:
 	if grabber.hands[grabber.active_hand] != null:
 		return
 
+	if grabber.body != null and grabber.body.is_arm_broken(grabber.active_hand):
+		return
+
 	# Grab cooldown check
 	var now_ms := Time.get_ticks_msec()
 	if _grab_cooldown_map.has(peer_id) and now_ms < _grab_cooldown_map[peer_id]:
@@ -2083,6 +2115,9 @@ func rpc_request_satchel_extract(satchel_path: NodePath, slot_index: int, hand_i
 
 	# The destination hand must be empty
 	if player.hands[hand_idx] != null:
+		return
+
+	if player.body != null and player.body.is_arm_broken(hand_idx):
 		return
 
 	var satchel := get_node_or_null(satchel_path)

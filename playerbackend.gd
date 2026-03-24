@@ -60,11 +60,8 @@ func get_detailed_description() -> String:
 			desc += "\n[color=gray]" + slot + ":[/color] " + item
 
 	if is_me and player.body != null:
-		var limb_display: Array = [
-			["head",  "head"],["chest", "chest"],
-			["r_arm", "right arm"],["l_arm", "left arm"],
-			["r_leg", "right leg"],
-			["l_leg", "left leg"],
+		var limb_display: Array =[
+			["head",  "head"],["chest", "chest"],["r_arm", "right arm"],["l_arm", "left arm"],["r_leg", "right leg"],["l_leg", "left leg"],
 		]
 		for entry in limb_display:
 			var limb_key: String    = entry[0]
@@ -445,14 +442,17 @@ func on_object_picked_up(object_node: Node) -> void:
 	else:
 		World.rpc_request_pickup.rpc_id(1, object_node.get_path(), player.active_hand)
 
-func drop_held_object() -> void:
-	if player.hands[player.active_hand] == null:
+func drop_item_from_hand(hand_idx: int) -> void:
+	if player.hands[hand_idx] == null:
 		return
-	var obj = player.hands[player.active_hand]
+	var obj = player.hands[hand_idx]
 	if player.multiplayer.is_server():
-		World.rpc_request_drop(obj.get_path(), player.tile_pos, player.DROP_SPREAD, player.active_hand)
+		World.rpc_request_drop(obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 	else:
-		World.rpc_request_drop.rpc_id(1, obj.get_path(), player.tile_pos, player.DROP_SPREAD, player.active_hand)
+		World.rpc_request_drop.rpc_id(1, obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
+
+func drop_held_object() -> void:
+	drop_item_from_hand(player.active_hand)
 
 func throw_held_object(mouse_world_pos: Vector2) -> void:
 	var mouse_tile := Vector2i(int(mouse_world_pos.x / World.TILE_SIZE), int(mouse_world_pos.y / World.TILE_SIZE))

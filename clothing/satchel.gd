@@ -311,7 +311,12 @@ func _on_slot_pressed(slot_index: int) -> void:
 	if player.hands[player.active_hand] != null:
 		return
 
+	if player.body != null and player.body.is_arm_broken(player.active_hand):
+		Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+		return
+
 	if multiplayer.is_server():
 		World.rpc_request_satchel_extract(get_path(), slot_index, player.active_hand)
 	else:
 		World.rpc_request_satchel_extract.rpc_id(1, get_path(), slot_index, player.active_hand)
+		
