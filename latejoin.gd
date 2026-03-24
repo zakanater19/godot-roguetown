@@ -167,12 +167,16 @@ func _get_object_sync_data(obj: Node) -> Dictionary:
 		data["_smelting"] = obj.get("_smelting")
 	if "contents" in obj:
 		data["contents"] = obj.get("contents").duplicate(true)
+	if "amount" in obj:
+		data["amount"] = obj.get("amount")
 	
 	if obj is Area2D:
 		if "rock.gd" in str(obj.get_script()):
 			data["type"] = "rock"
 		elif "tree.gd" in str(obj.get_script()):
 			data["type"] = "tree"
+		elif "coin.gd" in str(obj.get_script()):
+			data["type"] = "coin"
 			
 	return data
 
@@ -323,6 +327,8 @@ func _capture_hands_state(player_node: Node) -> Array:
 				
 			if "contents" in hand_item:
 				item_data["contents"] = hand_item.get("contents").duplicate(true)
+			if "amount" in hand_item:
+				item_data["amount"] = hand_item.get("amount")
 				
 			hands_state.append(item_data)
 		else:
@@ -404,7 +410,7 @@ func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node
 	var hand_names =[]
 	for h in player_node.hands:
 		hand_names.append(h.name if h != null else "")
-		
+	
 	update_player_state(new_peer_id, {
 		"position": player_node.position,
 		"disconnected": false,
@@ -477,13 +483,13 @@ func _restore_player_state(player_node: Node, player_state: Dictionary) -> void:
 				grabber.grabbed_target = player_node
 				
 				# Force refresh on grabber's UI
-				_rpc_force_update_grab_ui.rpc_id(grabber_peer)
+				World._rpc_force_update_grab_ui.rpc_id(grabber_peer)
 				
 				# Force grabber to update their 'grabbed_target' pointer
-				_rpc_set_grabbed_target.rpc_id(grabber_peer, player_node.get_path())
+				World._rpc_set_grabbed_target.rpc_id(grabber_peer, player_node.get_path())
 				
 				# Sync grabbed_by to the target client
-				_rpc_set_grabbed_by.rpc_id(player_node.get_multiplayer_authority(), grabber.get_path())
+				World._rpc_set_grabbed_by.rpc_id(player_node.get_multiplayer_authority(), grabber.get_path())
 
 	var equipped_data = player_state["equipped"]
 	for slot in equipped_data:
@@ -543,6 +549,8 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 		
 		if hand_data.has("contents") and "contents" in fallback_item:
 			fallback_item.set("contents", hand_data["contents"].duplicate(true))
+		if hand_data.has("amount") and "amount" in fallback_item:
+			fallback_item.set("amount", hand_data["amount"])
 			
 		main_node.add_child(fallback_item)
 		return fallback_item
@@ -557,6 +565,8 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	
 	if hand_data.has("contents") and "contents" in item:
 		item.set("contents", hand_data["contents"].duplicate(true))
+	if hand_data.has("amount") and "amount" in item:
+		item.set("amount", hand_data["amount"])
 		
 	main_node.add_child(item)
 	
@@ -589,26 +599,6 @@ func rpc_update_player_authority(player_path: NodePath, new_peer_id: int) -> voi
 		player.set_multiplayer_authority(new_peer_id)
 		if player.has_method("_on_authority_changed"):
 			player._on_authority_changed()
-
-@rpc("authority", "call_remote", "reliable")
-func _rpc_force_update_grab_ui() -> void:
-	var local_player = World.get_local_player()
-	if local_player and local_player.has_method("_update_grab_ui"):
-		local_player._update_grab_ui()
-
-@rpc("authority", "call_remote", "reliable")
-func _rpc_set_grabbed_by(grabber_path: NodePath) -> void:
-	var local_player = World.get_local_player()
-	if local_player:
-		local_player.grabbed_by = get_node_or_null(grabber_path)
-		local_player._update_grab_ui()
-
-@rpc("authority", "call_remote", "reliable")
-func _rpc_set_grabbed_target(target_path: NodePath) -> void:
-	var local_player = World.get_local_player()
-	if local_player:
-		local_player.grabbed_target = get_node_or_null(target_path)
-		local_player._update_grab_ui()
 
 @rpc("authority", "call_local", "reliable")
 func rpc_set_disconnect_indicator(player_path: NodePath, show: bool) -> void:
@@ -656,8 +646,11 @@ func receive_object_states(object_states: Dictionary) -> void:
 	for obj_path in object_states:
 		var obj_data = object_states[obj_path]
 		var obj = get_node_or_null(obj_path)
-		if obj != null and obj.has_method("set_hits"):
-			obj.set_hits(obj_data.get("hits", 0))
+		if obj != null:
+			if obj.has_method("set_hits"):
+				obj.set_hits(obj_data.get("hits", 0))
+			if obj_data.has("amount") and "amount" in obj:
+				obj.set("amount", obj_data["amount"])
 
 @rpc("authority", "call_remote", "reliable")
 func receive_player_states(player_states: Dictionary) -> void:
@@ -750,6 +743,9 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 				"tree":
 					var scene = load("res://objects/tree.tscn") as PackedScene
 					if scene: obj = scene.instantiate()
+				"coin":
+					var scene = load("res://objects/coin.tscn") as PackedScene
+					if scene: obj = scene.instantiate()
 				_:
 					if obj_data.has("script_path"):
 						var script = load(obj_data["script_path"])
@@ -771,6 +767,9 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			else:
 				obj.set("hits", obj_data["hits"])
 				
+		if obj_data.has("amount"):
+			obj.set("amount", obj_data["amount"])
+			
 		if obj_data.has("state"):
 			obj.set("state", obj_data["state"])
 			if obj.has_method("_update_sprite"):

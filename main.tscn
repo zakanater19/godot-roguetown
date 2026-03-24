@@ -1,4 +1,4 @@
-[gd_scene load_steps=35 format=4 uid="uid://buhminxyg50to"]
+[gd_scene load_steps=36 format=4 uid="uid://buhminxyg50to"]
 
 [ext_resource type="Script" uid="uid://dn855v6uco7aq" path="res://main.gd" id="1_main"]
 [ext_resource type="Texture2D" uid="uid://bheu3np1etlwp" path="res://tiles.png" id="2_h2yge"]
@@ -30,6 +30,7 @@
 [ext_resource type="PackedScene" uid="uid://cdirk001sc" path="res://objects/dirk.tscn" id="28_xuqvo"]
 [ext_resource type="PackedScene" path="res://objects/merchantvendor.tscn" id="29_qsp4k"]
 [ext_resource type="PackedScene" uid="uid://clamp001sc" path="res://objects/lamp.tscn" id="30_kq58d"]
+[ext_resource type="PackedScene" uid="uid://bkvmhw7qt51ly" path="res://objects/coin.tscn" id="31_seu75"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_p0366"]
 resource_name = "Floor Tiles"
@@ -184,3 +185,29 @@ scale = Vector2(1.5, 1.5)
 
 [node name="Lamp" parent="." instance=ExtResource("30_kq58d")]
 position = Vector2(31266, 32279)
+
+[node name="Coin" parent="." instance=ExtResource("31_seu75")]
+position = Vector2(31028, 32079)
+amount = 2
+
+[node name="Coin2" parent="." instance=ExtResource("31_seu75")]
+position = Vector2(31024, 32010)
+amount = 10
+
+[node name="Coin3" parent="." instance=ExtResource("31_seu75")]
+position = Vector2(31000, 32016)
+amount = 10
+
+[node name="Coin4" parent="." instance=ExtResource("31_seu75")]
+position = Vector2(31071, 32045)
+amount = 7
+
+[node name="Coin5" parent="." instance=ExtResource("31_seu75")]
+position = Vector2(31079, 31966)
+metal_type = 2
+amount = 20
+
+[node name="Coin6" parent="." instance=ExtResource("31_seu75")]
+position = Vector2(31034, 31966)
+metal_type = 1
+amount = 20

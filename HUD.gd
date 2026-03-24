@@ -7,7 +7,7 @@ const BOX:  int = 48
 const GAP:  int = 4
 const STEP: int = BOX + GAP   
 
-const SLOT_LAYOUT: Array = [["head",      1, 0],["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
+const SLOT_LAYOUT: Array =[["head",      1, 0],["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
 ]
 
 var _hud_tex:          Texture2D = null
@@ -17,10 +17,11 @@ var _clothing_panel:   Control   = null
 var _slot_boxes: Dictionary = {}
 var _slot_icons: Dictionary = {}
 
-var _hand_highlights:    Array = []
+var _hand_highlights:    Array =[]
 var _hand_icons:         Array =[]
 var _hand_labels:        Array =[]  # yellow "GRAB" labels, one per hand slot
 var _hand_broken_labels: Array =[]  # red "X" for broken hands
+var _hand_amt_labels:    Array =[]  # new label for stack amounts
 
 var _release_ctrl: Control = null
 var _resist_ctrl:  Control = null
@@ -208,6 +209,21 @@ func _build_hand_boxes(parent: Control) -> void:
 		icon.visible  = false
 		ctrl.add_child(icon)
 		_hand_icons.append(icon)
+		
+		# Quantity label for stacks (bottom right)
+		var amt_lbl := Label.new()
+		amt_lbl.text = ""
+		amt_lbl.add_theme_color_override("font_color", Color.WHITE)
+		amt_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+		amt_lbl.add_theme_constant_override("outline_size", 3)
+		amt_lbl.add_theme_font_size_override("font_size", 10)
+		amt_lbl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		amt_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		amt_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM
+		amt_lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+		amt_lbl.visible              = false
+		ctrl.add_child(amt_lbl)
+		_hand_amt_labels.append(amt_lbl)
 
 		# Yellow "GRAB" label — visible only while this hand is holding a grab
 		var grab_lbl := Label.new()
@@ -608,6 +624,7 @@ func update_hands_display(hands: Array, active_hand: int) -> void:
 		_hand_highlights[i].color = Color(0.7, 0.7, 0.7, 0.25) if i == active_hand else Color(0, 0, 0, 0)
 		var icon: Sprite2D = _hand_icons[i]
 		var grab_lbl: Label = _hand_labels[i] if i < _hand_labels.size() else null
+		var amt_lbl: Label = _hand_amt_labels[i] if i < _hand_amt_labels.size() else null
 		
 		# Check if the hand is broken and display the 'X'
 		var is_broken = false
@@ -619,11 +636,11 @@ func update_hands_display(hands: Array, active_hand: int) -> void:
 		if i == grab_hand:
 			# This hand is occupied by a grab — show GRAB label, hide item icon
 			icon.visible = false
-			if grab_lbl != null:
-				grab_lbl.visible = true
+			if grab_lbl != null: grab_lbl.visible = true
+			if amt_lbl != null: amt_lbl.visible = false
 		else:
-			if grab_lbl != null:
-				grab_lbl.visible = false
+			if grab_lbl != null: grab_lbl.visible = false
+			
 			if hands[i] != null:
 				var obj_sprite: Sprite2D = hands[i].get_node_or_null("Sprite2D")
 				if obj_sprite != null:
@@ -631,8 +648,15 @@ func update_hands_display(hands: Array, active_hand: int) -> void:
 					icon.region_enabled = obj_sprite.region_enabled
 					icon.region_rect    = obj_sprite.region_rect
 					icon.visible        = true
-				else: icon.visible = false
-			else: icon.visible = false
+				else: 
+					icon.visible = false
+					
+				# Removed logic that set amt_lbl.visible = true
+				if amt_lbl != null:
+					amt_lbl.visible = false
+			else: 
+				icon.visible = false
+				if amt_lbl != null: amt_lbl.visible = false
 
 func update_clothing_display(equipped: Dictionary) -> void:
 	for slot_name in _slot_icons.keys():
@@ -678,11 +702,13 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 
 	if Input.is_key_pressed(KEY_SHIFT):
 		if clicked_item == null: return
-		var itype = clicked_item.get("item_type")
-		if itype == null or itype == "":
-			itype = clicked_item.name.get_slice("@", 0)
-		var hand_label := "right hand" if hand_idx == 0 else "left hand"
-		player._show_inspect_text(itype + " (in " + hand_label + ")", "")
+		var desc = ""
+		if clicked_item.has_method("get_description"):
+			desc = clicked_item.get_description()
+		else:
+			desc = clicked_item.get("item_type") if clicked_item.get("item_type") != null else clicked_item.name.get_slice("@", 0)
+		
+		player._show_inspect_text(desc, "")
 		return
 
 	# If the clicked hand has a satchel and the active hand holds an item, insert into satchel
@@ -700,8 +726,32 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 				World.rpc_request_satchel_insert.rpc_id(1, clicked_item.get_path(), player.active_hand)
 			return
 
+	# Combine coins in hands
+	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] != null:
+		var active_held: Node = player.hands[player.active_hand]
+		if active_held.get("is_coin_stack") and clicked_item.get("is_coin_stack"):
+			if active_held.get("item_type") == clicked_item.get("item_type"):
+				if player.multiplayer.is_server():
+					World.rpc_request_combine_hand_coins(player.active_hand, hand_idx)
+				else:
+					World.rpc_request_combine_hand_coins.rpc_id(1, player.active_hand, hand_idx)
+				return
+
 	# If the clicked hand has an item and the active hand is empty, handle transfer or storage open
 	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] == null:
+		# Split coin stack
+		if clicked_item.get("is_coin_stack"):
+			if clicked_item.get("amount") > 1:
+				_show_coin_split_dialog(hand_idx, player.active_hand, clicked_item.get("amount"))
+			else:
+				# Only 1 coin, just transfer it normally
+				if player.multiplayer.has_multiplayer_peer():
+					if player.multiplayer.is_server():
+						player.rpc_transfer_to_hand(hand_idx, player.active_hand)
+					else:
+						player.rpc_transfer_to_hand.rpc_id(1, hand_idx, player.active_hand)
+			return
+
 		# Storage items (e.g. satchel) open their inventory instead of transferring to active hand
 		if clicked_item.has_method("_open_ui"):
 			if clicked_item.get("_ui_layer") != null and is_instance_valid(clicked_item.get("_ui_layer")):
@@ -730,6 +780,37 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 				player.rpc("_sync_active_hand", hand_idx)
 			else:
 				player.rpc_id(1, "_sync_active_hand", hand_idx)
+
+func _show_coin_split_dialog(from_idx: int, to_idx: int, max_amount: int) -> void:
+	var dialog = ConfirmationDialog.new()
+	dialog.title = "Split Coins"
+	
+	var vbox = VBoxContainer.new()
+	dialog.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Amount to split (Max: " + str(max_amount - 1) + "):"
+	vbox.add_child(label)
+	
+	var spinbox = SpinBox.new()
+	spinbox.min_value = 1
+	spinbox.max_value = max_amount - 1
+	spinbox.value = 1
+	vbox.add_child(spinbox)
+	
+	dialog.confirmed.connect(func():
+		var split_amt = int(spinbox.value)
+		if player != null and player.multiplayer.has_multiplayer_peer():
+			if player.multiplayer.is_server():
+				World.rpc_request_split_coins(from_idx, to_idx, split_amt)
+			else:
+				World.rpc_request_split_coins.rpc_id(1, from_idx, to_idx, split_amt)
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(func(): dialog.queue_free())
+	
+	add_child(dialog)
+	dialog.popup_centered()
 
 func _on_intent_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return

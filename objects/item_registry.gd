@@ -23,6 +23,9 @@ const ALL_ITEMS: Array =[
 	preload("res://items/tree2.tres"),
 	preload("res://items/dirk.tres"),
 	preload("res://items/lamp.tres"),
+	preload("res://items/copper_coin.tres"),
+	preload("res://items/silver_coin.tres"),
+	preload("res://items/gold_coin.tres"),
 	# --- Clothing ---
 	preload("res://items/ironhelmet.tres"),
 	preload("res://items/ironchestplate.tres"),
@@ -94,4 +97,3 @@ func get_by_type(item_type: String) -> ItemData:
 
 func get_scene_path(item_type: String) -> String:
 	return _scene_paths_cache.get(item_type, "")
-	

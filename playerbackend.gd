@@ -60,8 +60,7 @@ func get_detailed_description() -> String:
 			desc += "\n[color=gray]" + slot + ":[/color] " + item
 
 	if is_me and player.body != null:
-		var limb_display: Array =[
-			["head",  "head"],["chest", "chest"],["r_arm", "right arm"],["l_arm", "left arm"],["r_leg", "right leg"],["l_leg", "left leg"],
+		var limb_display: Array =[["head",  "head"],["chest", "chest"],["r_arm", "right arm"],["l_arm", "left arm"],["r_leg", "right leg"],["l_leg", "left leg"],
 		]
 		for entry in limb_display:
 			var limb_key: String    = entry[0]
@@ -104,18 +103,17 @@ func inspect_at(world_pos: Vector2) -> void:
 		show_inspect_text(get_description(), get_detailed_description())
 		return
 
-	# Check held items explicitly (they are filtered from pickable group below)
+	# Check held items explicitly
 	for i in range(2):
 		var held = player.hands[i]
 		if held == null or not is_instance_valid(held):
 			continue
 		var hand_tile := Vector2i(int(held.global_position.x / World.TILE_SIZE), int(held.global_position.y / World.TILE_SIZE))
 		if hand_tile == target_tile:
-			var itype = held.get("item_type")
-			if itype == null or itype == "":
-				itype = held.name.get_slice("@", 0)
-			var hand_label := "right hand" if i == 0 else "left hand"
-			show_inspect_text(itype + " (in " + hand_label + ")", "")
+			# CHANGE: Use get_description if it exists (for coins/items), otherwise fallback
+			var hand_label := " (in right hand)" if i == 0 else " (in left hand)"
+			var desc = held.get_description() if held.has_method("get_description") else (held.get("item_type") if held.get("item_type") != null else held.name.get_slice("@", 0))
+			show_inspect_text(desc + hand_label, "")
 			return
 
 	# Check NPCs
@@ -435,8 +433,18 @@ func face_toward(world_pos: Vector2) -> void:
 func on_object_picked_up(object_node: Node) -> void:
 	if not player._is_local_authority():
 		return
-	if player.hands[player.active_hand] != null:
+		
+	var active_item = player.hands[player.active_hand]
+	if active_item != null:
+		# Combine ground coins
+		if active_item.get("is_coin_stack") and object_node.get("is_coin_stack"):
+			if active_item.get("item_type") == object_node.get("item_type"):
+				if player.multiplayer.is_server():
+					World.rpc_request_combine_ground_coin(object_node.get_path(), player.active_hand)
+				else:
+					World.rpc_request_combine_ground_coin.rpc_id(1, object_node.get_path(), player.active_hand)
 		return
+		
 	if player.multiplayer.is_server():
 		World.rpc_request_pickup(object_node.get_path(), player.active_hand)
 	else:
@@ -447,8 +455,10 @@ func drop_item_from_hand(hand_idx: int) -> void:
 		return
 	var obj = player.hands[hand_idx]
 	if player.multiplayer.is_server():
-		World.rpc_request_drop(obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
+		# Server: directly call the authority RPC
+		World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 	else:
+		# Client: request the server to drop the item
 		World.rpc_request_drop.rpc_id(1, obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 
 func drop_held_object() -> void:

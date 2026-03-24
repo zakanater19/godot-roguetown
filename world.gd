@@ -902,7 +902,7 @@ func rpc_confirm_replace_tile(pos: Vector2i, source_id: int, atlas_coords: Vecto
 
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_break_stone_wall(pos: Vector2i) -> void:
-	# Replace stone wall tile with cobblestone floor (source 0, atlas col 5)
+	# Replace stone wall tile with cobblestone floor (source 0, col 5)
 	if tilemap == null: return
 	tilemap.set_cell(pos, 0, Vector2i(5, 0))
 	# Register tile change with LateJoin
@@ -1259,6 +1259,146 @@ func rpc_confirm_furnace_action(peer_id: int, furnace_path: NodePath, action: St
 	var furnace = get_node_or_null(furnace_path)
 	if furnace != null:
 		furnace._perform_action(action, player, hand_idx, generated_names)
+
+# ---------------------------------------------------------------------------
+# Coins
+# ---------------------------------------------------------------------------
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_split_coins(from_hand: int, to_hand: int, split_amount: int) -> void:
+	if not multiplayer.is_server(): return
+	var peer_id = multiplayer.get_remote_sender_id()
+	if peer_id == 0: peer_id = multiplayer.get_unique_id()
+	
+	var player = _find_player_by_peer(peer_id)
+	if player == null or player.dead: return
+	if player.hands[to_hand] != null: return
+	var from_item = player.hands[from_hand]
+	if from_item == null or from_item.get("is_coin_stack") != true: return
+	if from_item.get("amount") <= split_amount or split_amount <= 0: return # Must leave at least 1 coin behind
+	
+	var new_name = "Coin_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	var m_type = from_item.get("metal_type")
+	rpc_confirm_split_coins.rpc(peer_id, from_hand, to_hand, new_name, split_amount, m_type)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_split_coins(peer_id: int, from_hand: int, to_hand: int, new_name: String, split_amount: int, metal_type: int) -> void:
+	var player = _find_player_by_peer(peer_id)
+	if player == null: return
+	var from_item = player.hands[from_hand]
+	if from_item == null: return
+	
+	from_item.amount -= split_amount
+	
+	var scene_path = ItemRegistry.get_scene_path(from_item.item_type)
+	if scene_path == "":
+		push_error("World: Could not find scene path for " + str(from_item.item_type))
+		return
+		
+	var scene = load(scene_path) as PackedScene
+	if scene == null:
+		push_error("World: Failed to load scene: " + scene_path)
+		return
+		
+	var new_coin = scene.instantiate()
+	new_coin.name = new_name
+	new_coin.metal_type = metal_type
+	new_coin.amount = split_amount
+	player.get_parent().add_child(new_coin)
+	
+	for child in new_coin.get_children():
+		if child is CollisionShape2D:
+			child.disabled = true
+			
+	player.hands[to_hand] = new_coin
+	if player._is_local_authority():
+		player._update_hands_ui()
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_combine_hand_coins(from_hand: int, to_hand: int) -> void:
+	if not multiplayer.is_server(): return
+	var peer_id = multiplayer.get_remote_sender_id()
+	if peer_id == 0: peer_id = multiplayer.get_unique_id()
+	
+	var player = _find_player_by_peer(peer_id)
+	if player == null or player.dead: return
+	var from_item = player.hands[from_hand]
+	var to_item = player.hands[to_hand]
+	if from_item == null or to_item == null: return
+	if from_item.get("is_coin_stack") != true or to_item.get("is_coin_stack") != true: return
+	if from_item.get("item_type") != to_item.get("item_type"): return
+	
+	var available_space = 20 - to_item.get("amount")
+	if available_space <= 0: return
+	
+	var transfer_amt = min(from_item.get("amount"), available_space)
+	rpc_confirm_combine_hand_coins.rpc(peer_id, from_hand, to_hand, transfer_amt)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_combine_hand_coins(peer_id: int, from_hand: int, to_hand: int, amount: int) -> void:
+	var player = _find_player_by_peer(peer_id)
+	if player == null: return
+	var from_item = player.hands[from_hand]
+	var to_item = player.hands[to_hand]
+	if from_item == null or to_item == null: return
+	
+	to_item.amount += amount
+	from_item.amount -= amount
+	if from_item.amount <= 0:
+		player.hands[from_hand] = null
+		if is_instance_valid(from_item):
+			from_item.queue_free()
+	
+	if player._is_local_authority():
+		player._update_hands_ui()
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_combine_ground_coin(coin_path: NodePath, hand_idx: int) -> void:
+	if not multiplayer.is_server(): return
+	var peer_id = multiplayer.get_remote_sender_id()
+	if peer_id == 0: peer_id = multiplayer.get_unique_id()
+	
+	var player = _find_player_by_peer(peer_id)
+	if player == null or player.dead: return
+	if not _server_check_action_cooldown(player): return
+	
+	var hand_item = player.hands[hand_idx]
+	var ground_coin = get_node_or_null(coin_path)
+	if hand_item == null or ground_coin == null: return
+	if not _is_within_interaction_range(player, ground_coin.global_position): return
+	if hand_item.get("is_coin_stack") != true or ground_coin.get("is_coin_stack") != true: return
+	if hand_item.get("item_type") != ground_coin.get("item_type"): return
+	
+	var available_space = 20 - hand_item.get("amount")
+	if available_space <= 0: return
+	
+	var transfer_amt = min(ground_coin.get("amount"), available_space)
+	rpc_confirm_combine_ground_coin.rpc(peer_id, coin_path, hand_idx, transfer_amt)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_combine_ground_coin(peer_id: int, coin_path: NodePath, hand_idx: int, amount: int) -> void:
+	var player = _find_player_by_peer(peer_id)
+	var hand_item = player.hands[hand_idx] if player else null
+	
+	# Update the hand item if it exists
+	if hand_item != null:
+		hand_item.amount += amount
+			
+	# Update the ground coin node if it exists
+	var ground_coin = get_node_or_null(coin_path)
+	if ground_coin != null and is_instance_valid(ground_coin):
+		ground_coin.amount -= amount
+		if ground_coin.amount <= 0:
+			if has_node("/root/LateJoin"):
+				LateJoin.unregister_object(coin_path)
+			if is_instance_valid(ground_coin):
+				ground_coin.queue_free()
+		else:
+			if has_node("/root/LateJoin"):
+				LateJoin.register_object_state(coin_path, {"amount": ground_coin.amount, "type": "coin"})
+			
+	if player and player._is_local_authority():
+		player._update_hands_ui()
 
 # ---------------------------------------------------------------------------
 # Item Interactions (Pickup, Drop, Throw)
