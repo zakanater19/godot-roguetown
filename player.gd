@@ -410,6 +410,11 @@ func _sync_sleep_state(new_state: int) -> void:
 			sleep_state = new_state as SleepState
 			_set_lying_down_visuals(sleep_state != SleepState.AWAKE)
 
+@rpc("authority", "call_local", "reliable")
+func rpc_heal_limbs(amount: int) -> void:
+	if body != null:
+		body.heal_limbs(amount)
+
 func _set_lying_down_visuals(_lying_down: bool) -> void:
 	if dead: return
 	_update_sprite()
@@ -845,7 +850,7 @@ func _process(delta: float) -> void:
 	
 	_check_stamina_regen(delta)
 
-	if sleep_state != SleepState.AWAKE:
+	if sleep_state != SleepState.AWAKE and not dead:
 		if sleep_state == SleepState.FALLING_ASLEEP:
 			sleep_timer -= delta
 			if sleep_timer <= 0.0:
@@ -867,7 +872,18 @@ func _process(delta: float) -> void:
 				if health_regen_accumulator >= 1.0:
 					var heal_amount = int(health_regen_accumulator)
 					health_regen_accumulator -= heal_amount
-					health = clamp(health + heal_amount, 0, 100)
+					
+					if health < 100:
+						var missing = 100 - health
+						if heal_amount <= missing:
+							health += heal_amount
+							heal_amount = 0
+						else:
+							health = 100
+							heal_amount -= missing
+							
+					if heal_amount > 0:
+						rpc_heal_limbs.rpc(heal_amount)
 
 	if is_local and _sleep_blackout != null:
 		if sleep_state == SleepState.AWAKE:

@@ -108,6 +108,57 @@ func _on_limb_broken(limb: String) -> void:
 				player._update_water_submerge()
 
 # ---------------------------------------------------------------------------
+# Limb Healing (Triggered by resting when full HP)
+# ---------------------------------------------------------------------------
+
+func heal_limbs(amount: int) -> int:
+	var leftover = amount
+	while leftover > 0:
+		var lowest_limb = ""
+		var lowest_hp = LIMB_MAX_HP
+		
+		# Find the most damaged limb
+		for limb in limb_hp.keys():
+			if limb_hp[limb] < lowest_hp:
+				lowest_hp = limb_hp[limb]
+				lowest_limb = limb
+				
+		# If all limbs are at maximum, break out
+		if lowest_limb == "":
+			break
+			
+		var needed = LIMB_MAX_HP - limb_hp[lowest_limb]
+		var heal_this_time = min(leftover, needed)
+		var was_broken = limb_broken[lowest_limb]
+		
+		limb_hp[lowest_limb] += heal_this_time
+		leftover -= heal_this_time
+		
+		# If the limb was broken, but is now back above 0 HP, it's usable again
+		if was_broken and limb_hp[lowest_limb] > 0:
+			_on_limb_healed(lowest_limb)
+			
+	return leftover
+
+func _on_limb_healed(limb: String) -> void:
+	limb_broken[limb] = false
+	var is_local: bool = player._is_local_authority()
+	
+	match limb:
+		"r_arm":
+			if is_local:
+				Sidebar.add_message("[color=#aaffaa]Your right arm has healed and is usable again![/color]")
+		"l_arm":
+			if is_local:
+				Sidebar.add_message("[color=#aaffaa]Your left arm has healed and is usable again![/color]")
+		"r_leg", "l_leg":
+			if is_local and not are_legs_broken():
+				Sidebar.add_message("[color=#aaffaa]Your legs have healed enough to stand up![/color]")
+		"chest":
+			if is_local:
+				Sidebar.add_message("[color=#aaffaa]Your chest has healed![/color]")
+
+# ---------------------------------------------------------------------------
 # Helpers queried by player.gd
 # ---------------------------------------------------------------------------
 
