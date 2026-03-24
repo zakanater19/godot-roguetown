@@ -59,26 +59,34 @@ func _process(_delta: float) -> void:
 	else:
 		sun_weight = 1.0
 
-	# Apply visual color
-	var night_color = Color(0.1, 0.1, 0.15, 1.0)
+	# Apply visual color (Black for total darkness at night)
+	var night_color = Color(0.0, 0.0, 0.0, 1.0) 
 	canvas_mod.color = night_color.lerp(Color.WHITE, sun_weight)
 
-	# Continually ensure all players have a weak test light attached
+	# Manage player "sight" lights
 	var players = get_tree().get_nodes_in_group("player")
+	var local_player = World.get_local_player()
+	
 	for p in players:
 		var light = p.get_node_or_null("PlayerLight")
-		if light == null:
-			light = PointLight2D.new()
-			light.name = "PlayerLight"
-			light.texture = light_texture
-			# Use MIX blend mode so lights don't blow out into pure white when stacked
-			light.blend_mode = PointLight2D.BLEND_MODE_MIX
-			light.energy = 0.8
-			light.z_index = 15
-			p.add_child(light)
+		
+		# If this is the local player, ensure the light exists and is configured
+		if p == local_player:
+			if light == null:
+				light = PointLight2D.new()
+				light.name = "PlayerLight"
+				light.texture = light_texture
+				# Use MIX blend mode so lights don't blow out into pure white when stacked
+				light.blend_mode = PointLight2D.BLEND_MODE_MIX
+				light.z_index = 15
+				p.add_child(light)
 			
-		# Enable lights only when sun_weight drops below 50%
-		light.enabled = (sun_weight < 0.5)
+			light.energy = 0.4 # Halved from 0.8
+			light.enabled = (sun_weight < 0.5)
+			
+		# If this is a remote player, ensure their light is removed
+		elif light != null:
+			light.queue_free()
 
 # Called by the UI button
 func toggle_time_of_day() -> void:
