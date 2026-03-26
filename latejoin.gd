@@ -149,6 +149,9 @@ func _get_object_sync_data(obj: Node) -> Dictionary:
 	if obj.get_script() != null:
 		data["script_path"] = obj.get_script().resource_path
 		
+	if "z_level" in obj:
+		data["z_level"] = obj.get("z_level")
+		
 	if "hits" in obj: data["hits"] = obj.get("hits")
 	if "state" in obj: data["state"] = obj.get("state")
 	if "is_on" in obj: data["is_on"] = obj.get("is_on")
@@ -541,6 +544,20 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 	if main_node == null: return
 	var obj_name = str(obj_data["name"])
 	var obj = main_node.get_node_or_null(NodePath(obj_name))
+	
+	# If object exists, we might need to fix Z and registry
+	if obj != null:
+		if obj_data.has("z_level"):
+			var new_z = obj_data["z_level"]
+			var old_z = obj.get("z_level")
+			if old_z != new_z:
+				var tile = World._world_to_tile(obj.global_position)
+				World.unregister_solid(tile, old_z, obj)
+				World.register_solid(tile, new_z, obj)
+				obj.set("z_level", new_z)
+				obj.z_index = (new_z - 1) * 200 + (obj.z_index % 200)
+
+	# If object doesn't exist, spawn it
 	if obj == null:
 		if obj_data.has("scene_file_path") and obj_data["scene_file_path"] != "":
 			var scene = load(obj_data["scene_file_path"]) as PackedScene
@@ -553,7 +570,14 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 				_:
 					if obj_data.has("script_path"):
 						var s = load(obj_data["script_path"]); if s: obj = Node2D.new(); obj.set_script(s)
-		if obj != null: obj.name = obj_name; main_node.add_child(obj)
+		if obj != null:
+			obj.name = obj_name
+			if obj_data.has("z_level"):
+				obj.set("z_level", obj_data["z_level"])
+			main_node.add_child(obj)
+			if obj_data.has("z_level"):
+				obj.z_index = (obj.z_level - 1) * 200 + (obj.z_index % 200)
+
 	if obj != null:
 		obj.position = obj_data["position"]
 		if obj_data.has("hits"):
