@@ -370,6 +370,12 @@ func rpc_sync_z_level(new_z: int) -> void:
 	z_level = new_z
 	z_index = (z_level - 1) * 200 + 10
 	_update_water_submerge()
+	
+	# Fix: Update held items' z_level so main.gd visibility logic doesn't hide them
+	for h in hands:
+		if h != null and is_instance_valid(h):
+			h.set("z_level", new_z)
+
 	if _is_local_authority():
 		if _hud:
 			_hud.update_stats(health, stamina)
@@ -462,6 +468,8 @@ func sync_hands(hand_names: Array) -> void:
 			hands[i] = found
 			for child in found.get_children():
 				if child is CollisionShape2D: child.disabled = true
+			# Ensure the hand item knows it is now on the player's z-level
+			found.set("z_level", z_level)
 	_update_hands_ui()
 
 func _setup_clothing_sprites() -> void:
@@ -487,7 +495,7 @@ func _update_clothing_sprites() -> void:
 		elif sleep_state == SleepState.ASLEEP: target_rot = 90.0
 	elif is_lying_down: target_rot = 90.0
 
-	var slots := [["HelmetSprite", "head"],["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["TrousersSprite", "trousers"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["WaistSprite", "waist"]]
+	var slots := [["HelmetSprite", "head"],["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["WaistSprite", "waist"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["TrousersSprite", "trousers"]]
 
 	for slot in slots:
 		var sprite: Sprite2D = get_node_or_null(slot[0])
