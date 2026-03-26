@@ -96,6 +96,7 @@ func _send_world_state_to_peer(peer_id: int) -> void:
 		var eq_data_state = node.get("equipped_data").duplicate(true) if "equipped_data" in node else {}
 		player_states[pid] = {
 			"position": node.position,
+			"z_level": node.get("z_level"),
 			"disconnected": false,
 			"health": node.get("health"),
 			"limb_hp": node.get("body").limb_hp.duplicate() if node.get("body") != null else {},
@@ -213,6 +214,7 @@ func _capture_player_state(player_node: Node2D) -> Dictionary:
 		"character_name": player_node.get("character_name"),
 		"character_class": player_node.get("character_class"),
 		"position": player_node.position,
+		"z_level": player_node.get("z_level"),
 		"tile_pos": player_node.get("tile_pos"),
 		"facing": player_node.get("facing"),
 		"health": player_node.get("health"),
@@ -346,6 +348,9 @@ func _restore_player_state(player_node: Node2D, player_state: Dictionary) -> voi
 	player_node.set("character_name", player_state.get("character_name", "noob"))
 	player_node.set("character_class", player_state.get("character_class", "peasant"))
 	player_node.position = player_state["position"]
+	if player_state.has("z_level"):
+		player_node.set("z_level", player_state["z_level"])
+		player_node.z_index = (player_node.get("z_level") - 1) * 200 + 10
 	player_node.set("tile_pos", player_state["tile_pos"])
 	player_node.set("facing", player_state["facing"])
 	player_node.set("health", player_state["health"])
@@ -500,6 +505,7 @@ func receive_player_states(player_states: Dictionary) -> void:
 		if node != null:
 			var lp = World.get_local_player() as Node2D
 			if lp != null and (p_data["position"] - lp.position).length() > 1000: node.position = p_data["position"]
+			if p_data.has("z_level"): node.set("z_level", p_data["z_level"])
 			if p_data.has("limb_hp") and node.get("body") != null: node.get("body").limb_hp = p_data["limb_hp"].duplicate()
 			if p_data.has("limb_broken") and node.get("body") != null: node.get("body").limb_broken = p_data["limb_broken"].duplicate()
 			if p_data.has("hands") and node.has_method("sync_hands"): node.call("sync_hands", p_data["hands"])

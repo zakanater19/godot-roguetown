@@ -1,4 +1,4 @@
-# Full file: project/player.gd
+# res://player.gd
 extends Node2D
 
 const MOVE_TIME:   float = 0.22
@@ -365,6 +365,15 @@ func _rpc_sync_lying_down(val: bool) -> void:
 			_update_sprite()
 			_update_water_submerge()
 
+@rpc("any_peer", "call_local", "reliable")
+func rpc_sync_z_level(new_z: int) -> void:
+	z_level = new_z
+	z_index = (z_level - 1) * 200 + 10
+	_update_water_submerge()
+	if _is_local_authority():
+		if _hud:
+			_hud.update_stats(health, stamina)
+
 func _enter_tree() -> void:
 	if name.begins_with("Player_"):
 		var peer_id := name.trim_prefix("Player_").to_int()
@@ -456,9 +465,7 @@ func sync_hands(hand_names: Array) -> void:
 	_update_hands_ui()
 
 func _setup_clothing_sprites() -> void:
-	var layers = [["TrousersSprite", 1], 
-		["ClothingSprite", 2],["ChestSprite", 3],["BackpackSprite", 4], 
-		["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["CloakSprite", 7]
+	var layers = [["TrousersSprite", 1],["ClothingSprite", 2],["ChestSprite", 3],["BackpackSprite", 4],["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["CloakSprite", 7]
 	]
 	for spec in layers:
 		var s := Sprite2D.new()

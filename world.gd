@@ -117,6 +117,46 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
 	objects.drop_item_at(obj, tile, spread)
 
+func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
+	var check_z = current_z
+	while check_z > 1:
+		var tm = get_tilemap(check_z)
+		# A source ID of -1 means empty space
+		if tm != null and tm.get_cell_source_id(tile_pos) != -1:
+			return check_z
+		check_z -= 1
+	return 1
+
+func apply_gravity_to_player(player: Node2D) -> void:
+	if player == null or player.dead: return
+	var land_z = calculate_gravity_z(player.tile_pos, player.z_level)
+	if land_z < player.z_level:
+		var drop = player.z_level - land_z
+		player.rpc_sync_z_level.rpc(land_z)
+		
+		var dmg = randi_range(20, 30) * drop
+		var target_limb = "chest"
+		if drop >= 2:
+			target_limb =["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"].pick_random()
+		
+		player.receive_damage.rpc(dmg, target_limb)
+		rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")
+
+@rpc("authority", "call_local", "reliable")
+func rpc_set_object_z_level(obj_path: NodePath, new_z: int) -> void:
+	var obj = get_node_or_null(obj_path)
+	if obj != null:
+		var old_z = obj.get("z_level")
+		obj.set("z_level", new_z)
+		var base = obj.z_index % 200
+		obj.z_index = (new_z - 1) * 200 + base
+		
+		if old_z != null and old_z != new_z:
+			var tile = utils.world_to_tile(obj.global_position)
+			if obj.is_in_group("choppable_object") or obj.is_in_group("minable_object") or obj.is_in_group("door") or obj.is_in_group("inspectable") or obj.is_in_group("bed"):
+				unregister_solid(tile, old_z, obj)
+				register_solid(tile, new_z, obj)
+
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_update_laws(new_laws: Array) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -332,8 +372,8 @@ func rpc_request_throw(item_path: NodePath, hand_index: int, dir: Vector2, throw
 	objects.handle_rpc_request_throw(sender_id, item_path, hand_index, dir, throw_range)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int, land_pixel: Vector2) -> void:
-	objects.handle_rpc_confirm_throw(peer_id, item_path, hand_index, land_pixel)
+func rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int, land_pixel: Vector2, land_z: int) -> void:
+	objects.handle_rpc_confirm_throw(peer_id, item_path, hand_index, land_pixel, land_z)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_send_chat(message: String) -> void:

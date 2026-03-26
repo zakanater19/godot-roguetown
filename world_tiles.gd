@@ -97,6 +97,8 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			world.combat.drag_grabbed_entity(sender_id, old_tile)
 			world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
 			world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), old_tile, false)
+			world.apply_gravity_to_player(blocking_player)
+			world.apply_gravity_to_player(player)
 		else:
 			var push_dest = next_tile + dir
 			if push_dest.x >= 0 and push_dest.x < world.GRID_WIDTH and push_dest.y >= 0 and push_dest.y < world.GRID_HEIGHT:
@@ -114,12 +116,15 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 						world.combat.drag_grabbed_entity(sender_id, old_tile)
 						world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), push_dest, false)
 						world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
+						world.apply_gravity_to_player(blocking_player)
+						world.apply_gravity_to_player(player)
 						return
 			world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 	else:
 		player.tile_pos = next_tile
 		world.combat.drag_grabbed_entity(sender_id, old_tile)
 		world.rpc_confirm_move.rpc(sender_id, next_tile, is_sprinting)
+		world.apply_gravity_to_player(player)
 
 func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D

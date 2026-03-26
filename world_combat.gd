@@ -194,6 +194,7 @@ func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 			target_player.tile_pos = shove_dest
 			world.rpc_confirm_move.rpc(target_player.get_multiplayer_authority(), shove_dest, false)
 			world.rpc_broadcast_damage_log.rpc(attacker.character_name, target_player.character_name, 0, attacker.tile_pos, attacker.z_level, false, true, "", "")
+			world.apply_gravity_to_player(target_player)
 
 func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_limb: String) -> void:
 	if not world.multiplayer.is_server(): return
@@ -204,7 +205,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 	if not world.utils.server_check_action_cooldown(attacker, true): return
 	var held_item = attacker.hands[attacker.active_hand]
 	var amount: int = attacker._get_weapon_damage(held_item)
-	var is_sword = held_item != null and (held_item.get("item_type") in ["Sword", "Dirk"] or "Sword" in held_item.name or "Dirk" in held_item.name)
+	var is_sword = held_item != null and (held_item.get("item_type") in["Sword", "Dirk"] or "Sword" in held_item.name or "Dirk" in held_item.name)
 	var entities = world.utils.get_entities_at_tile(tile, attacker.z_level, sender_id)
 	for entity in entities:
 		var roll = calculate_combat_roll(attacker, entity, amount, is_sword)

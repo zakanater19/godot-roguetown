@@ -28,6 +28,9 @@ properties/6/replication_mode = 1
 properties/7/path = NodePath(".:character_class")
 properties/7/spawn = true
 properties/7/replication_mode = 1
+properties/8/path = NodePath(".:z_level")
+properties/8/spawn = true
+properties/8/replication_mode = 1
 
 [node name="Player" type="Node2D"]
 script = ExtResource("1_onrkg")

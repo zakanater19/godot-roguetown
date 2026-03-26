@@ -72,6 +72,7 @@ sources/5 = SubResource("TileSetAtlasSource_mjrc7")
 script = ExtResource("1_main")
 
 [node name="TileMapLayer_Z1" type="TileMapLayer" parent="."]
+tile_map_data = PackedByteArray("AADpAe0BAAAIAAAAAADqAe0BAAAIAAAAAADqAe4BAAAIAAAAAADrAe4BAAAIAAAAAADrAe8BAAAIAAAAAADsAe8BAAAIAAAAAADtAe8BAAAIAAAAAADtAfABAAAIAAAAAADuAfABAAAIAAAAAADuAfEBAAAIAAAAAADvAfEBAAAIAAAAAADwAfIBAAAIAAAAAADxAfIBAAAIAAAAAADxAfMBAAAIAAAAAADsAfABAAAIAAAAAADpAe4BAAAIAAAAAADoAe0BAAAIAAAAAADnAewBAAAIAAAAAADoAewBAAAIAAAAAAA=")
 tile_set = SubResource("TileSet_seu75")
 
 [node name="Darken_Z1_Z2" type="ColorRect" parent="."]
@@ -131,86 +132,86 @@ script = ExtResource("2_overlay")
 [node name="Camera2D" type="Camera2D" parent="."]
 
 [node name="Pickaxe" parent="." instance=ExtResource("6_7mycd")]
-z_index = 805
+z_index = 402
 position = Vector2(31890, 32213)
 
 [node name="Sword" parent="." instance=ExtResource("7_272bh")]
-z_index = 805
+z_index = 402
 position = Vector2(31964, 32226)
 
 [node name="IronIngot" parent="." instance=ExtResource("8_5vw27")]
-z_index = 1205
+z_index = 402
 position = Vector2(31830, 32103)
 
 [node name="Furnace" parent="." instance=ExtResource("9_kek77")]
-z_index = 405
+z_index = 402
 position = Vector2(32163, 31904)
 
 [node name="IronOre" parent="." instance=ExtResource("10_efxa6")]
-z_index = 1205
+z_index = 402
 position = Vector2(31916, 32141)
 
 [node name="Coal" parent="." instance=ExtResource("11_dg77c")]
-z_index = 1205
+z_index = 402
 position = Vector2(31960, 32147)
 
 [node name="Spider" parent="." instance=ExtResource("12_spider")]
 position = Vector2(33469, 32208)
 
 [node name="IronChestplate" parent="." instance=ExtResource("13_w48qg")]
-z_index = 1205
+z_index = 402
 position = Vector2(31508, 32214)
 
 [node name="IronHelmet" parent="." instance=ExtResource("14_vivmo")]
-z_index = 1205
+z_index = 402
 position = Vector2(31536, 32152)
 
 [node name="LeatherBoots" parent="." instance=ExtResource("15_lboots")]
-z_index = 1205
+z_index = 402
 position = Vector2(31533, 32236)
 
 [node name="LeatherTrousers" parent="." instance=ExtResource("16_ltrousers")]
-z_index = 1205
+z_index = 402
 position = Vector2(31505, 32157)
 
 [node name="Sword2" parent="." instance=ExtResource("7_272bh")]
-z_index = 805
+z_index = 402
 position = Vector2(31977, 32234)
 
 [node name="Tree" parent="." instance=ExtResource("18_074og")]
-z_index = 1205
+z_index = 402
 position = Vector2(31903, 32345)
 
 [node name="Undershirt" parent="." instance=ExtResource("17_cegan")]
-z_index = 1205
+z_index = 402
 position = Vector2(31584, 32281)
 
 [node name="Blackshirt" parent="." instance=ExtResource("18_82xsv")]
-z_index = 1205
+z_index = 402
 position = Vector2(31569, 32294)
 
 [node name="Apothshirt" parent="." instance=ExtResource("17_yaehf")]
-z_index = 1205
+z_index = 402
 position = Vector2(31595, 32296)
 
 [node name="Merchantrobe" parent="." instance=ExtResource("20_82xsv")]
-z_index = 1205
+z_index = 402
 position = Vector2(31592, 32237)
 
 [node name="Plate" parent="." instance=ExtResource("21_getpj")]
-z_index = 1205
+z_index = 402
 position = Vector2(31637, 32279)
 
 [node name="Door" parent="." instance=ExtResource("4_ryguw")]
-z_index = 1205
+z_index = 1605
 position = Vector2(31135, 32160)
 
 [node name="Door2" parent="." instance=ExtResource("4_ryguw")]
-z_index = 1205
+z_index = 1605
 position = Vector2(30815, 32288)
 
 [node name="Door3" parent="." instance=ExtResource("4_ryguw")]
-z_index = 1205
+z_index = 1605
 position = Vector2(32351, 32862)
 
 [node name="Spawner" parent="." instance=ExtResource("23_d13ii")]
@@ -230,19 +231,19 @@ position = Vector2(32872, 32706)
 spawn_type = "bandit"
 
 [node name="NormalBed" parent="." instance=ExtResource("24_1u8w0")]
-z_index = 804
+z_index = 402
 position = Vector2(31150, 31902)
 
 [node name="Satchel" parent="." instance=ExtResource("25_0odxb")]
-z_index = 805
+z_index = 402
 position = Vector2(31915, 32080)
 
 [node name="KingCloak" parent="." instance=ExtResource("26_lswn8")]
-z_index = 1205
+z_index = 402
 position = Vector2(31748, 32216)
 
 [node name="Crown" parent="." instance=ExtResource("27_a6jrf")]
-z_index = 1205
+z_index = 402
 position = Vector2(31705, 32255)
 
 [node name="Spawner5" parent="." instance=ExtResource("23_d13ii")]
@@ -250,46 +251,46 @@ position = Vector2(30256, 32227)
 spawn_type = "king"
 
 [node name="Dirk" parent="." instance=ExtResource("28_xuqvo")]
-z_index = 805
+z_index = 402
 position = Vector2(31395, 32228)
 
 [node name="MerchantVendor" parent="." instance=ExtResource("29_qsp4k")]
-z_index = 1205
+z_index = 1605
 position = Vector2(30560, 32095)
 scale = Vector2(1.5, 1.5)
 
 [node name="Lamp" parent="." instance=ExtResource("30_kq58d")]
-z_index = 805
+z_index = 402
 position = Vector2(31266, 32279)
 
 [node name="Coin" parent="." instance=ExtResource("31_seu75")]
-z_index = 805
+z_index = 402
 position = Vector2(31028, 32079)
 amount = 2
 
 [node name="Coin2" parent="." instance=ExtResource("31_seu75")]
-z_index = 805
+z_index = 402
 position = Vector2(31024, 32010)
 amount = 10
 
 [node name="Coin3" parent="." instance=ExtResource("31_seu75")]
-z_index = 805
+z_index = 402
 position = Vector2(31000, 32016)
 amount = 10
 
 [node name="Coin4" parent="." instance=ExtResource("31_seu75")]
-z_index = 805
+z_index = 402
 position = Vector2(31071, 32045)
 amount = 7
 
 [node name="Coin5" parent="." instance=ExtResource("31_seu75")]
-z_index = 805
+z_index = 402
 position = Vector2(31079, 31966)
 metal_type = 2
 amount = 20
 
 [node name="Coin6" parent="." instance=ExtResource("31_seu75")]
-z_index = 805
+z_index = 402
 position = Vector2(31034, 31966)
 metal_type = 1
 amount = 20

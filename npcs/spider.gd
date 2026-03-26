@@ -42,24 +42,20 @@ var attack_timer: float = 0.0
 var move_timer:   float = 0.0
 var wander_timer: float = 0.0
 
-
 func get_description() -> String:
 	if dead:
 		return "a dead spider, curled up and harmless"
 	return "a giant spider! careful!"
-
 
 func get_inspect_color() -> Color:
 	if dead:
 		return Color.WHITE
 	return Color(1.0, 0.0, 0.0) # Red for danger
 
-
 func get_inspect_font_size() -> int:
 	if dead:
 		return 11
 	return 14
-
 
 func _ready() -> void:
 	z_index = (z_level - 1) * 200 + z_index
@@ -76,6 +72,10 @@ func _ready() -> void:
 	_update_sprite()
 	World.register_solid(tile_pos, z_level, self)
 
+@rpc("authority", "call_remote", "reliable")
+func rpc_sync_spider_z_level(new_z: int) -> void:
+	z_level = new_z
+	z_index = (z_level - 1) * 200 + (z_index % 200)
 
 @rpc("call_local", "reliable")
 func rpc_spawn_blood(pos: Vector2) -> void:
@@ -85,7 +85,6 @@ func rpc_spawn_blood(pos: Vector2) -> void:
 	spray.z_index = (z_level - 1) * 200 + 50
 	get_parent().add_child(spray)
 
-
 func receive_damage(amount: int) -> void:
 	if dead:
 		return
@@ -94,7 +93,6 @@ func receive_damage(amount: int) -> void:
 	if health <= 0:
 		# Setter handles unregister_solid and sprite flip on all peers via StateSync
 		dead = true
-
 
 func _process(delta: float) -> void:
 	# Spider AI is server-authoritative only
@@ -157,7 +155,6 @@ func _process(delta: float) -> void:
 		if wander_timer >= WANDER_INTERVAL:
 			_wander()
 
-
 func _attack_player(player: Node) -> void:
 	attack_timer = ATTACK_COOLDOWN
 	
@@ -178,7 +175,6 @@ func _attack_player(player: Node) -> void:
 	var target_name: String = player.character_name
 	World.rpc_broadcast_damage_log.rpc("Spider", target_name, roll.damage, tile_pos, z_level, roll.blocked, false, "", roll.get("block_type", ""))
 
-
 func _move_toward_player(player: Node) -> void:
 	var path: Array[Vector2i] = World.find_path(tile_pos, player.tile_pos, z_level)
 
@@ -187,14 +183,12 @@ func _move_toward_player(player: Node) -> void:
 		var dir := next_tile - tile_pos
 		_try_move(dir)
 
-
 func _wander() -> void:
 	var dirs =[Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 	var dir = dirs.pick_random()
 	_try_move(dir)
 	# Reset timer regardless of whether move succeeded, to keep interval consistent
 	wander_timer = 0.0
-
 
 func _try_move(dir: Vector2i) -> void:
 	if   dir.y > 0: facing = 0
@@ -221,6 +215,17 @@ func _try_move(dir: Vector2i) -> void:
 	# Execute move
 	World.unregister_solid(tile_pos, z_level, self)
 	tile_pos     = next
+	
+	var land_z = World.calculate_gravity_z(tile_pos, z_level)
+	if land_z < z_level:
+		var drop = z_level - land_z
+		z_level = land_z
+		z_index = (z_level - 1) * 200 + (z_index % 200)
+		rpc_sync_spider_z_level.rpc(land_z)
+		
+		var dmg = randi_range(20, 30) * drop
+		receive_damage(dmg)
+		
 	World.register_solid(tile_pos, z_level, self)
 
 	move_from    = pixel_pos
@@ -228,7 +233,6 @@ func _try_move(dir: Vector2i) -> void:
 	move_elapsed = 0.0
 	moving       = true
 	move_timer   = MOVE_TIME
-
 
 func _update_sprite() -> void:
 	var sprite: Sprite2D = get_node_or_null("Sprite2D")
