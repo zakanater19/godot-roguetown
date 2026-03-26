@@ -6,11 +6,10 @@ var item_type: String = "Sword"
 
 var weaponizable: bool = true
 var force: int = 50
-
-# Prevents insertion into a satchel — too long to fit.
 var too_large_for_satchel: bool = true
-
 var slot: String = "waist"
+
+@export var z_level: int = 3
 
 func get_description() -> String:
 	return "a sword, regular steel"
@@ -22,6 +21,9 @@ func get_hand_offset() -> Vector2:
 	return Vector2(0.0, -10.0)
 
 func _ready() -> void:
+	# Standardized to floor base + 2 (below players at +10)
+	z_index = (z_level - 1) * 200 + 2
+	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return
 	add_to_group("pickable")
@@ -33,7 +35,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		if Input.is_key_pressed(KEY_SHIFT):
 			return
 		var player: Node = World.get_local_player()
-		if player == null:
+		if player == null or player.z_level != z_level:
 			return
 		var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 		var diff: Vector2i = (my_tile - player.tile_pos).abs()

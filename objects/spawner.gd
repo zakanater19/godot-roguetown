@@ -2,19 +2,16 @@
 extends Marker2D
 
 var spawn_type: String = "peasant"
+@export var z_level: int = 3
 
 func _get_property_list() -> Array[Dictionary]:
 	var options: PackedStringArray = PackedStringArray()
-	
-	# Dynamically pull the class list from classes.gd
 	if Classes and "DATA" in Classes:
 		for key in Classes.DATA.keys():
 			options.append(key)
 	else:
-		# Fallback just in case the editor hasn't loaded it into memory yet
 		options.append_array(["peasant", "merchant", "bandit", "adventurer", "swordsman", "miner", "debug"])
 		
-	# Add the latejoin specific spawn points
 	options.append("latejoin")
 	options.append("antag latejoin")
 	

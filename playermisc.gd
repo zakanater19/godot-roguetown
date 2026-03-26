@@ -22,7 +22,7 @@ func _init(p_player: Node2D) -> void:
 func update(delta: float) -> void:
 	if loot_panel != null and is_instance_valid(loot_target):
 		var diff: Vector2i = (loot_target.tile_pos - player.tile_pos).abs()
-		if diff.x > 1 or diff.y > 1:
+		if diff.x > 1 or diff.y > 1 or loot_target.z_level != player.z_level:
 			close_target_inventory()
 
 	_update_loot_attempts(delta)
@@ -45,7 +45,7 @@ func open_target_inventory(target: Node) -> void:
 		close_target_inventory()
 
 	var diff: Vector2i = (target.tile_pos - player.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1:
+	if diff.x > 1 or diff.y > 1 or target.z_level != player.z_level:
 		return
 
 	loot_target = target
@@ -194,7 +194,7 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 			return
 
 	var diff: Vector2i = (loot_target.tile_pos - player.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1:
+	if diff.x > 1 or diff.y > 1 or loot_target.z_level != player.z_level:
 		return
 
 	var item_desc: String = ""
@@ -259,7 +259,7 @@ func _update_loot_attempts(delta: float) -> void:
 			continue
 
 		var diff: Vector2i = (target.tile_pos - player.tile_pos).abs()
-		if diff.x > 1 or diff.y > 1:
+		if diff.x > 1 or diff.y > 1 or target.z_level != player.z_level:
 			cancelled_keys.append(slot_key)
 			continue
 
@@ -362,4 +362,3 @@ func show_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 		var looter_name = looter.character_name if looter != null and "character_name" in looter else "Player " + str(looter_peer_id)
 		var msg: String = "[color=#ff2222][b]WARNING:[/b] " + looter_name + " is attempting to remove your " + item_desc + "![/color]"
 		Sidebar.add_message(msg)
-		

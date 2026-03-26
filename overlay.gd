@@ -4,17 +4,21 @@ extends Node2D
 # Draws grid outlines on top of everything.
 # Reads display config from Main (get_parent()); grid dimensions from World.
 
+func _ready() -> void:
+	var main: Node2D = get_parent()
+	if main and main.get("HIDE_OUTLINES_AT_RUNTIME") and not Engine.is_editor_hint():
+		set_process(false)
+		hide()
 
 func _process(_delta: float) -> void:
 	queue_redraw()
 
-
 func _draw() -> void:
 	var main: Node2D = get_parent()
-	if not main.SHOW_OUTLINES:
+	if not main or not main.get("SHOW_OUTLINES"):
 		return
 		
-	if main.HIDE_OUTLINES_AT_RUNTIME and not Engine.is_editor_hint():
+	if main.get("HIDE_OUTLINES_AT_RUNTIME") and not Engine.is_editor_hint():
 		return
 
 	var total_w := float(World.GRID_WIDTH  * World.TILE_SIZE)

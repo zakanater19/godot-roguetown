@@ -1,10 +1,6 @@
 @tool
 extends Node2D
 
-# --- CONFIGURATION ---
-# TILE_SIZE / GRID_WIDTH / GRID_HEIGHT live in world.gd (the World autoload).
-# Reference them via World.TILE_SIZE etc. rather than defining duplicates here.
-
 const SHOW_OUTLINES: bool  = true
 const OUTLINE_COLOR: Color = Color(0.5, 0.5, 0.5, 0.5)
 const OUTLINE_WIDTH: float = 1.0
@@ -12,9 +8,6 @@ const OUTLINE_WIDTH: float = 1.0
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
 var target_fps: int = 60
-
-var _bg_material: ShaderMaterial = null
-
 
 func _ready() -> void:
 	_build_tileset()
@@ -24,19 +17,13 @@ func _ready() -> void:
 		return
 
 	Engine.max_fps = target_fps
-
-	# Force windowed fullscreen (borderless) at runtime in case project setting
-	# was not applied (e.g. when launched from the editor).
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 
-	World.tilemap = $TileMapLayer
-
-
-func shake_tile(tile_pos: Vector2i) -> void:
+func shake_tile(tile_pos: Vector2i, z_level: int = 3) -> void:
 	var tile_origin := Vector2(tile_pos.x * World.TILE_SIZE, tile_pos.y * World.TILE_SIZE)
 	var shaker := Node2D.new()
 	shaker.position = tile_origin
-	shaker.z_index  = 8
+	shaker.z_index  = (z_level - 1) * 200 + 8
 	var highlight := Polygon2D.new()
 	highlight.polygon = PackedVector2Array([
 		Vector2(2, 2),
@@ -54,76 +41,45 @@ func shake_tile(tile_pos: Vector2i) -> void:
 	tween.tween_property(shaker, "position", tile_origin,                  0.03)
 	tween.tween_callback(shaker.queue_free)
 
-
 func _build_background() -> void:
-	var bg_texture: Texture2D = load("res://231.jpg")
-	if bg_texture == null:
-		push_warning("res://231.jpg not found")
-		return
-	var shader: Shader = load("res://background.gdshader")
-	if shader == null:
-		push_warning("res://background.gdshader not found")
-		return
-	_bg_material = ShaderMaterial.new()
-	_bg_material.shader = shader
-	_bg_material.set_shader_parameter("bg_texture",  bg_texture)
-	_bg_material.set_shader_parameter("tile_size",   float(World.TILE_SIZE))
-	_bg_material.set_shader_parameter("grid_width",  World.GRID_WIDTH)
-	_bg_material.set_shader_parameter("grid_height", World.GRID_HEIGHT)
-	_bg_material.set_shader_parameter("time",        0.0)
 	var rect := ColorRect.new()
 	rect.name         = "Background"
 	rect.position     = Vector2.ZERO
 	rect.size         = Vector2(World.GRID_WIDTH * World.TILE_SIZE, World.GRID_HEIGHT * World.TILE_SIZE)
-	rect.color        = Color.WHITE
+	rect.color        = Color.BLACK
 	rect.z_index      = -1
-	rect.material     = _bg_material
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(rect)
 	move_child(rect, 0)
 
-
 func _build_tileset() -> void:
-	var tilemap: TileMapLayer = $TileMapLayer
+	var tilemap: TileMapLayer = $TileMapLayer_Z3
 	
 	if OS.has_feature("editor"):
-		# tiles.png layout (64x64 each, single row):
-		#  col 0: grass          (floor)
-		#  col 1: cobble-orig    (floor)
-		#  col 2: dirt           (floor)
-		#  col 3: rock wall      (solid, 3 hits to break)
-		#  col 4: wood floor     (floor)
-		#  col 5: cobblestone    (floor, also placed when stone wall breaks)
-		#  col 6: stone wall     (solid, 10 hits to break)
-		#  col 7: wooden wall    (solid, 5 hits to break, drops wood floor)
-		#  col 8: greenblocks    (floor)
 		var floor_atlas := TileSetAtlasSource.new()
 		floor_atlas.resource_name = "Floor Tiles"
 		floor_atlas.texture = load("res://tiles.png")
 		floor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-		floor_atlas.create_tile(Vector2i(0, 0))  # grass
-		floor_atlas.create_tile(Vector2i(1, 0))  # cobble-orig
-		floor_atlas.create_tile(Vector2i(2, 0))  # dirt
-		floor_atlas.create_tile(Vector2i(4, 0))  # wood floor
-		floor_atlas.create_tile(Vector2i(5, 0))  # cobblestone floor
-		floor_atlas.create_tile(Vector2i(8, 0))  # greenblocks
+		floor_atlas.create_tile(Vector2i(0, 0)) 
+		floor_atlas.create_tile(Vector2i(1, 0))  
+		floor_atlas.create_tile(Vector2i(2, 0))  
+		floor_atlas.create_tile(Vector2i(4, 0))  
+		floor_atlas.create_tile(Vector2i(5, 0))  
+		floor_atlas.create_tile(Vector2i(8, 0))  
 		
 		var solid_atlas := TileSetAtlasSource.new()
 		solid_atlas.resource_name = "Solid Tiles"
 		solid_atlas.texture = load("res://tiles.png")
 		solid_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-		solid_atlas.create_tile(Vector2i(3, 0))  # rock wall
-		solid_atlas.create_tile(Vector2i(6, 0))  # stone wall
-		solid_atlas.create_tile(Vector2i(7, 0))  # wooden wall
+		solid_atlas.create_tile(Vector2i(3, 0))  
+		solid_atlas.create_tile(Vector2i(6, 0))  
+		solid_atlas.create_tile(Vector2i(7, 0))  
 		
 		var ts := TileSet.new()
 		ts.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
 		ts.add_source(floor_atlas, 0)
 		ts.add_source(solid_atlas, 1)
 		
-		# Water: res://animated/water_sheet.png — a 192x64 PNG sprite sheet (3 frames × 64x64)
-		# Generated from water.gif frames scaled to 64x64.
-		# Godot 4 animates this automatically via TileSetAtlasSource animation columns.
 		var water_tex = load("res://animated/water_sheet.png")
 		if water_tex != null:
 			var water_atlas := TileSetAtlasSource.new()
@@ -139,19 +95,48 @@ func _build_tileset() -> void:
 			push_warning("res://animated/water_sheet.png not found — Water tile skipped.")
 		
 		tilemap.tile_set = ts
+		
+		for z in range(1, 6):
+			var tm = get_node_or_null("TileMapLayer_Z" + str(z))
+			if tm != null:
+				tm.tile_set = ts
+
 		ResourceSaver.save(ts, "res://tileset.tres")
 	else:
 		var cached_ts = load("res://tileset.tres") as TileSet
 		if cached_ts != null:
-			tilemap.tile_set = cached_ts
+			for z in range(1, 6):
+				var tm = get_node_or_null("TileMapLayer_Z" + str(z))
+				if tm != null:
+					tm.tile_set = cached_ts
 		else:
 			push_error("Failed to load cached tileset.tres!")
 
-
 func _process(_delta: float) -> void:
-	if has_node("TileMapLayer"):
-		$TileMapLayer.position = Vector2.ZERO
-	if has_node("Overlay"):
-		$Overlay.position = Vector2.ZERO
-	if _bg_material != null:
-		_bg_material.set_shader_parameter("time", Time.get_ticks_msec() / 1000.0)
+	if Engine.is_editor_hint():
+		# Hide the depth darken effects while working in the editor
+		for z in range(1, 6):
+			var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
+			if darken and darken.visible:
+				darken.visible = false
+		return
+
+	var local_player = World.get_local_player()
+	var current_z = 3
+	if local_player != null:
+		current_z = local_player.z_level
+
+	for z in range(1, 6):
+		var tm = get_node_or_null("TileMapLayer_Z" + str(z))
+		if tm:
+			tm.visible = (z <= current_z)
+			
+		var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
+		if darken:
+			darken.visible = (z < current_z)
+
+	for ent in get_tree().get_nodes_in_group("z_entity"):
+		var ez = ent.get("z_level")
+		if ez != null:
+			if ez > current_z:
+				ent.visible = false

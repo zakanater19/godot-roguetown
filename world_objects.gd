@@ -11,7 +11,6 @@ func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
 		randf_range(-spread, spread)
 	)
 	obj.global_position = world.utils.tile_to_pixel(tile) + drop_offset
-	obj.z_index = 5
 
 func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 	if not world.multiplayer.is_server(): return
@@ -30,7 +29,7 @@ func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 		world.get_node("/root/LateJoin").register_object_state(rock_path, {"hits": rock.hits, "type": "rock"})
 	
 	if rock.hits >= rock.HITS_TO_BREAK:
-		var drops = ["pebble", "pebble"]
+		var drops =["pebble", "pebble"]
 		if randf() < 0.20: drops.append("coal")
 		if randf() < 0.10: drops.append("ironore")
 
@@ -396,7 +395,7 @@ func handle_rpc_request_throw(sender_id: int, item_path: NodePath, hand_index: i
 	if player.body != null and player.body.is_arm_broken(hand_index): return
 	if not world.utils.server_check_action_cooldown(player, true): return
 	var safe_range = int(clamp(throw_range, 1, player.THROW_TILES))
-	var land_tile = world.utils.cast_throw(player.tile_pos, player.pixel_pos, dir, safe_range)
+	var land_tile = world.utils.cast_throw(player.tile_pos, player.pixel_pos, player.z_level, dir, safe_range)
 	var land_pixel = world.utils.tile_to_pixel(land_tile)
 	world.rpc_confirm_throw.rpc(sender_id, item_path, hand_index, land_pixel)
 
@@ -408,7 +407,8 @@ func handle_rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int
 	if player._is_local_authority():
 		player._is_throwing = true
 		player._update_hands_ui()
-	obj.z_index = 7
+	var z_lvl = player.z_level
+	obj.z_index = (z_lvl - 1) * 200 + 7
 	var sprite: Node = obj.get_node_or_null("Sprite2D")
 	if sprite != null:
 		sprite.rotation_degrees = 0.0
@@ -419,7 +419,7 @@ func handle_rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int
 	tween.tween_property(obj, "global_position", final_pos, player.THROW_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(func():
 		if player._is_local_authority(): player._is_throwing = false
-		obj.z_index = 5
+		obj.z_index = (z_lvl - 1) * 200 + 5
 		for child in obj.get_children():
 			if child is CollisionShape2D: child.disabled = false
 		if world.multiplayer.is_server():
@@ -427,16 +427,15 @@ func handle_rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int
 			var dmg = player._get_weapon_damage(obj)
 			var attacker_p    := world.utils.find_player_by_peer(peer_id) as Node2D
 			var src_tile: Vector2i = attacker_p.tile_pos if attacker_p != null else land_tile_check
-			var hit_results = world.combat.deal_damage_at_tile(land_tile_check, dmg, peer_id, false)
-			# FIX: Use generic Array to avoid typed array assignment crash
-			var throw_targets = world.utils.get_entities_at_tile(land_tile_check, peer_id)
+			var hit_results = world.combat.deal_damage_at_tile(land_tile_check, z_lvl, dmg, peer_id, false)
+			var throw_targets = world.utils.get_entities_at_tile(land_tile_check, z_lvl, peer_id)
 			for entity in throw_targets:
 				var target_name: String = ""
 				if entity.is_in_group("player"): target_name = (entity as Node2D).character_name
 				elif entity.has_method("receive_damage"): target_name = entity.name.get_slice("@", 0)
 				if target_name != "":
 					var roll = hit_results.get(entity, {"damage": dmg, "blocked": false})
-					world.rpc_broadcast_damage_log.rpc(attacker_p.character_name, target_name, roll.damage, src_tile, roll.blocked, false, "", roll.get("block_type", ""))
+					world.rpc_broadcast_damage_log.rpc(attacker_p.character_name, target_name, roll.damage, src_tile, z_lvl, roll.blocked, false, "", roll.get("block_type", ""))
 	)
 
 func handle_rpc_notify_loot_warning(target_peer_id: int, looter_peer_id: int, item_desc: String) -> void:
@@ -457,7 +456,7 @@ func handle_rpc_request_loot_item(sender_id: int, target_peer_id: int, looter_pe
 	var looter: Node2D = world.utils.find_player_by_peer(looter_peer_id) as Node2D
 	if target == null or looter == null or looter.dead: return
 	var diff: Vector2i = (target.tile_pos - looter.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1: return
+	if diff.x > 1 or diff.y > 1 or target.z_level != looter.z_level: return
 
 	var drop_tile: Vector2i = target.tile_pos
 	const SPREAD: float = 14.0
@@ -497,6 +496,7 @@ func handle_rpc_confirm_loot_unequip_drop(target_peer_id: int, equip_slot: Strin
 	var item: Node2D = scene.instantiate()
 	item.name        = new_node_name
 	item.position    = world.utils.tile_to_pixel(drop_tile)
+	item.set("z_level", target.z_level)
 	
 	if "equipped_data" in target and target.equipped_data.get(equip_slot) != null:
 		if "contents" in target.equipped_data[equip_slot] and "contents" in item:
@@ -517,7 +517,7 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 		"sword": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/sword.tscn"},
 		"pickaxe": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/pickaxe.tscn"},
 		"wooden_floor": {"req": "Log", "req_amt": 1, "tile": [0, Vector2i(4, 0)]},
-		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile": [0, Vector2i(5, 0)]},
+		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile":[0, Vector2i(5, 0)]},
 		"stone_wall": {"req": "Pebble", "req_amt": 2, "tile":[1, Vector2i(6, 0)]}
 	}
 	if not recipes.has(recipe_id): return
@@ -529,6 +529,7 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 			
 	for obj in world.get_tree().get_nodes_in_group("pickable"):
 		if obj == player.hands[0] or obj == player.hands[1]: continue
+		if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 		var obj_tile = Vector2i(int(obj.global_position.x / world.TILE_SIZE), int(obj.global_position.y / world.TILE_SIZE))
 		var diff = (obj_tile - player.tile_pos).abs()
 		if diff.x <= 1 and diff.y <= 1:
@@ -552,13 +553,13 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 		world.rpc_confirm_craft_item.rpc(sender_id, consumed_paths, recipe["scene"], result_name, player.tile_pos)
 	elif recipe.has("tile"):
 		var tile_data = recipe["tile"]
-		world.rpc_confirm_craft_tile.rpc(sender_id, consumed_paths, player.tile_pos, tile_data[0], tile_data[1])
+		world.rpc_confirm_craft_tile.rpc(sender_id, consumed_paths, player.tile_pos, player.z_level, tile_data[0], tile_data[1])
 
 func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_tile: Vector2i) -> void:
+	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 	for p in consumed_paths:
 		var n = world.get_node_or_null(p)
 		if n != null:
-			var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 			if player != null:
 				for i in range(2):
 					if player.hands[i] == n:
@@ -571,6 +572,8 @@ func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_pa
 	if scene == null: return
 	var item: Node2D = scene.instantiate()
 	item.name = result_name
+	if player != null:
+		item.set("z_level", player.z_level)
 	
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main:
@@ -579,7 +582,7 @@ func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_pa
 		for child in item.get_children():
 			if child is CollisionShape2D: child.disabled = false
 
-func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, source_id: int, atlas_coords: Vector2i) -> void:
+func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	for p in consumed_paths:
 		var n = world.get_node_or_null(p)
 		if n != null:
@@ -592,17 +595,18 @@ func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos
 						break
 			n.queue_free()
 			
-	if world.tilemap != null:
-		world.tilemap.set_cell(tile_pos, source_id, atlas_coords)
+	var tm = world.get_tilemap(z_level)
+	if tm != null:
+		tm.set_cell(tile_pos, source_id, atlas_coords)
 		if world.has_node("/root/LateJoin"):
-			world.get_node("/root/LateJoin").register_tile_change(tile_pos, source_id, atlas_coords)
+			world.get_node("/root/LateJoin").register_tile_change(tile_pos, source_id, atlas_coords) # NOTE: Needs Z update
 
 func handle_rpc_request_satchel_insert(sender_id: int, satchel_path: NodePath, hand_idx: int) -> void:
 	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	var satchel := world.get_node_or_null(satchel_path)
-	if satchel == null: return
+	if satchel == null or satchel.get("z_level") != player.z_level: return
 	if not world.utils.is_within_interaction_range(player, satchel.global_position): return
 	var item: Node = player.hands[hand_idx]
 	if item == null or not is_instance_valid(item): return
@@ -644,7 +648,7 @@ func handle_rpc_request_satchel_extract(sender_id: int, satchel_path: NodePath, 
 	if player.hands[hand_idx] != null: return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
 	var satchel := world.get_node_or_null(satchel_path)
-	if satchel == null: return
+	if satchel == null or satchel.get("z_level") != player.z_level: return
 	if not world.utils.is_within_interaction_range(player, satchel.global_position): return
 	if slot_index >= satchel.contents.size(): return
 	var slot = satchel.contents[slot_index]
@@ -664,6 +668,7 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, sl
 	var item: Node2D = scene.instantiate()
 	item.name = new_node_name
 	item.position = satchel.global_position
+	item.set("z_level", satchel.z_level)
 	satchel.get_parent().add_child(item)
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = true

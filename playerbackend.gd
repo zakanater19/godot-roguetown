@@ -110,14 +110,13 @@ func inspect_at(world_pos: Vector2) -> void:
 			continue
 		var hand_tile := Vector2i(int(held.global_position.x / World.TILE_SIZE), int(held.global_position.y / World.TILE_SIZE))
 		if hand_tile == target_tile:
-			# CHANGE: Use get_description if it exists (for coins/items), otherwise fallback
 			var hand_label := " (in right hand)" if i == 0 else " (in left hand)"
 			var desc = held.get_description() if held.has_method("get_description") else (held.get("item_type") if held.get("item_type") != null else held.name.get_slice("@", 0))
 			show_inspect_text(desc + hand_label, "")
 			return
 
 	# Check NPCs
-	for obj in World.get_entities_at_tile(target_tile):
+	for obj in World.get_entities_at_tile(target_tile, player.z_level):
 		var d: float = (world_pos - player.global_position).length()
 		if d < best_dist:
 			best_dist = d
@@ -127,7 +126,6 @@ func inspect_at(world_pos: Vector2) -> void:
 		if best_npc.has_method("get_description"):
 			var short_desc = best_npc.get_description()
 			
-			# Pricing logic
 			if player.prices_shown and best_npc.get("item_type"):
 				var p = Trade.get_price(best_npc.item_type)
 				if p > 0: short_desc += "[Price: " + str(p) + "]"
@@ -141,6 +139,8 @@ func inspect_at(world_pos: Vector2) -> void:
 		var best: Node = null
 		best_dist = INF
 		for obj in player.get_tree().get_nodes_in_group(group):
+			if obj.get("z_level") != null and obj.z_level != player.z_level:
+				continue
 			if group == "pickable" and (player.hands[0] == obj or player.hands[1] == obj):
 				continue
 			var col := obj.get_node_or_null("CollisionShape2D")
@@ -156,7 +156,6 @@ func inspect_at(world_pos: Vector2) -> void:
 			if best.has_method("get_description"):
 				var short_desc = best.get_description()
 				
-				# Pricing logic
 				if player.prices_shown and best.get("item_type"):
 					var p = Trade.get_price(best.item_type)
 					if p > 0: short_desc += "[Price: " + str(p) + "]"
@@ -168,9 +167,10 @@ func inspect_at(world_pos: Vector2) -> void:
 	# Check Tiles
 	var source_id:    int      = -1
 	var atlas_coords: Vector2i = Vector2i(-1, -1)
-	if World.tilemap != null:
-		source_id    = World.tilemap.get_cell_source_id(target_tile)
-		atlas_coords = World.tilemap.get_cell_atlas_coords(target_tile)
+	var tm = World.get_tilemap(player.z_level)
+	if tm != null:
+		source_id    = tm.get_cell_source_id(target_tile)
+		atlas_coords = tm.get_cell_atlas_coords(target_tile)
 	show_inspect_text(World.get_tile_description(source_id, atlas_coords), "")
 
 func show_inspect_text(text: String, detailed_desc: String) -> void:
@@ -381,6 +381,7 @@ func perform_unequip(slot_name: String, new_node_name: String, hand_index: int) 
 	var item: Node2D = scene.instantiate()
 	item.name     = new_node_name
 	item.position = player.pixel_pos
+	item.set("z_level", player.z_level)
 	
 	if player.equipped_data.get(slot_name) != null:
 		if "contents" in player.equipped_data[slot_name] and "contents" in item:
@@ -455,10 +456,8 @@ func drop_item_from_hand(hand_idx: int) -> void:
 		return
 	var obj = player.hands[hand_idx]
 	if player.multiplayer.is_server():
-		# Server: directly call the authority RPC
 		World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 	else:
-		# Client: request the server to drop the item
 		World.rpc_request_drop.rpc_id(1, obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 
 func drop_held_object() -> void:
@@ -497,7 +496,8 @@ func interact_held_object() -> void:
 				World.rpc_request_interact_hand_item.rpc_id(1, player.active_hand)
 
 func use_held_object(mouse_world_pos: Vector2) -> void:
-	if World.tilemap == null:
+	var tm = World.get_tilemap(player.z_level)
+	if tm == null:
 		return
 
 	var target_tile := Vector2i(
@@ -541,8 +541,8 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			if player.intent == "harm" and not is_clothing:
 				can_attack = true
 
-	var source_id = World.tilemap.get_cell_source_id(target_tile)
-	var atlas_coords = World.tilemap.get_cell_atlas_coords(target_tile)
+	var source_id = tm.get_cell_source_id(target_tile)
+	var atlas_coords = tm.get_cell_atlas_coords(target_tile)
 	var is_wooden_wall = (source_id == 1 and atlas_coords == Vector2i(7, 0))
 	
 	var target_found = false
@@ -550,7 +550,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var is_attack_action = false
 	
 	if can_attack:
-		var entities_at := World.get_entities_at_tile(target_tile, player.multiplayer.get_unique_id())
+		var entities_at := World.get_entities_at_tile(target_tile, player.z_level, player.multiplayer.get_unique_id())
 		if not entities_at.is_empty():
 			target_found = true
 			is_exerting = true
@@ -558,6 +558,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			
 	if not target_found:
 		for obj in player.get_tree().get_nodes_in_group("door"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if held_item == null:
 					target_found = true
@@ -569,6 +570,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				
 	if not target_found and can_chop:
 		for obj in player.get_tree().get_nodes_in_group("choppable_object"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				target_found = true
 				is_exerting = true
@@ -576,6 +578,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 
 	if not target_found and can_break:
 		for obj in player.get_tree().get_nodes_in_group("breakable_object"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				target_found = true
 				is_exerting = true
@@ -583,6 +586,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 
 	if not target_found and can_mine:
 		for obj in player.get_tree().get_nodes_in_group("minable_object"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				target_found = true
 				is_exerting = true
@@ -627,6 +631,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 		return
 
 	for obj in player.get_tree().get_nodes_in_group("door"):
+		if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 		if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 			if player.multiplayer.is_server():
 				World.rpc_request_hit_door(obj.get_path())
@@ -636,6 +641,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 
 	if can_chop:
 		for obj in player.get_tree().get_nodes_in_group("choppable_object"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if player.multiplayer.is_server():
 					World.rpc_request_hit_tree(obj.get_path())
@@ -645,6 +651,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 
 	if can_break:
 		for obj in player.get_tree().get_nodes_in_group("breakable_object"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if player.multiplayer.is_server():
 					World.rpc_request_hit_breakable(obj.get_path())
@@ -654,6 +661,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 
 	if can_mine or (is_sword and is_wooden_wall):
 		for obj in player.get_tree().get_nodes_in_group("minable_object"):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if player.multiplayer.is_server():
 					World.rpc_request_hit_rock(obj.get_path())
@@ -661,9 +669,8 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 					World.rpc_request_hit_rock.rpc_id(1, obj.get_path())
 				return
 
-		if World.tilemap.get_cell_source_id(target_tile) == 1:
+		if tm.get_cell_source_id(target_tile) == 1:
 			if player.multiplayer.is_server():
 				World.rpc_damage_wall(target_tile)
 			else:
 				World.rpc_damage_wall.rpc_id(1, target_tile)
-				

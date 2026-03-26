@@ -1,16 +1,16 @@
-# file: project/world.gd
 extends Node
 
-# --- CONFIGURATION ---
 const TILE_SIZE:   int = 64
 const GRID_WIDTH:  int = 1000
 const GRID_HEIGHT: int = 1000
 
+# tilemap property replaced with get_tilemap(z) function below
 var tilemap: TileMapLayer = null
 
-# --- STATE ---
-var solid_grid: Dictionary = {}
-var tile_hit_counts: Dictionary = {}
+# Map Z-levels (1-5) to their spatial grids
+var solid_grid: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
+var tile_hit_counts: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
+
 const WALL_HITS_TO_BREAK: int = 3
 const STONE_WALL_HITS_TO_BREAK: int = 10
 const WOODEN_WALL_HITS_TO_BREAK: int = 5
@@ -22,18 +22,18 @@ var current_laws: Array =[
 	"2. You must obey orders given to you by a king, except where such orders would conflict with the First Law.",
 ]
 
-# Public maps for backend module access
 var grab_map: Dictionary = {}
 const GRAB_COOLDOWN_MS:   int = 1000
 const RESIST_COOLDOWN_MS: int = 1000
 var grab_cooldown_map:   Dictionary = {}
 var resist_cooldown_map: Dictionary = {}
 
-# --- BACKEND MODULES ---
 var utils = null
 var tiles = null
 var combat = null
 var objects = null
+
+var _tilemap_cache: Dictionary = {}
 
 func _ready() -> void:
 	utils = preload("res://world_utils.gd").new(self)
@@ -42,24 +42,32 @@ func _ready() -> void:
 	objects = preload("res://world_objects.gd").new(self)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
+func get_tilemap(z: int) -> TileMapLayer:
+	if _tilemap_cache.has(z) and is_instance_valid(_tilemap_cache[z]):
+		return _tilemap_cache[z]
+	var main = get_tree().root.get_node_or_null("Main")
+	if main != null:
+		var tm = main.get_node_or_null("TileMapLayer_Z" + str(z)) as TileMapLayer
+		if tm != null:
+			_tilemap_cache[z] = tm
+		return tm
+	return null
+
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
 		print("LateJoin: Peer disconnected - ", id)
 		if grab_map.has(id):
 			combat.release_grab_for_peer(id, true)
 
-# ---------------------------------------------------------------------------
-# API Wrappers (Delegates to Modules)
-# ---------------------------------------------------------------------------
-
-func _is_within_interaction_range(player: Node, target_pos: Vector2) -> bool:
+func _is_within_interaction_range(player: Node, target_pos: Vector2, target_z: int) -> bool:
+	if player.z_level != target_z: return false
 	return utils.is_within_interaction_range(player, target_pos)
 
 func _server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool:
 	return utils.server_check_action_cooldown(player, is_attack)
 
-func get_entities_at_tile(tile: Vector2i, exclude_peer: int = 0) -> Array:
-	return utils.get_entities_at_tile(tile, exclude_peer)
+func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -> Array:
+	return utils.get_entities_at_tile(tile, z_level, exclude_peer)
 
 func _find_player_by_peer(peer_id: int) -> Node:
 	return utils.find_player_by_peer(peer_id)
@@ -73,29 +81,29 @@ func _world_to_tile(world_pos: Vector2) -> Vector2i:
 func get_local_player() -> Node:
 	return utils.get_local_player()
 
-func cast_throw(from_tile: Vector2i, from_pixel: Vector2, dir: Vector2, max_tiles: int) -> Vector2i:
-	return utils.cast_throw(from_tile, from_pixel, dir, max_tiles)
+func cast_throw(from_tile: Vector2i, from_pixel: Vector2, z_level: int, dir: Vector2, max_tiles: int) -> Vector2i:
+	return utils.cast_throw(from_tile, from_pixel, z_level, dir, max_tiles)
 
-func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
-	return utils.find_path(start, target)
+func find_path(start: Vector2i, target: Vector2i, z_level: int) -> Array[Vector2i]:
+	return utils.find_path(start, target, z_level)
 
 func _reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array[Vector2i]:
 	return utils.reconstruct_path(came_from, current)
 
-func register_solid(pos: Vector2i, obj: Node) -> void:
-	tiles.register_solid(pos, obj)
+func register_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
+	tiles.register_solid(pos, z_level, obj)
 
-func unregister_solid(pos: Vector2i, obj: Node) -> void:
-	tiles.unregister_solid(pos, obj)
+func unregister_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
+	tiles.unregister_solid(pos, z_level, obj)
 
-func is_solid(pos: Vector2i) -> bool:
-	return tiles.is_solid(pos)
+func is_solid(pos: Vector2i, z_level: int) -> bool:
+	return tiles.is_solid(pos, z_level)
 
-func try_move(from: Vector2i, dir: Vector2i) -> Vector2i:
-	return tiles.try_move(from, dir)
+func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
+	return tiles.try_move(from, z_level, dir)
 
-func break_wall(pos: Vector2i, parent: Node, rock_name: String = "") -> void:
-	tiles.break_wall(pos, parent, rock_name)
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "") -> void:
+	tiles.break_wall(pos, z_level, parent, rock_name)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return tiles.get_tile_description(source_id, atlas_coords)
@@ -103,15 +111,11 @@ func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_sword_attack: bool) -> Dictionary:
 	return combat.calculate_combat_roll(attacker, defender, base_amount, is_sword_attack)
 
-func deal_damage_at_tile(tile: Vector2i, amount: int, attacker_id: int = 0, is_sword_attack: bool = false) -> Dictionary:
-	return combat.deal_damage_at_tile(tile, amount, attacker_id, is_sword_attack)
+func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id: int = 0, is_sword_attack: bool = false) -> Dictionary:
+	return combat.deal_damage_at_tile(tile, z_level, amount, attacker_id, is_sword_attack)
 
 func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
 	objects.drop_item_at(obj, tile, spread)
-
-# ---------------------------------------------------------------------------
-# Laws
-# ---------------------------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_update_laws(new_laws: Array) -> void:
@@ -123,10 +127,6 @@ func rpc_request_update_laws(new_laws: Array) -> void:
 func rpc_update_laws(new_laws: Array) -> void:
 	utils.handle_rpc_update_laws(new_laws)
 
-# ---------------------------------------------------------------------------
-# Movement
-# ---------------------------------------------------------------------------
-
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -136,10 +136,6 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool = false) -> void:
 	tiles.handle_rpc_confirm_move(peer_id, new_pos, is_sprinting)
-
-# ---------------------------------------------------------------------------
-# Active Shoving & Damage
-# ---------------------------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_shove(target_tile: Vector2i) -> void:
@@ -160,24 +156,20 @@ func rpc_damage_wall(pos: Vector2i) -> void:
 	tiles.handle_rpc_damage_wall(sender_id, pos)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_hit_wall(pos: Vector2i) -> void:
-	tiles.handle_rpc_confirm_hit_wall(pos)
+func rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
+	tiles.handle_rpc_confirm_hit_wall(pos, z_level)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_break_wall(pos: Vector2i, rock_name: String) -> void:
-	tiles.handle_rpc_confirm_break_wall(pos, rock_name)
+func rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String) -> void:
+	tiles.handle_rpc_confirm_break_wall(pos, z_level, rock_name)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_replace_tile(pos: Vector2i, source_id: int, atlas_coords: Vector2i) -> void:
-	tiles.handle_rpc_confirm_replace_tile(pos, source_id, atlas_coords)
+func rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	tiles.handle_rpc_confirm_replace_tile(pos, z_level, source_id, atlas_coords)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_break_stone_wall(pos: Vector2i) -> void:
-	tiles.handle_rpc_confirm_break_stone_wall(pos)
-
-# ---------------------------------------------------------------------------
-# Object Mining/Breaking
-# ---------------------------------------------------------------------------
+func rpc_confirm_break_stone_wall(pos: Vector2i, z_level: int) -> void:
+	tiles.handle_rpc_confirm_break_stone_wall(pos, z_level)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_rock(rock_path: NodePath) -> void:
@@ -221,10 +213,6 @@ func rpc_confirm_hit_breakable(obj_path: NodePath) -> void:
 func rpc_confirm_break_breakable(obj_path: NodePath) -> void:
 	objects.handle_rpc_confirm_break_breakable(obj_path)
 
-# ---------------------------------------------------------------------------
-# Doors & Interactions
-# ---------------------------------------------------------------------------
-
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_door(door_path: NodePath) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -256,10 +244,6 @@ func rpc_request_interact_hand_item(hand_idx: int) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
 	objects.handle_rpc_confirm_interact_hand_item(peer_id, hand_idx)
-
-# ---------------------------------------------------------------------------
-# Equipment & Furnaces & Coins
-# ---------------------------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_equip(item_path: NodePath, slot_name: String, hand_index: int) -> void:
@@ -321,10 +305,6 @@ func rpc_request_combine_ground_coin(coin_path: NodePath, hand_idx: int) -> void
 func rpc_confirm_combine_ground_coin(peer_id: int, coin_path: NodePath, hand_idx: int, amount: int) -> void:
 	objects.handle_rpc_confirm_combine_ground_coin(peer_id, coin_path, hand_idx, amount)
 
-# ---------------------------------------------------------------------------
-# Pickups & Drops & Throws
-# ---------------------------------------------------------------------------
-
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_pickup(item_path: NodePath, hand_index: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -355,10 +335,6 @@ func rpc_request_throw(item_path: NodePath, hand_index: int, dir: Vector2, throw
 func rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int, land_pixel: Vector2) -> void:
 	objects.handle_rpc_confirm_throw(peer_id, item_path, hand_index, land_pixel)
 
-# ---------------------------------------------------------------------------
-# Chat & Logs
-# ---------------------------------------------------------------------------
-
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_send_chat(message: String) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
@@ -366,16 +342,12 @@ func rpc_send_chat(message: String) -> void:
 	utils.handle_rpc_send_chat(sender_id, message)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i) -> void:
-	utils.handle_rpc_broadcast_chat(sender_peer_id, message, sender_tile)
+func rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i, sender_z: int) -> void:
+	utils.handle_rpc_broadcast_chat(sender_peer_id, message, sender_tile, sender_z)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "", block_type: String = "") -> void:
-	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, blocked, is_shove, targeted_limb, block_type)
-
-# ---------------------------------------------------------------------------
-# Looting & Crafting
-# ---------------------------------------------------------------------------
+func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "", block_type: String = "") -> void:
+	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, source_z, blocked, is_shove, targeted_limb, block_type)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_notify_loot_warning(target_peer_id: int, looter_peer_id: int, item_desc: String) -> void:
@@ -406,12 +378,8 @@ func rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: Str
 	objects.handle_rpc_confirm_craft_item(peer_id, consumed_paths, scene_path, result_name, drop_tile)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, source_id: int, atlas_coords: Vector2i) -> void:
-	objects.handle_rpc_confirm_craft_tile(peer_id, consumed_paths, tile_pos, source_id, atlas_coords)
-
-# ---------------------------------------------------------------------------
-# Satchels
-# ---------------------------------------------------------------------------
+func rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	objects.handle_rpc_confirm_craft_tile(peer_id, consumed_paths, tile_pos, z_level, source_id, atlas_coords)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_satchel_insert(satchel_path: NodePath, hand_idx: int) -> void:
@@ -432,10 +400,6 @@ func rpc_request_satchel_extract(satchel_path: NodePath, slot_index: int, hand_i
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int, new_node_name: String, scene_path: String) -> void:
 	objects.handle_rpc_confirm_satchel_extract(peer_id, satchel_path, slot_index, hand_idx, new_node_name, scene_path)
-
-# ---------------------------------------------------------------------------
-# Grab System Wrappers
-# ---------------------------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_grab(target_path: NodePath, limb: String = "chest") -> void:

@@ -14,13 +14,15 @@ const WANDER_INTERVAL: float = 10.0
 
 const BloodSpray = preload("res://npcs/blood_spray.gd")
 
+@export var z_level: int = 3
+
 var health:       int   = 80
 var dead: bool = false :
 	set(val):
 		dead = val
 		if dead:
 			# Unregister from solid grid and flip to dead sprite on all peers
-			World.unregister_solid(tile_pos, self)
+			World.unregister_solid(tile_pos, z_level, self)
 			var sprite: Sprite2D = get_node_or_null("Sprite2D")
 			if sprite != null:
 				sprite.region_rect = Rect2(128, 0, 64, 64)
@@ -60,6 +62,9 @@ func get_inspect_font_size() -> int:
 
 
 func _ready() -> void:
+	z_index = (z_level - 1) * 200 + z_index
+	add_to_group("z_entity")
+	
 	# Ensure the spider is in the NPC group for targeting
 	if not is_in_group("npc"):
 		add_to_group("npc")
@@ -69,7 +74,7 @@ func _ready() -> void:
 	pixel_pos = World.tile_to_pixel(tile_pos)
 	position  = pixel_pos
 	_update_sprite()
-	World.register_solid(tile_pos, self)
+	World.register_solid(tile_pos, z_level, self)
 
 
 @rpc("call_local", "reliable")
@@ -77,6 +82,7 @@ func rpc_spawn_blood(pos: Vector2) -> void:
 	var spray := Node2D.new()
 	spray.set_script(BloodSpray)
 	spray.position = pos
+	spray.z_index = (z_level - 1) * 200 + 50
 	get_parent().add_child(spray)
 
 
@@ -123,7 +129,7 @@ func _process(delta: float) -> void:
 	var min_dist = INF
 
 	for p in players:
-		if p.dead: continue
+		if p.dead or p.z_level != z_level: continue
 		var d = (p.tile_pos - tile_pos).length_squared()
 		if d < min_dist:
 			min_dist = d
@@ -170,11 +176,11 @@ func _attack_player(player: Node) -> void:
 			World.rpc_confirm_move.rpc(player.get_multiplayer_authority(), roll.dodge_tile, false)
 			
 	var target_name: String = player.character_name
-	World.rpc_broadcast_damage_log.rpc("Spider", target_name, roll.damage, tile_pos, roll.blocked, false, "", roll.get("block_type", ""))
+	World.rpc_broadcast_damage_log.rpc("Spider", target_name, roll.damage, tile_pos, z_level, roll.blocked, false, "", roll.get("block_type", ""))
 
 
 func _move_toward_player(player: Node) -> void:
-	var path: Array[Vector2i] = World.find_path(tile_pos, player.tile_pos)
+	var path: Array[Vector2i] = World.find_path(tile_pos, player.tile_pos, z_level)
 
 	if path.size() > 0:
 		var next_tile := path[0]
@@ -203,19 +209,19 @@ func _try_move(dir: Vector2i) -> void:
 		return
 
 	# Solid check
-	if World.is_solid(next):
+	if World.is_solid(next, z_level):
 		return
 
 	# Don't walk onto any player (unless they are dead)
 	var players = get_tree().get_nodes_in_group("player")
 	for p in players:
-		if next == p.tile_pos and not p.dead:
+		if next == p.tile_pos and not p.dead and p.z_level == z_level:
 			return
 
 	# Execute move
-	World.unregister_solid(tile_pos, self)
+	World.unregister_solid(tile_pos, z_level, self)
 	tile_pos     = next
-	World.register_solid(tile_pos, self)
+	World.register_solid(tile_pos, z_level, self)
 
 	move_from    = pixel_pos
 	move_to      = World.tile_to_pixel(tile_pos)
@@ -229,4 +235,3 @@ func _update_sprite() -> void:
 	if sprite == null:
 		return
 	sprite.region_rect = Rect2(facing * 64, 0, 64, 64)
-	

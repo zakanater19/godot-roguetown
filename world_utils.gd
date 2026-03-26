@@ -14,27 +14,19 @@ func server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool
 	var current_time = Time.get_ticks_msec()
 	var peer_id = player.get_multiplayer_authority()
 	var next_allowed = world.server_action_cooldowns.get(peer_id, 0)
-	
-	if current_time < next_allowed - 100:
-		return false
-	
+	if current_time < next_allowed - 100: return false
 	var delay = 0.5
 	var held_item = player.hands[player.active_hand]
-	if held_item != null and held_item.has_method("get_use_delay"):
-		delay = held_item.get_use_delay()
-		
-	if is_attack and delay < 1.0:
-		delay = 1.0
-	
-	if player.exhausted:
-		delay *= 3.0
-		
+	if held_item != null and held_item.has_method("get_use_delay"): delay = held_item.get_use_delay()
+	if is_attack and delay < 1.0: delay = 1.0
+	if player.exhausted: delay *= 3.0
 	world.server_action_cooldowns[peer_id] = current_time + int(delay * 1000)
 	return true
 
-func get_entities_at_tile(tile: Vector2i, exclude_peer: int = 0) -> Array:
+func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -> Array:
 	var result :=[]
 	for npc in world.get_tree().get_nodes_in_group("npc"):
+		if npc.z_level != z_level: continue
 		if npc.tile_pos == tile:
 			result.append(npc)
 			continue
@@ -42,6 +34,7 @@ func get_entities_at_tile(tile: Vector2i, exclude_peer: int = 0) -> Array:
 			var visual_tile := Vector2i(int(npc.global_position.x / world.TILE_SIZE), int(npc.global_position.y / world.TILE_SIZE))
 			if visual_tile == tile: result.append(npc)
 	for p in world.get_tree().get_nodes_in_group("player"):
+		if p.z_level != z_level: continue
 		if p.get_multiplayer_authority() == exclude_peer: continue
 		if p.dead: continue
 		if p.tile_pos == tile:
@@ -69,7 +62,7 @@ func get_local_player() -> Node:
 	var local_id = world.multiplayer.get_unique_id()
 	return find_player_by_peer(local_id)
 
-func cast_throw(from_tile: Vector2i, from_pixel: Vector2, dir: Vector2, max_tiles: int) -> Vector2i:
+func cast_throw(from_tile: Vector2i, from_pixel: Vector2, z_level: int, dir: Vector2, max_tiles: int) -> Vector2i:
 	if dir == Vector2.ZERO: return from_tile
 	var ray_dir := dir.normalized()
 	var map_check := from_tile
@@ -102,11 +95,11 @@ func cast_throw(from_tile: Vector2i, from_pixel: Vector2, dir: Vector2, max_tile
 			current_dist = ray_length_1d.y
 			ray_length_1d.y += ray_step_size.y
 		if map_check.x < 0 or map_check.x >= world.GRID_WIDTH or map_check.y < 0 or map_check.y >= world.GRID_HEIGHT: break
-		if world.tiles.is_solid(map_check): return last_valid
+		if world.tiles.is_solid(map_check, z_level): return last_valid
 		last_valid = map_check
 	return last_valid
 
-func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
+func find_path(start: Vector2i, target: Vector2i, z_level: int) -> Array[Vector2i]:
 	var open: Array[Vector2i] = [start]
 	var open_set := {start: true}
 	var closed := {}
@@ -116,8 +109,8 @@ func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
 	var f_score := {start: start_h}
 	var iterations := 0
 	var max_iterations := 500
-	var dirs_x: Array[int] = [1, -1, 0, 0]
-	var dirs_y: Array[int] = [0, 0, 1, -1]
+	var dirs_x: Array[int] =[1, -1, 0, 0]
+	var dirs_y: Array[int] =[0, 0, 1, -1]
 	var best_node := start
 	var best_h: int = start_h
 	while not open.is_empty():
@@ -147,7 +140,7 @@ func find_path(start: Vector2i, target: Vector2i) -> Array[Vector2i]:
 			var neighbor := Vector2i(nx, ny)
 			if nx < 0 or nx >= world.GRID_WIDTH or ny < 0 or ny >= world.GRID_HEIGHT: continue
 			if closed.has(neighbor): continue
-			if neighbor != target and world.tiles.is_solid(neighbor): continue
+			if neighbor != target and world.tiles.is_solid(neighbor, z_level): continue
 			var tentative_g: int = current_g + 1
 			if tentative_g < g_score.get(neighbor, 999999):
 				came_from[neighbor] = current
@@ -188,11 +181,12 @@ func handle_rpc_send_chat(sender_id: int, message: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var sender := find_player_by_peer(sender_id)
 	if sender == null: return
-	world.rpc_broadcast_chat.rpc(sender_id, message, sender.tile_pos)
+	world.rpc_broadcast_chat.rpc(sender_id, message, sender.tile_pos, sender.z_level)
 
-func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i) -> void:
+func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i, sender_z: int) -> void:
 	var local_player := get_local_player()
 	if local_player == null: return
+	if local_player.z_level != sender_z: return
 	var diff: Vector2i = local_player.tile_pos - sender_tile
 	if diff.length_squared() > 144: return
 	var sender_node = find_player_by_peer(sender_peer_id)
@@ -204,9 +198,10 @@ func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile
 	if sender_node.has_method("_show_chat_message"): sender_node._show_chat_message(message)
 	if local_player.has_method("_show_inspect_text"): local_player._show_inspect_text(sender_node.character_name + " says: " + message, "")
 
-func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, blocked: bool, is_shove: bool, targeted_limb: String, block_type: String) -> void:
+func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool, is_shove: bool, targeted_limb: String, block_type: String) -> void:
 	var local_player := get_local_player()
 	if local_player == null: return
+	if local_player.z_level != source_z: return
 	var diff: Vector2i = local_player.tile_pos - source_tile
 	if diff.length_squared() > 144: return
 	var Sidebar = world.get_node("/root/Sidebar") if world.has_node("/root/Sidebar") else null

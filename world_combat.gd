@@ -36,8 +36,8 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 			for dir in[Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 				var check_tile = defender.tile_pos + dir
 				if check_tile.x < 0 or check_tile.x >= world.GRID_WIDTH or check_tile.y < 0 or check_tile.y >= world.GRID_HEIGHT: continue
-				if world.tiles.is_solid(check_tile): continue
-				var occupants = world.utils.get_entities_at_tile(check_tile)
+				if world.tiles.is_solid(check_tile, defender.z_level): continue
+				var occupants = world.utils.get_entities_at_tile(check_tile, defender.z_level)
 				var blocked = false
 				for ent in occupants:
 					if ent.is_in_group("player") and not ent.dead:
@@ -79,11 +79,10 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 	else: result.block_type = ""
 	return result
 
-func deal_damage_at_tile(tile: Vector2i, amount: int, attacker_id: int = 0, is_sword_attack: bool = false) -> Dictionary:
+func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id: int = 0, is_sword_attack: bool = false) -> Dictionary:
 	var results = {}
 	var attacker = world.utils.find_player_by_peer(attacker_id)
-	# FIX: Use generic Array to avoid typed array assignment crash
-	var entities = world.utils.get_entities_at_tile(tile, attacker_id)
+	var entities = world.utils.get_entities_at_tile(tile, z_level, attacker_id)
 	for entity in entities:
 		var roll = calculate_combat_roll(attacker, entity, amount, is_sword_attack)
 		results[entity] = roll
@@ -175,7 +174,7 @@ func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand): return
 	if (target_tile - attacker.tile_pos).abs().x > 1 or (target_tile - attacker.tile_pos).abs().y > 1: return
 	if not world.utils.server_check_action_cooldown(attacker, true): return
-	var occupants = world.utils.get_entities_at_tile(target_tile)
+	var occupants = world.utils.get_entities_at_tile(target_tile, attacker.z_level)
 	var target_player: Node2D = null
 	for ent in occupants:
 		if ent.is_in_group("player") and not ent.dead:
@@ -185,16 +184,16 @@ func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 		var shove_dest = target_player.tile_pos + (target_tile - attacker.tile_pos)
 		var dest_blocked = false
 		if shove_dest.x < 0 or shove_dest.x >= world.GRID_WIDTH or shove_dest.y < 0 or shove_dest.y >= world.GRID_HEIGHT: dest_blocked = true
-		elif world.tiles.is_solid(shove_dest): dest_blocked = true
+		elif world.tiles.is_solid(shove_dest, target_player.z_level): dest_blocked = true
 		else:
-			for ent in world.utils.get_entities_at_tile(shove_dest):
+			for ent in world.utils.get_entities_at_tile(shove_dest, target_player.z_level):
 				if ent.is_in_group("player") and not ent.dead:
 					if not (ent.get("is_lying_down") == true or ent.get("sleep_state") != 0):
 						dest_blocked = true; break
 		if not dest_blocked:
 			target_player.tile_pos = shove_dest
 			world.rpc_confirm_move.rpc(target_player.get_multiplayer_authority(), shove_dest, false)
-			world.rpc_broadcast_damage_log.rpc(attacker.character_name, target_player.character_name, 0, attacker.tile_pos, false, true, "", "")
+			world.rpc_broadcast_damage_log.rpc(attacker.character_name, target_player.character_name, 0, attacker.tile_pos, attacker.z_level, false, true, "", "")
 
 func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_limb: String) -> void:
 	if not world.multiplayer.is_server(): return
@@ -206,7 +205,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 	var held_item = attacker.hands[attacker.active_hand]
 	var amount: int = attacker._get_weapon_damage(held_item)
 	var is_sword = held_item != null and (held_item.get("item_type") in ["Sword", "Dirk"] or "Sword" in held_item.name or "Dirk" in held_item.name)
-	var entities = world.utils.get_entities_at_tile(tile, sender_id)
+	var entities = world.utils.get_entities_at_tile(tile, attacker.z_level, sender_id)
 	for entity in entities:
 		var roll = calculate_combat_roll(attacker, entity, amount, is_sword)
 		var t_name = ""
@@ -222,7 +221,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 			t_name = entity.name.get_slice("@", 0)
 			if roll.damage > 0: entity.receive_damage(roll.damage)
 		else: continue
-		world.rpc_broadcast_damage_log.rpc(attacker.character_name, t_name, roll.damage, attacker.tile_pos, roll.blocked, false, "", roll.get("block_type", ""))
+		world.rpc_broadcast_damage_log.rpc(attacker.character_name, t_name, roll.damage, attacker.tile_pos, attacker.z_level, roll.blocked, false, "", roll.get("block_type", ""))
 
 func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String) -> void:
 	if not world.multiplayer.is_server(): return
@@ -233,7 +232,7 @@ func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String
 	if world.grab_cooldown_map.has(sender_id) and now_ms < world.grab_cooldown_map[sender_id]: return
 	world.grab_cooldown_map[sender_id] = now_ms + world.GRAB_COOLDOWN_MS
 	var target := world.get_node_or_null(target_path)
-	if target == null or not is_instance_valid(target): return
+	if target == null or not is_instance_valid(target) or target.get("z_level") != grabber.z_level: return
 	if world.grab_map.has(sender_id): release_grab_for_peer(sender_id)
 	if not world.utils.is_within_interaction_range(grabber, target.global_position): return
 	var is_player = target.is_in_group("player")

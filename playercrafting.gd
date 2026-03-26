@@ -46,13 +46,15 @@ func _close_crafting_menu() -> void:
 	craft_panel = null
 
 func _get_available_crafting_resources() -> Array:
-	var available_nodes = []
+	var available_nodes =[]
 	for i in range(2):
 		if player.hands[i] != null:
 			available_nodes.append(player.hands[i])
 	
 	for obj in player.get_tree().get_nodes_in_group("pickable"):
 		if obj == player.hands[0] or obj == player.hands[1]:
+			continue
+		if obj.get("z_level") != null and obj.z_level != player.z_level:
 			continue
 		var obj_tile = Vector2i(int(obj.global_position.x / TILE_SIZE), int(obj.global_position.y / TILE_SIZE))
 		var diff = (obj_tile - player.tile_pos).abs()
@@ -172,7 +174,7 @@ func _on_craft_button_pressed(recipe_id: String) -> void:
 
 func _update_craft_attempts(delta: float) -> void:
 	var completed_keys: Array =[]
-	var cancelled_keys: Array = []
+	var cancelled_keys: Array =[]
 	
 	for attempt in active_craft_attempts:
 		var recipe_id = attempt["recipe_id"]
@@ -242,4 +244,3 @@ func _remove_craft_indicator(target: Node, recipe_id: String) -> void:
 	var lbl = target.get_node_or_null("CraftProg_" + recipe_id)
 	if lbl != null:
 		lbl.queue_free()
-		

@@ -5,32 +5,35 @@ var world: Node
 func _init(p_world: Node) -> void:
 	world = p_world
 
-func register_solid(pos: Vector2i, obj: Node) -> void:
-	if not world.solid_grid.has(pos): world.solid_grid[pos] =[]
-	if not obj in world.solid_grid[pos]: world.solid_grid[pos].append(obj)
+func register_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
+	if not world.solid_grid[z_level].has(pos): world.solid_grid[z_level][pos] =[]
+	if not obj in world.solid_grid[z_level][pos]: world.solid_grid[z_level][pos].append(obj)
 
-func unregister_solid(pos: Vector2i, obj: Node) -> void:
-	if world.solid_grid.has(pos):
-		world.solid_grid[pos].erase(obj)
-		if world.solid_grid[pos].is_empty(): world.solid_grid.erase(pos)
+func unregister_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
+	if world.solid_grid[z_level].has(pos):
+		world.solid_grid[z_level][pos].erase(obj)
+		if world.solid_grid[z_level][pos].is_empty(): world.solid_grid[z_level].erase(pos)
 
-func is_solid(pos: Vector2i) -> bool:
-	if world.tilemap != null and world.tilemap.get_cell_source_id(pos) == 1: return true
-	return world.solid_grid.has(pos)
+func is_solid(pos: Vector2i, z_level: int) -> bool:
+	var tm = world.get_tilemap(z_level)
+	if tm != null and tm.get_cell_source_id(pos) == 1: return true
+	return world.solid_grid[z_level].has(pos)
 
-func try_move(from: Vector2i, dir: Vector2i) -> Vector2i:
+func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	if dir == Vector2i.ZERO: return from
 	var next := from + dir
 	if next.x < 0 or next.x >= world.GRID_WIDTH or next.y < 0 or next.y >= world.GRID_HEIGHT: return from
-	if is_solid(next): return from
+	if is_solid(next, z_level): return from
 	return next
 
-func break_wall(pos: Vector2i, parent: Node, rock_name: String = "") -> void:
-	if world.tilemap == null: return
-	world.tilemap.set_cell(pos, 0, Vector2i(1, 0))
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "") -> void:
+	var tm = world.get_tilemap(z_level)
+	if tm == null: return
+	tm.set_cell(pos, 0, Vector2i(1, 0))
 	var scene = load("res://objects/rock.tscn") as PackedScene
 	if scene:
 		var rock: Node2D = scene.instantiate()
+		rock.z_level = z_level
 		if rock_name != "": rock.name = rock_name
 		rock.position = world.utils.tile_to_pixel(pos)
 		parent.add_child(rock)
@@ -74,10 +77,10 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 	if next_tile.x < 0 or next_tile.x >= world.GRID_WIDTH or next_tile.y < 0 or next_tile.y >= world.GRID_HEIGHT:
 		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 		return
-	if is_solid(next_tile):
+	if is_solid(next_tile, player.z_level):
 		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 		return
-	var occupants = world.utils.get_entities_at_tile(next_tile)
+	var occupants = world.utils.get_entities_at_tile(next_tile, player.z_level)
 	var blocking_player: Node = null
 	for ent in occupants:
 		if ent.is_in_group("player") and not ent.dead:
@@ -97,8 +100,8 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 		else:
 			var push_dest = next_tile + dir
 			if push_dest.x >= 0 and push_dest.x < world.GRID_WIDTH and push_dest.y >= 0 and push_dest.y < world.GRID_HEIGHT:
-				if not is_solid(push_dest):
-					var dest_occupants = world.utils.get_entities_at_tile(push_dest)
+				if not is_solid(push_dest, player.z_level):
+					var dest_occupants = world.utils.get_entities_at_tile(push_dest, player.z_level)
 					var dest_blocked = false
 					for ent in dest_occupants:
 						if ent.is_in_group("player") and not ent.dead:
@@ -127,10 +130,12 @@ func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool
 	if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").update_player_state(peer_id, {"position": player.position})
 
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
-	if not world.multiplayer.is_server() or world.tilemap == null or world.tilemap.get_cell_source_id(pos) != 1: return
-	var atlas_coords: Vector2i = world.tilemap.get_cell_atlas_coords(pos)
+	if not world.multiplayer.is_server(): return
 	var attacker: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if attacker == null or attacker.dead: return
+	var tm = world.get_tilemap(attacker.z_level)
+	if tm == null or tm.get_cell_source_id(pos) != 1: return
+	var atlas_coords: Vector2i = tm.get_cell_atlas_coords(pos)
 	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand): return
 	if (pos - attacker.tile_pos).abs().x > 1 or (pos - attacker.tile_pos).abs().y > 1: return
 	if not world.utils.server_check_action_cooldown(attacker): return
@@ -153,32 +158,32 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 		elif holding_pickaxe and attacker.combat_mode: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
 		else: return
 	else: return
-	if not world.tile_hit_counts.has(pos): world.tile_hit_counts[pos] = 0
-	world.tile_hit_counts[pos] += 1
-	if world.tile_hit_counts[pos] >= hits_needed:
-		world.tile_hit_counts.erase(pos)
+	if not world.tile_hit_counts[attacker.z_level].has(pos): world.tile_hit_counts[attacker.z_level][pos] = 0
+	world.tile_hit_counts[attacker.z_level][pos] += 1
+	if world.tile_hit_counts[attacker.z_level][pos] >= hits_needed:
+		world.tile_hit_counts[attacker.z_level].erase(pos)
 		if atlas_coords == Vector2i(3, 0):
-			world.rpc_confirm_break_wall.rpc(pos, "WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
-		elif atlas_coords == Vector2i(7, 0): world.rpc_confirm_replace_tile.rpc(pos, 0, Vector2i(4, 0))
-		else: world.rpc_confirm_break_stone_wall.rpc(pos)
-	else: world.rpc_confirm_hit_wall.rpc(pos)
+			world.rpc_confirm_break_wall.rpc(pos, attacker.z_level, "WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
+		elif atlas_coords == Vector2i(7, 0): world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, Vector2i(4, 0))
+		else: world.rpc_confirm_break_stone_wall.rpc(pos, attacker.z_level)
+	else: world.rpc_confirm_hit_wall.rpc(pos, attacker.z_level)
 
-func handle_rpc_confirm_hit_wall(pos: Vector2i) -> void:
+func handle_rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
 	var main = world.get_tree().root.get_node_or_null("Main")
-	if main != null and main.has_method("shake_tile"): main.shake_tile(pos)
+	if main != null and main.has_method("shake_tile"): main.shake_tile(pos, z_level)
 
-func handle_rpc_confirm_break_wall(pos: Vector2i, rock_name: String) -> void:
+func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String) -> void:
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main != null:
-		break_wall(pos, main, rock_name)
-		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(1, 0))
+		break_wall(pos, z_level, main, rock_name)
+		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(1, 0)) # NOTE: Needs z integration on latejoin
 
-func handle_rpc_confirm_replace_tile(pos: Vector2i, source_id: int, atlas_coords: Vector2i) -> void:
-	if world.tilemap == null: return
-	world.tilemap.set_cell(pos, source_id, atlas_coords)
-	if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, source_id, atlas_coords)
+func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	var tm = world.get_tilemap(z_level)
+	if tm == null: return
+	tm.set_cell(pos, source_id, atlas_coords)
 
-func handle_rpc_confirm_break_stone_wall(pos: Vector2i) -> void:
-	if world.tilemap == null: return
-	world.tilemap.set_cell(pos, 0, Vector2i(5, 0))
-	if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(5, 0))
+func handle_rpc_confirm_break_stone_wall(pos: Vector2i, z_level: int) -> void:
+	var tm = world.get_tilemap(z_level)
+	if tm == null: return
+	tm.set_cell(pos, 0, Vector2i(5, 0))

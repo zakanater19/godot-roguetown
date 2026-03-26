@@ -10,6 +10,7 @@ var too_large_for_satchel: bool = false
 var slot: String = ""
 
 var is_on: bool = false
+@export var z_level: int = 3
 
 func get_description() -> String:
 	return "a portable lamp, currently " + ("ON" if is_on else "OFF")
@@ -18,26 +19,25 @@ func get_use_delay() -> float:
 	return 0.3
 
 func _ready() -> void:
+	# Standardized to floor base + 2 (below players at +10)
+	z_index = (z_level - 1) * 200 + 2
+	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return
 	add_to_group("pickable")
 	_set_sprite(is_on)
 
-# --- Added _process to dynamically control light based on sun_weight ---
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
 	var light = get_node_or_null("PointLight2D")
 	if light:
-		# Brighter at night (low sun_weight), off/dim during the day
 		light.energy = 1.2 * (1.0 - Lighting.sun_weight)
-		# Disable light if it's too bright outside (sun_weight > 0.8)
 		light.enabled = (Lighting.sun_weight < 0.8) and is_on
 
 func _set_sprite(on: bool) -> void:
 	is_on = on
 	var sprite = get_node_or_null("Sprite2D")
-	# REMOVED: if light: light.enabled = is_on (Handled in _process now)
 	if sprite:
 		sprite.texture = load("res://objects/lampon.png") if is_on else load("res://objects/lampoff.png")
 
@@ -55,7 +55,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		if Input.is_key_pressed(KEY_SHIFT):
 			return
 		var player: Node = World.get_local_player()
-		if player == null:
+		if player == null or player.z_level != z_level:
 			return
 		var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 		var diff: Vector2i = (my_tile - player.tile_pos).abs()
@@ -63,4 +63,3 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			get_viewport().set_input_as_handled()
 			if player.has_method("_on_object_picked_up"):
 				player._on_object_picked_up(self)
-				
