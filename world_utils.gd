@@ -36,7 +36,7 @@ func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -
 	for p in world.get_tree().get_nodes_in_group("player"):
 		if p.z_level != z_level: continue
 		if p.get_multiplayer_authority() == exclude_peer: continue
-		if p.dead: continue
+		if p.get("dead"): continue
 		if p.tile_pos == tile:
 			result.append(p)
 			continue
@@ -47,7 +47,9 @@ func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -
 
 func find_player_by_peer(peer_id: int) -> Node:
 	for p in world.get_tree().get_nodes_in_group("player"):
-		if p.get_multiplayer_authority() == peer_id:
+		# Ignores unpossessed corpses so actions (grabbing/chatting) reliably 
+		# target the currently possessed avatar of the given peer ID.
+		if p.get_multiplayer_authority() == peer_id and p.get("is_possessed") != false:
 			return p
 	return null
 
@@ -168,7 +170,7 @@ func reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array[Vector2
 func handle_rpc_request_update_laws(sender_id: int, new_laws: Array) -> void:
 	if not world.multiplayer.is_server(): return
 	var player = find_player_by_peer(sender_id)
-	if player == null or player.character_class != "king": return
+	if player == null or player.get("character_class") != "king": return
 	world.rpc_update_laws.rpc(new_laws)
 
 func handle_rpc_update_laws(new_laws: Array) -> void:
@@ -181,13 +183,13 @@ func handle_rpc_send_chat(sender_id: int, message: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var sender := find_player_by_peer(sender_id)
 	if sender == null: return
-	world.rpc_broadcast_chat.rpc(sender_id, message, sender.tile_pos, sender.z_level)
+	world.rpc_broadcast_chat.rpc(sender_id, message, sender.get("tile_pos"), sender.get("z_level"))
 
 func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i, sender_z: int) -> void:
 	var local_player := get_local_player()
 	if local_player == null: return
-	if local_player.z_level != sender_z: return
-	var diff: Vector2i = local_player.tile_pos - sender_tile
+	if local_player.get("z_level") != sender_z: return
+	var diff: Vector2i = local_player.get("tile_pos") - sender_tile
 	if diff.length_squared() > 144: return
 	var sender_node = find_player_by_peer(sender_peer_id)
 	if sender_node == null: return
@@ -196,22 +198,22 @@ func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile
 			world.get_node("/root/Sidebar").add_message("[color=#aaaaaa]you hear someone talking...[/color]")
 		return
 	if sender_node.has_method("_show_chat_message"): sender_node._show_chat_message(message)
-	if local_player.has_method("_show_inspect_text"): local_player._show_inspect_text(sender_node.character_name + " says: " + message, "")
+	if local_player.has_method("_show_inspect_text"): local_player._show_inspect_text(sender_node.get("character_name") + " says: " + message, "")
 
 func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool, is_shove: bool, targeted_limb: String, block_type: String) -> void:
 	var local_player := get_local_player()
 	if local_player == null: return
-	if local_player.z_level != source_z: return
-	var diff: Vector2i = local_player.tile_pos - source_tile
+	if local_player.get("z_level") != source_z: return
+	var diff: Vector2i = local_player.get("tile_pos") - source_tile
 	if diff.length_squared() > 144: return
 	var Sidebar = world.get_node("/root/Sidebar") if world.has_node("/root/Sidebar") else null
 	if Sidebar == null: return
 	if local_player.get("sleep_state") == 2:
-		if target_name == local_player.character_name: Sidebar.add_message("[color=#ff0000][b]YOU FEEL PAIN!!![/b][/color]")
+		if target_name == local_player.get("character_name"): Sidebar.add_message("[color=#ff0000][b]YOU FEEL PAIN!!![/b][/color]")
 		else: Sidebar.add_message("[color=#aaaaaa]you hear a scuffle...[/color]")
 		return
-	var disp_attacker = "You" if attacker_name == local_player.character_name else attacker_name
-	var disp_target = "You" if target_name == local_player.character_name else target_name
+	var disp_attacker = "You" if attacker_name == local_player.get("character_name") else attacker_name
+	var disp_target = "You" if target_name == local_player.get("character_name") else target_name
 	var limb_str = targeted_limb
 	match targeted_limb:
 		"r_arm": limb_str = "right arm"

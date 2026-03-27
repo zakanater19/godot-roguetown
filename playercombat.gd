@@ -17,14 +17,10 @@ func get_strength_damage_modifier() -> float:
 func get_weapon_damage(item: Node) -> int:
 	var base_damage: int = 5
 	if item != null:
-		# Prefer the item's own declared force value — this is now the single
-		# source of truth for all weapon damage (including the pickaxe, which
-		# sets force = 25 in its own script).
 		var force = item.get("force")
 		if force != null:
 			base_damage = force
 
-	# Apply strength modifier
 	var modifier = get_strength_damage_modifier()
 	var final_damage = int(round(base_damage * (1.0 + modifier)))
 	if final_damage < 0:
@@ -95,7 +91,7 @@ func die() -> void:
 	if player.multiplayer.is_server():
 		for i in range(2):
 			if player.hands[i] != null:
-				World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), player.hands[i].get_path(), player.tile_pos, player.DROP_SPREAD, i)
+				World.rpc_drop_item_at.rpc(player.get_path(), player.hands[i].get_path(), player.tile_pos, player.DROP_SPREAD, i)
 
 	if player.misc:
 		player.misc.close_menus()

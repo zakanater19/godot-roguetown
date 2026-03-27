@@ -4,10 +4,8 @@ const TILE_SIZE:   int = 64
 const GRID_WIDTH:  int = 1000
 const GRID_HEIGHT: int = 1000
 
-# tilemap property replaced with get_tilemap(z) function below
 var tilemap: TileMapLayer = null
 
-# Map Z-levels (1-5) to their spatial grids
 var solid_grid: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
 var tile_hit_counts: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
 
@@ -121,7 +119,6 @@ func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
 	var check_z = current_z
 	while check_z > 1:
 		var tm = get_tilemap(check_z)
-		# A source ID of -1 means empty space
 		if tm != null and tm.get_cell_source_id(tile_pos) != -1:
 			return check_z
 		check_z -= 1
@@ -141,6 +138,41 @@ func apply_gravity_to_player(player: Node2D) -> void:
 		
 		player.receive_damage.rpc(dmg, target_limb)
 		rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")
+
+@rpc("any_peer", "call_local", "reliable")
+func rpc_request_respawn(request_peer_id: int) -> void:
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	if sender_id != request_peer_id: return
+	
+	var old_player = utils.find_player_by_peer(sender_id) as Node2D
+	if old_player != null and old_player.dead:
+		# Depossess the body without changing names to break the Sync
+		old_player.rpc_make_corpse.rpc()
+		
+		# Drop the client completely from active peer lists
+		Host.peers.erase(sender_id)
+		if LateJoin._disconnected_players.has(sender_id):
+			LateJoin._disconnected_players.erase(sender_id)
+			
+		if grab_map.has(sender_id):
+			combat.release_grab_for_peer(sender_id, true)
+			
+		# Make sure grabs on the corpse transfer correctly
+		for gp_id in grab_map:
+			var entry = grab_map[gp_id]
+			if entry.get("is_player") and entry.get("target") == old_player:
+				entry["target_peer_id"] = 1 # The host now rules the corpse entirely
+				
+		# Send the player back to the lobby instead of spawning immediately
+		rpc_return_to_lobby.rpc_id(sender_id)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_return_to_lobby() -> void:
+	if has_node("/root/Lobby"):
+		var lobby = get_node("/root/Lobby")
+		lobby.show_lobby()
 
 @rpc("authority", "call_local", "reliable")
 func rpc_set_object_z_level(obj_path: NodePath, new_z: int) -> void:
@@ -362,8 +394,8 @@ func rpc_request_drop(item_path: NodePath, tile: Vector2i, spread: float, hand_i
 	objects.handle_rpc_request_drop(sender_id, item_path, tile, spread, hand_index)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_drop_item_at(peer_id: int, item_path: NodePath, tile: Vector2i, spread: float, hand_index: int) -> void:
-	objects.handle_rpc_drop_item_at(peer_id, item_path, tile, spread, hand_index)
+func rpc_drop_item_at(player_path: NodePath, item_path: NodePath, tile: Vector2i, spread: float, hand_index: int) -> void:
+	objects.handle_rpc_drop_item_at(player_path, item_path, tile, spread, hand_index)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_throw(item_path: NodePath, hand_index: int, dir: Vector2, throw_range: int) -> void:
@@ -390,22 +422,22 @@ func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount
 	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, source_z, blocked, is_shove, targeted_limb, block_type)
 
 @rpc("any_peer", "call_remote", "reliable")
-func rpc_notify_loot_warning(target_peer_id: int, looter_peer_id: int, item_desc: String) -> void:
-	objects.handle_rpc_notify_loot_warning(target_peer_id, looter_peer_id, item_desc)
+func rpc_notify_loot_warning(target_path: NodePath, looter_peer_id: int, item_desc: String) -> void:
+	objects.handle_rpc_notify_loot_warning(target_path, looter_peer_id, item_desc)
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_deliver_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 	objects.handle_rpc_deliver_loot_warning(looter_peer_id, item_desc)
 
 @rpc("any_peer", "call_remote", "reliable")
-func rpc_request_loot_item(target_peer_id: int, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void:
+func rpc_request_loot_item(target_path: NodePath, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()
-	objects.handle_rpc_request_loot_item(sender_id, target_peer_id, looter_peer_id, slot_type, slot_index)
+	objects.handle_rpc_request_loot_item(sender_id, target_path, looter_peer_id, slot_type, slot_index)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_loot_unequip_drop(target_peer_id: int, equip_slot: String, new_node_name: String, drop_tile: Vector2i, spread: float) -> void:
-	objects.handle_rpc_confirm_loot_unequip_drop(target_peer_id, equip_slot, new_node_name, drop_tile, spread)
+func rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: String, new_node_name: String, drop_tile: Vector2i, spread: float) -> void:
+	objects.handle_rpc_confirm_loot_unequip_drop(target_path, equip_slot, new_node_name, drop_tile, spread)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
@@ -474,3 +506,7 @@ func rpc_confirm_resist_result(grabber_peer_id: int, grabbed_peer_id: int, broke
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_drag_object(obj_path: NodePath, new_pixel: Vector2) -> void:
 	combat.handle_rpc_confirm_drag_object(obj_path, new_pixel)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_drag_corpse(corpse_path: NodePath, new_pos: Vector2i) -> void:
+	combat.handle_rpc_confirm_drag_corpse(corpse_path, new_pos)

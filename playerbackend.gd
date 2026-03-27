@@ -456,7 +456,7 @@ func drop_item_from_hand(hand_idx: int) -> void:
 		return
 	var obj = player.hands[hand_idx]
 	if player.multiplayer.is_server():
-		World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
+		World.rpc_drop_item_at.rpc(player.get_path(), obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 	else:
 		World.rpc_request_drop.rpc_id(1, obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
 

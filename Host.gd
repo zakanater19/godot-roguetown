@@ -122,7 +122,12 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 	if player_scene == null: return
 
 	var player: Node2D = player_scene.instantiate()
-	player.name = "Player_%d" % peer_id
+	
+	# Ensures completely unique names for players upon respawning, which fixes the
+	# MultiplayerSpawner collision errors. The client reads to_int() up to the first non-digit
+	# and accurately finds their peer ID logic anyway (e.g. Player_1_248434 to_int() returns 1)
+	player.name = "Player_%d_%d" % [peer_id, Time.get_ticks_usec()]
+	
 	player.set_multiplayer_authority(peer_id)
 	player.character_name = p_name
 	player.character_class = p_class
@@ -130,7 +135,7 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 	var preferred_spawns: Array[String] =[]
 	if is_latejoin:
 		if p_class in["swordsman", "miner", "adventurer"]: preferred_spawns =[p_class, "adventurer", "latejoin"]
-		elif p_class == "bandit": preferred_spawns = ["antag latejoin", "bandit", "latejoin"]
+		elif p_class == "bandit": preferred_spawns =["antag latejoin", "bandit", "latejoin"]
 		else: preferred_spawns =["latejoin", p_class]
 	else:
 		if p_class in["swordsman", "miner", "adventurer"]: preferred_spawns =[p_class, "adventurer", "latejoin"]

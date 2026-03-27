@@ -74,9 +74,9 @@ func open_target_inventory(target: Node) -> void:
 	var title_row := HBoxContainer.new()
 	vbox.add_child(title_row)
 
-	var title := Label.new()
 	var target_peer: int = target.get_multiplayer_authority()
 	var target_name: String = target.character_name if "character_name" in target else "Player " + str(target_peer)
+	var title := Label.new()
 	title.text = target_name + ("[DEAD]" if target.dead else "")
 	title.add_theme_color_override("font_color", Color(1, 0.6, 0.1))
 	title.add_theme_font_size_override("font_size", 12)
@@ -237,11 +237,11 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 	active_loot_attempts.append(attempt)
 
 	var my_peer_id: int = player.multiplayer.get_unique_id()
-	var tgt_peer_id: int = loot_target.get_multiplayer_authority()
+	var target_path: NodePath = loot_target.get_path()
 	if player.multiplayer.is_server():
-		World.rpc_notify_loot_warning(tgt_peer_id, my_peer_id, item_desc)
+		World.rpc_notify_loot_warning(target_path, my_peer_id, item_desc)
 	else:
-		World.rpc_notify_loot_warning.rpc_id(1, tgt_peer_id, my_peer_id, item_desc)
+		World.rpc_notify_loot_warning.rpc_id(1, target_path, my_peer_id, item_desc)
 
 func _update_loot_attempts(delta: float) -> void:
 	var completed_keys: Array =[]
@@ -336,7 +336,7 @@ func _complete_loot_attempt(slot_key: String) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 
-	var target_peer_id: int = target.get_multiplayer_authority()
+	var target_path: NodePath = target.get_path()
 	var my_peer_id:     int = player.multiplayer.get_unique_id()
 
 	var slot_type:  String = ""
@@ -350,9 +350,9 @@ func _complete_loot_attempt(slot_key: String) -> void:
 		slot_index = slot_key.trim_prefix("equip_")
 
 	if player.multiplayer.is_server():
-		World.rpc_request_loot_item(target_peer_id, my_peer_id, slot_type, slot_index)
+		World.rpc_request_loot_item(target_path, my_peer_id, slot_type, slot_index)
 	else:
-		World.rpc_request_loot_item.rpc_id(1, target_peer_id, my_peer_id, slot_type, slot_index)
+		World.rpc_request_loot_item.rpc_id(1, target_path, my_peer_id, slot_type, slot_index)
 
 func show_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 	if player.sleep_state == 2: # SleepState.ASLEEP

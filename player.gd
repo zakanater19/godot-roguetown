@@ -34,6 +34,8 @@ var combat = null
 var crafting = null
 var body = null
 
+var is_possessed: bool = true
+
 enum SleepState { AWAKE, FALLING_ASLEEP, ASLEEP, WAKING_UP }
 var sleep_state: SleepState = SleepState.AWAKE
 var sleep_timer: float = 0.0
@@ -106,7 +108,7 @@ var dead: bool = false :
 		dead = val
 		if dead: _die_visuals()
 
-var hands:        Array[Node] = [null, null]
+var hands:        Array[Node] =[null, null]
 var active_hand:  int         = 0
 var _is_throwing: bool        = false
 
@@ -371,7 +373,6 @@ func rpc_sync_z_level(new_z: int) -> void:
 	z_index = (z_level - 1) * 200 + 10
 	_update_water_submerge()
 	
-	# Fix: Update held items' z_level so main.gd visibility logic doesn't hide them
 	for h in hands:
 		if h != null and is_instance_valid(h):
 			h.set("z_level", new_z)
@@ -380,13 +381,34 @@ func rpc_sync_z_level(new_z: int) -> void:
 		if _hud:
 			_hud.update_stats(health, stamina)
 
+@rpc("any_peer", "call_local", "reliable")
+func rpc_make_corpse() -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id != 1 and sender_id != 0: return
+	
+	is_possessed = false
+	set_multiplayer_authority(1) 
+	
+	if _canvas_layer:
+		_canvas_layer.queue_free()
+		_canvas_layer = null
+	if _hud:
+		_hud.queue_free()
+		_hud = null
+	if camera:
+		# Do NOT free the shared Camera2D. Just clear the reference.
+		camera = null
+	if _combat_indicator:
+		_combat_indicator.queue_free()
+		_combat_indicator = null
+
 func _enter_tree() -> void:
 	if name.begins_with("Player_"):
-		var peer_id := name.trim_prefix("Player_").to_int()
-		set_multiplayer_authority(peer_id)
+		var parts = name.split("_")
+		if parts.size() > 1:
+			set_multiplayer_authority(parts[1].to_int())
 
 func _ready() -> void:
-	# Standardized to floor base + 10 to ensure player is above items (+2)
 	z_index = (z_level - 1) * 200 + 10
 	add_to_group("z_entity")
 	backend = preload("res://playerbackend.gd").new(self)
@@ -417,6 +439,7 @@ func _ready() -> void:
 		_build_ui()
 
 func _is_local_authority() -> bool:
+	if not is_possessed: return false
 	if not is_inside_tree(): return false
 	if not multiplayer.has_multiplayer_peer(): return false
 	if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED: return false
@@ -468,7 +491,6 @@ func sync_hands(hand_names: Array) -> void:
 			hands[i] = found
 			for child in found.get_children():
 				if child is CollisionShape2D: child.disabled = true
-			# Ensure the hand item knows it is now on the player's z-level
 			found.set("z_level", z_level)
 	_update_hands_ui()
 
@@ -599,12 +621,19 @@ func _build_ui() -> void:
 	_dead_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_dead_container.visible   = false
 	safe_area.add_child(_dead_container)
+	
 	var you_died_label := Label.new()
 	you_died_label.text = "YOU DIED"
 	you_died_label.add_theme_color_override("font_color", Color(0.85, 0.0, 0.0))
 	you_died_label.add_theme_font_size_override("font_size", 72)
 	you_died_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_dead_container.add_child(you_died_label)
+	
+	var respawn_btn := Button.new()
+	respawn_btn.text = "Respawn"
+	respawn_btn.add_theme_font_size_override("font_size", 24)
+	respawn_btn.pressed.connect(_on_respawn_pressed)
+	_dead_container.add_child(respawn_btn)
 
 	_chat_input = LineEdit.new()
 	_chat_input.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -626,6 +655,16 @@ func _build_ui() -> void:
 	_hud.update_stance_display(combat_stance)
 
 	_update_hands_ui()
+
+func _on_respawn_pressed() -> void:
+	# Yield authority locally immediately to prevent the synchronizer warning
+	# when the server takes over this corpse.
+	set_multiplayer_authority(1)
+	
+	if multiplayer.is_server():
+		World.rpc_request_respawn.rpc(multiplayer.get_unique_id())
+	else:
+		World.rpc_request_respawn.rpc_id(1, multiplayer.get_unique_id())
 
 func _update_hands_ui() -> void:
 	if _hud != null: _hud.update_hands_display(hands, active_hand)
@@ -654,8 +693,11 @@ func show_stats_skills() -> void:
 
 func _process(delta: float) -> void:
 	var is_local := _is_local_authority()
-	_check_stamina_regen(delta)
-	if sleep_state != SleepState.AWAKE and not dead:
+	
+	if is_possessed:
+		_check_stamina_regen(delta)
+		
+	if sleep_state != SleepState.AWAKE and not dead and is_possessed:
 		if sleep_state == SleepState.FALLING_ASLEEP:
 			sleep_timer -= delta
 			if sleep_timer <= 0.0:
@@ -687,6 +729,7 @@ func _process(delta: float) -> void:
 							heal_amount -= missing
 					if heal_amount > 0:
 						rpc_heal_limbs.rpc(heal_amount)
+						
 	if is_local and _sleep_blackout != null:
 		if sleep_state == SleepState.AWAKE: _sleep_blackout.color.a = 0.0
 		elif sleep_state == SleepState.FALLING_ASLEEP: _sleep_blackout.color.a = clamp(1.0 - (sleep_timer / 10.0), 0.0, 1.0)
@@ -717,9 +760,13 @@ func _process(delta: float) -> void:
 			get_parent().add_child(drip)
 
 	if is_local and _hud: _hud.update_stats(health, stamina)
-	if misc: misc.update(delta)
-	if crafting: crafting.update(delta)
+	
+	if is_possessed:
+		if misc: misc.update(delta)
+		if crafting: crafting.update(delta)
+		
 	if is_local and action_cooldown > 0.0: action_cooldown -= delta
+	
 	if dead:
 		if camera and is_local:
 			camera.position = pixel_pos
