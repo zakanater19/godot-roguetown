@@ -148,24 +148,16 @@ func rpc_request_respawn(request_peer_id: int) -> void:
 	
 	var old_player = utils.find_player_by_peer(sender_id) as Node2D
 	if old_player != null and old_player.dead:
-		# Depossess the body without changing names to break the Sync
 		old_player.rpc_make_corpse.rpc()
-		
-		# Drop the client completely from active peer lists
 		Host.peers.erase(sender_id)
 		if LateJoin._disconnected_players.has(sender_id):
 			LateJoin._disconnected_players.erase(sender_id)
-			
 		if grab_map.has(sender_id):
 			combat.release_grab_for_peer(sender_id, true)
-			
-		# Make sure grabs on the corpse transfer correctly
 		for gp_id in grab_map:
 			var entry = grab_map[gp_id]
 			if entry.get("is_player") and entry.get("target") == old_player:
-				entry["target_peer_id"] = 1 # The host now rules the corpse entirely
-				
-		# Send the player back to the lobby instead of spawning immediately
+				entry["target_peer_id"] = 1 
 		rpc_return_to_lobby.rpc_id(sender_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -174,8 +166,9 @@ func rpc_return_to_lobby() -> void:
 		var lobby = get_node("/root/Lobby")
 		lobby.show_lobby()
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func rpc_set_object_z_level(obj_path: NodePath, new_z: int) -> void:
+	if not multiplayer.is_server(): return
 	var obj = get_node_or_null(obj_path)
 	if obj != null:
 		var old_z = obj.get("z_level")
