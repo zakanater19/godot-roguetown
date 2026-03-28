@@ -10,7 +10,7 @@ func _get_property_list() -> Array[Dictionary]:
 		for key in Classes.DATA.keys():
 			options.append(key)
 	else:
-		options.append_array(["peasant", "merchant", "bandit", "adventurer", "swordsman", "miner", "debug"])
+		options.append_array(["peasant", "merchant", "bandit", "adventurer", "swordsman", "miner"])
 		
 	options.append("latejoin")
 	options.append("antag latejoin")

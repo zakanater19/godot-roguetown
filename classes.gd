@@ -114,16 +114,5 @@ const DATA: Dictionary = {
 			"cloak": "KingCloak",
 			"head": "Crown"
 		}
-	},
-	"debug": {
-		"stats": {
-			"strength": 20,
-			"agility": 10
-		},
-		"skills": {
-			"sword_fighting": 5,
-			"blacksmithing": 5
-		},
-		"equipment": {}
 	}
 }

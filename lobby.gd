@@ -93,7 +93,6 @@ func _build_ui() -> void:
 	_class_option.add_item("bandit")
 	_class_option.add_item("adventurer")
 	_class_option.add_item("king")
-	_class_option.add_item("debug")
 	_class_option.add_theme_font_size_override("font_size", 24)
 	_class_option.custom_minimum_size = Vector2(250, 60)
 	_class_option.set_anchors_preset(Control.PRESET_CENTER)
@@ -154,7 +153,6 @@ func _build_ui() -> void:
 	_lj_class_option.add_item("bandit")
 	_lj_class_option.add_item("adventurer")
 	_lj_class_option.add_item("king")
-	_lj_class_option.add_item("debug")
 	_lj_class_option.add_theme_font_size_override("font_size", 20)
 	lj_vbox.add_child(_lj_class_option)
 	
@@ -413,7 +411,7 @@ func _show_error(msg: String) -> void:
 	_error_dialog.dialog_text = msg
 	_error_dialog.popup_centered()
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func rpc_show_name_error(msg: String) -> void:
 	_show_error(msg)
 
@@ -462,12 +460,29 @@ func _start_game() -> void:
 	game_started = true
 	sync_game_started.rpc()
 	
+	# Determine King candidate if any
+	var king_candidates =[]
+	for peer_id in ready_players:
+		var data = ready_players[peer_id]
+		if data.get("ready", false) == true and data.get("class", "peasant") == "king":
+			king_candidates.append(peer_id)
+			
+	var chosen_king = -1
+	if king_candidates.size() > 0:
+		chosen_king = king_candidates.pick_random()
+		
+	# Spawn evaluated players
 	for peer_id in ready_players:
 		var data = ready_players[peer_id]
 		if data.get("ready", false) == true:
-			# Pass the name explicitly, and false for is_latejoin
-			Host.spawn_player(peer_id, data.get("name", "noob"), data.get("class", "peasant"), false)
-			rpc_hide_lobby.rpc_id(peer_id)
+			if data.get("class", "peasant") == "king" and peer_id != chosen_king:
+				# Failed to get the role
+				data["ready"] = false
+				sync_ready_state.rpc(peer_id, false, data.get("name", "noob"), data.get("class", "peasant"))
+				rpc_show_name_error.rpc_id(peer_id, "You failed to get the King role. Please latejoin as another class.")
+			else:
+				Host.spawn_player(peer_id, data.get("name", "noob"), data.get("class", "peasant"), false)
+				rpc_hide_lobby.rpc_id(peer_id)
 
 @rpc("any_peer", "call_local", "reliable")
 func request_latejoin(p_name: String, p_class: String) -> void:
@@ -477,6 +492,24 @@ func request_latejoin(p_name: String, p_class: String) -> void:
 	if _get_validation_error(p_name) != "":
 		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
 		return
+		
+	if p_class == "king":
+		var king_exists = false
+		for peer in Host.peers:
+			var p = Host.peers[peer]
+			if is_instance_valid(p) and p.get("character_class") == "king":
+				king_exists = true
+				break
+		if LateJoin != null and "LateJoin" in str(LateJoin.name):
+			for peer in LateJoin._disconnected_players:
+				var d = LateJoin._disconnected_players[peer]
+				if d.state.get("character_class") == "king":
+					king_exists = true
+					break
+		
+		if king_exists:
+			rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "The King role is already taken.")
+			return
 	
 	var peer_id = multiplayer.get_remote_sender_id()
 	if peer_id == 0: peer_id = multiplayer.get_unique_id()
