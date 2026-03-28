@@ -33,6 +33,8 @@ texture = ExtResource("2_lampoff")
 enabled = false
 color = Color(1, 0.95, 0.8, 1)
 energy = 1.2
+range_z_min = -4096
+range_z_max = 4096
 texture = SubResource("GradientTexture2D_lamp")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]

@@ -112,6 +112,8 @@ func _update_player_light() -> void:
 		# Use MIX blend mode so lights don't blow out into pure white when stacked
 		light.blend_mode = PointLight2D.BLEND_MODE_MIX
 		light.z_index = 15
+		light.range_z_min = -4096
+		light.range_z_max = 4096
 		light.energy = 0.4
 		local_player.add_child(light)
 
