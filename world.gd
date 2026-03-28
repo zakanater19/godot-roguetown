@@ -132,6 +132,7 @@ func apply_gravity_to_player(player: Node2D) -> void:
 	var land_z = calculate_gravity_z(player.tile_pos, player.z_level)
 	if land_z < player.z_level:
 		var drop = player.z_level - land_z
+		player.rpc_sync_z_level(land_z)
 		player.rpc_sync_z_level.rpc(land_z)
 		
 		var dmg = randi_range(20, 30) * drop

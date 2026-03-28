@@ -82,6 +82,19 @@ func _build_tileset() -> void:
 		ts.add_source(floor_atlas, 0)
 		ts.add_source(solid_atlas, 1)
 		
+		# --- STAIRS IMPLEMENTATION ---
+		var stairs_tex = load("res://doors/stairs.png")
+		if stairs_tex != null:
+			var stairs_atlas := TileSetAtlasSource.new()
+			stairs_atlas.resource_name = "Stairs"
+			stairs_atlas.texture = stairs_tex
+			# Now 64x64 to match the resized stair tile
+			stairs_atlas.texture_region_size = Vector2i(64, 64)
+			stairs_atlas.create_tile(Vector2i(0, 0))
+			ts.add_source(stairs_atlas, 2)
+		else:
+			push_warning("res://doors/stairs.png not found — Stairs tile skipped.")
+		
 		var water_tex = load("res://animated/water_sheet.png")
 		if water_tex != null:
 			var water_atlas := TileSetAtlasSource.new()

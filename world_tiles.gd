@@ -1,3 +1,4 @@
+# res://world_tiles.gd
 extends RefCounted
 
 var world: Node
@@ -24,7 +25,6 @@ func is_opaque(pos: Vector2i, z_level: int) -> bool:
 	if tm != null and tm.get_cell_source_id(pos) == 1: return true
 	if world.solid_grid[z_level].has(pos):
 		for obj in world.solid_grid[z_level][pos]:
-			# If it doesn't explicitly declare blocks_fov = false, assume it blocks vision
 			if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
 				return true
 	return false
@@ -65,6 +65,7 @@ func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 				Vector2i(6, 0): return "a stone wall, solid but workable"
 				Vector2i(7, 0): return "a wooden wall, solid and sturdy"
 				_: return "a wall"
+		2: return "a set of stairs"
 		5: return "water, murky and still"
 		_: return "empty space, nothing here"
 
@@ -83,14 +84,60 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 		elif dir.x > 0: player.facing = 2
 		elif dir.x < 0: player.facing = 3
 	var old_tile: Vector2i = player.tile_pos
-	var next_tile: Vector2i = player.tile_pos + dir
+	
+	# Z-Level Transition Logic
+	var current_z: int = player.z_level
+	var next_z: int = current_z
+	var tm = world.get_tilemap(current_z)
+	if tm != null and tm.get_cell_source_id(old_tile) == 2:
+		var alt = tm.get_cell_alternative_tile(old_tile)
+		# 0=North, 1=East, 2=South, 3=West
+		match alt:
+			0: # North facing stairs
+				if dir == Vector2i(0, -1): next_z += 1
+				elif dir == Vector2i(0, 1): next_z -= 1
+			1: # East facing
+				if dir == Vector2i(1, 0): next_z += 1
+				elif dir == Vector2i(-1, 0): next_z -= 1
+			2: # South facing
+				if dir == Vector2i(0, 1): next_z += 1
+				elif dir == Vector2i(0, -1): next_z -= 1
+			3: # West facing
+				if dir == Vector2i(-1, 0): next_z += 1
+				elif dir == Vector2i(1, 0): next_z -= 1
+	
+	next_z = clamp(next_z, 1, 5)
+	var next_tile: Vector2i = old_tile + dir
+
 	if next_tile.x < 0 or next_tile.x >= world.GRID_WIDTH or next_tile.y < 0 or next_tile.y >= world.GRID_HEIGHT:
 		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 		return
-	if is_solid(next_tile, player.z_level):
+	
+	# Smart Z-level transitioning: Ensure we don't fall through floors or fly into the sky
+	if next_z != current_z:
+		if next_z < current_z:
+			# Going DOWN: If the current level's destination HAS a floor, you are stepping off the stairs. Stay on current floor.
+			if tm.get_cell_source_id(next_tile) != -1:
+				next_z = current_z
+		elif next_z > current_z:
+			# Going UP: The upper level's destination MUST have a floor/tile to stand on.
+			var next_tm = world.get_tilemap(next_z)
+			if next_tm == null or next_tm.get_cell_source_id(next_tile) == -1:
+				next_z = current_z
+			# Going UP: The tile directly above the stairs MUST be air (uncovered).
+			elif next_tm.get_cell_source_id(old_tile) != -1:
+				next_z = current_z
+	
+	# Block Z-level changes if the destination tile on either the current or next floor is blocked by solid objects/walls
+	if next_z != current_z:
+		if is_solid(next_tile, current_z) or is_solid(next_tile, next_z):
+			next_z = current_z
+
+	if is_solid(next_tile, next_z):
 		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 		return
-	var occupants = world.utils.get_entities_at_tile(next_tile, player.z_level)
+	
+	var occupants = world.utils.get_entities_at_tile(next_tile, next_z)
 	var blocking_player: Node = null
 	for ent in occupants:
 		if ent.is_in_group("player") and not ent.dead:
@@ -102,8 +149,15 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 				break
 	if blocking_player != null:
 		if not player.combat_mode and not blocking_player.combat_mode:
+			var old_z = player.z_level
 			player.tile_pos = next_tile
 			blocking_player.tile_pos = old_tile
+			if old_z != next_z:
+				player.rpc_sync_z_level(next_z)
+				player.rpc_sync_z_level.rpc(next_z)
+			if blocking_player.get("z_level") != old_z:
+				blocking_player.rpc_sync_z_level(old_z)
+				blocking_player.rpc_sync_z_level.rpc(old_z)
 			world.combat.drag_grabbed_entity(sender_id, old_tile)
 			world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
 			world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), old_tile, false)
@@ -112,8 +166,8 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 		else:
 			var push_dest = next_tile + dir
 			if push_dest.x >= 0 and push_dest.x < world.GRID_WIDTH and push_dest.y >= 0 and push_dest.y < world.GRID_HEIGHT:
-				if not is_solid(push_dest, player.z_level):
-					var dest_occupants = world.utils.get_entities_at_tile(push_dest, player.z_level)
+				if not is_solid(push_dest, next_z):
+					var dest_occupants = world.utils.get_entities_at_tile(push_dest, next_z)
 					var dest_blocked = false
 					for ent in dest_occupants:
 						if ent.is_in_group("player") and not ent.dead:
@@ -121,8 +175,15 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 								dest_blocked = true
 								break
 					if not dest_blocked:
+						var old_z = player.z_level
 						blocking_player.tile_pos = push_dest
 						player.tile_pos = next_tile
+						if old_z != next_z:
+							player.rpc_sync_z_level(next_z)
+							player.rpc_sync_z_level.rpc(next_z)
+						if blocking_player.get("z_level") != next_z:
+							blocking_player.rpc_sync_z_level(next_z)
+							blocking_player.rpc_sync_z_level.rpc(next_z)
 						world.combat.drag_grabbed_entity(sender_id, old_tile)
 						world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), push_dest, false)
 						world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
@@ -132,6 +193,9 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 	else:
 		player.tile_pos = next_tile
+		if current_z != next_z:
+			player.rpc_sync_z_level(next_z)
+			player.rpc_sync_z_level.rpc(next_z)
 		world.combat.drag_grabbed_entity(sender_id, old_tile)
 		world.rpc_confirm_move.rpc(sender_id, next_tile, is_sprinting)
 		world.apply_gravity_to_player(player)
@@ -191,7 +255,7 @@ func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: Strin
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main != null:
 		break_wall(pos, z_level, main, rock_name)
-		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(1, 0)) # NOTE: Needs z integration on latejoin
+		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(1, 0))
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	var tm = world.get_tilemap(z_level)
