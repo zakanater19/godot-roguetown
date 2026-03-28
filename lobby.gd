@@ -7,6 +7,7 @@ var ready_players: Dictionary = {}
 var round_time: float = 0.0
 
 var _ui_layer: CanvasLayer
+var _main_content: Control
 var _time_label: Label
 var _ready_btn: Button
 var _force_btn: Button
@@ -56,13 +57,18 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ui_layer.add_child(bg)
 
+	_main_content = Control.new()
+	_main_content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_main_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.add_child(_main_content)
+
 	var title = Label.new()
 	title.text = "LOBBY"
 	title.add_theme_font_size_override("font_size", 64)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	title.offset_top = 100
-	bg.add_child(title)
+	_main_content.add_child(title)
 
 	_time_label = Label.new()
 	_time_label.text = "300s"
@@ -70,7 +76,7 @@ func _build_ui() -> void:
 	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_time_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	_time_label.offset_top = 200
-	bg.add_child(_time_label)
+	_main_content.add_child(_time_label)
 
 	_name_input = LineEdit.new()
 	_name_input.text = "noob"
@@ -79,7 +85,7 @@ func _build_ui() -> void:
 	_name_input.custom_minimum_size = Vector2(250, 60)
 	_name_input.set_anchors_preset(Control.PRESET_CENTER)
 	_name_input.position = Vector2(-125, -90)
-	bg.add_child(_name_input)
+	_main_content.add_child(_name_input)
 
 	_class_option = OptionButton.new()
 	_class_option.add_item("peasant")
@@ -92,7 +98,7 @@ func _build_ui() -> void:
 	_class_option.custom_minimum_size = Vector2(250, 60)
 	_class_option.set_anchors_preset(Control.PRESET_CENTER)
 	_class_option.position = Vector2(-125, -20)
-	bg.add_child(_class_option)
+	_main_content.add_child(_class_option)
 
 	_ready_btn = Button.new()
 	_ready_btn.text = "Unready"
@@ -101,7 +107,7 @@ func _build_ui() -> void:
 	_ready_btn.set_anchors_preset(Control.PRESET_CENTER)
 	_ready_btn.position = Vector2(-125, 50)
 	_ready_btn.pressed.connect(_on_ready_pressed)
-	bg.add_child(_ready_btn)
+	_main_content.add_child(_ready_btn)
 
 	_force_btn = Button.new()
 	_force_btn.text = "Force Start"
@@ -110,7 +116,7 @@ func _build_ui() -> void:
 	_force_btn.set_anchors_preset(Control.PRESET_CENTER)
 	_force_btn.position = Vector2(-125, 120)
 	_force_btn.pressed.connect(_on_force_pressed)
-	bg.add_child(_force_btn)
+	_main_content.add_child(_force_btn)
 
 	_force_btn.visible = false
 	
@@ -158,6 +164,15 @@ func _build_ui() -> void:
 	lj_confirm_btn.pressed.connect(_on_confirm_latejoin_pressed)
 	lj_vbox.add_child(lj_confirm_btn)
 
+	var lj_back_btn = Button.new()
+	lj_back_btn.text = "Back"
+	lj_back_btn.add_theme_font_size_override("font_size", 24)
+	lj_back_btn.pressed.connect(func():
+		_latejoin_panel.visible = false
+		_main_content.visible = true
+	)
+	lj_vbox.add_child(lj_back_btn)
+
 	# --- Subclass Panel (Intercepts Adventurer choice) ---
 	_subclass_panel = Panel.new()
 	_subclass_panel.custom_minimum_size = Vector2(300, 240)
@@ -195,11 +210,17 @@ func _build_ui() -> void:
 	sub_vbox.add_child(btn_miner)
 
 	var btn_cancel = Button.new()
-	btn_cancel.text = "Cancel"
+	btn_cancel.text = "Back"
 	btn_cancel.add_theme_font_size_override("font_size", 16)
 	btn_cancel.custom_minimum_size = Vector2(200, 30)
 	btn_cancel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	btn_cancel.pressed.connect(func(): _subclass_panel.visible = false)
+	btn_cancel.pressed.connect(func():
+		_subclass_panel.visible = false
+		if _pending_action == "latejoin":
+			_latejoin_panel.visible = true
+		else:
+			_main_content.visible = true
+	)
 	sub_vbox.add_child(btn_cancel)
 	
 	# --- Lobby Chat Input ---
@@ -314,11 +335,13 @@ func _on_ready_pressed() -> void:
 		if is_ready and p_class == "adventurer":
 			_pending_action = "ready"
 			_subclass_panel.visible = true
+			_main_content.visible = false
 			return
 		
 		_send_ready_request(is_ready, p_name, p_class)
 	else:
 		_latejoin_panel.visible = true
+		_main_content.visible = false
 
 func _on_confirm_latejoin_pressed() -> void:
 	var p_name = _lj_name_input.text.strip_edges()
@@ -334,12 +357,14 @@ func _on_confirm_latejoin_pressed() -> void:
 	if p_class == "adventurer":
 		_pending_action = "latejoin"
 		_subclass_panel.visible = true
+		_latejoin_panel.visible = false
 		return
 	
 	_send_latejoin_request(p_name, p_class)
 
 func _on_subclass_chosen(subclass: String) -> void:
 	_subclass_panel.visible = false
+	_main_content.visible = true
 	
 	if _pending_action == "ready":
 		var p_name = _name_input.text.strip_edges()
@@ -515,4 +540,3 @@ func _on_peer_connected(id: int) -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
 		ready_players.erase(id)
-		
