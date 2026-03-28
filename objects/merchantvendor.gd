@@ -11,7 +11,7 @@ func get_description() -> String:
 	return "a merchant vendor, ready to trade"
 
 func _ready() -> void:
-	z_index = (z_level - 1) * 200 + z_index
+	z_index = (z_level - 1) * 200 + 5
 	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return

@@ -19,7 +19,7 @@ var _anim_frames: int = 1
 var _frame_size: int = 64
 
 func _ready() -> void:
-	z_index = (z_level - 1) * 200 + z_index
+	z_index = (z_level - 1) * 200 + 5
 	add_to_group("z_entity")
 	if Engine.is_editor_hint(): return
 	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
