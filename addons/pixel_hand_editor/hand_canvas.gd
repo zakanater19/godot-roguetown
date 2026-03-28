@@ -30,9 +30,10 @@ var active_hand:   int     = 0
 var offset:          Vector2 = Vector2(20.0, 8.0)
 var active_rotation: float   = 0.0
 
-# Offset/rotation of the inactive hand -- shown as ghost
+# Offset/rotation/scale of the inactive hand -- shown as ghost
 var other_offset:    Vector2 = Vector2(-20.0, 8.0)
 var other_rotation:  float   = 0.0
+var other_scale:     float   = 1.0
 
 # Flip state for each hand
 var flipped:       bool    = false
@@ -72,7 +73,7 @@ func _draw() -> void:
 
 	# Ghost hand (behind player)
 	if objects_tex != null or item_custom_tex != null:
-		_draw_item(other_offset, other_rotation, Color(0.40, 0.70, 1.00, 0.55), false, other_flipped, 1.0, item_custom_tex)
+		_draw_item(other_offset, other_rotation, Color(0.40, 0.70, 1.00, 0.55), false, other_flipped, other_scale, item_custom_tex)
 
 	# Player sprite
 	if player_tex != null:
@@ -143,10 +144,15 @@ func _draw_item(item_offset: Vector2, rot: float, tint: Color, show_border: bool
 	if facing == 3:
 		draw_flip = not draw_flip
 		
-	var center       := CENTER + item_offset * float(CANVAS_SCALE)
-	var display_size := 64.0 * scale_val * float(CANVAS_SCALE)
-	var half         := display_size * 0.5
-	var dest         := Rect2(-half, -half, display_size, display_size)
+	var center := CENTER + item_offset * float(CANVAS_SCALE)
+	var tex_size := Vector2(64.0, 64.0)
+	if custom_tex != null:
+		tex_size = custom_tex.get_size()
+		
+	var display_size := tex_size * scale_val * float(CANVAS_SCALE)
+	var half_w       := display_size.x * 0.5
+	var half_h       := display_size.y * 0.5
+	var dest         := Rect2(-half_w, -half_h, display_size.x, display_size.y)
 
 	draw_set_transform(center, deg_to_rad(rot), Vector2(-1.0 if draw_flip else 1.0, 1.0))
 	
@@ -180,12 +186,14 @@ func _gui_input(event: InputEvent) -> void:
 						_drag_start_offset = clothing_offset
 						accept_event()
 			else:
-				var center       := CENTER + offset * float(CANVAS_SCALE)
-				var display_size := 64.0 * item_game_scale * float(CANVAS_SCALE)
-				var half         := display_size * 0.5
-				var item_rect    := Rect2(center.x - half, center.y - half, display_size, display_size)
-				
-				if item_rect.has_point(event.position):
+				var center = CENTER + offset * float(CANVAS_SCALE)
+				var tex_size = Vector2(64.0, 64.0)
+				if item_custom_tex != null:
+					tex_size = item_custom_tex.get_size()
+					
+				# Use a radius check so rotated/flipped items are perfectly grabbable
+				var radius = max(tex_size.x, tex_size.y) * item_game_scale * float(CANVAS_SCALE) * 0.5
+				if event.position.distance_to(center) <= radius:
 					_dragging          = true
 					_drag_start_mouse  = event.position
 					_drag_start_offset = offset

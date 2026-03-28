@@ -15,7 +15,7 @@ const HOLDABLE_ITEMS: Dictionary = {
 	"Coal":      {"col": 4, "game_scale": 0.45},
 	"IronOre":   {"col": 5, "game_scale": 0.45},
 	"IronIngot": {"col": 6, "game_scale": 0.75},
-	"Dirk":      {"col": -1, "game_scale": 0.75, "custom_tex": "res://objects/dirk.png"},
+	"Dirk":      {"col": -1, "game_scale": 1.00, "custom_tex": "res://objects/dirk.png"},
 	"Lamp":      {"col": -1, "game_scale": 1.00, "custom_tex": "res://objects/lampoff.png"},
 }
 
@@ -445,7 +445,8 @@ func _on_spin_changed(_v: float) -> void:
 	if _canvas != null:
 		_canvas.offset = new_offset
 		_canvas.active_rotation = new_rot
-		_canvas.item_game_scale = new_scale if _active_hand == 2 else _canvas.item_game_scale
+		if hand_key == "waist":
+			_canvas.item_game_scale = new_scale
 		_canvas.queue_redraw()
 
 func _on_canvas_clothing_offset_changed(new_offset: Vector2) -> void:
@@ -535,7 +536,6 @@ func _refresh_canvas() -> void:
 	_canvas.clothing_mode = false
 	var info: Dictionary = HOLDABLE_ITEMS[_selected_item]
 	_canvas.item_col        = info["col"]
-	_canvas.item_game_scale = info.get("game_scale", 1.0)
 	
 	if info.has("custom_tex"):
 		_canvas.item_custom_tex = load(info["custom_tex"])
@@ -554,7 +554,10 @@ func _refresh_canvas() -> void:
 	var active_off   = _read_offset(_selected_item, facing_name, ah_key)
 	var active_flip  = _read_flipped(_selected_item, facing_name, ah_flip_key)
 	var active_rot   = _read_rotation(_selected_item, facing_name, ah_rot_key)
-	var active_scale = _read_scale(_selected_item, facing_name, ah_scale_key, info.get("game_scale", 1.0))
+	
+	var active_scale = info.get("game_scale", 1.0)
+	if ah_key == "waist":
+		active_scale = _read_scale(_selected_item, facing_name, ah_scale_key, active_scale)
 
 	_canvas.offset          = active_off
 	_canvas.flipped         = active_flip
@@ -564,19 +567,28 @@ func _refresh_canvas() -> void:
 	var oh_key       = "left" if _active_hand == 0 else "right"
 	var oh_flip_key  = oh_key + "_flipped"
 	var oh_rot_key   = oh_key + "_rotation"
+	
 	var other_off    = _read_offset(_selected_item, facing_name, oh_key)
 	var other_flip   = _read_flipped(_selected_item, facing_name, oh_flip_key)
 	var other_rot    = _read_rotation(_selected_item, facing_name, oh_rot_key)
+	
+	var other_scale  = info.get("game_scale", 1.0)
+	if oh_key == "waist":
+		other_scale  = _read_scale(_selected_item, facing_name, oh_key + "_scale", other_scale)
 
 	_canvas.other_offset   = other_off
 	_canvas.other_flipped  = other_flip
 	_canvas.other_rotation = other_rot
+	_canvas.other_scale    = other_scale
 
 	_updating_ui = true
 	if _x_spin != null: _x_spin.value = active_off.x
 	if _y_spin != null: _y_spin.value = active_off.y
 	if _rot_spin != null: _rot_spin.value = active_rot
-	if _waist_scale_spin != null: _waist_scale_spin.value = active_scale
+	if _waist_scale_spin != null: 
+		_waist_scale_spin.editable = (ah_key == "waist")
+		if ah_key == "waist":
+			_waist_scale_spin.value = active_scale
 	if _flip_btn != null: _flip_btn.set_pressed_no_signal(active_flip)
 	_updating_ui = false
 
@@ -655,7 +667,10 @@ func _store_field(item: String, facing: String, key: String, value: Vector2, rot
 	_ensure_entry(item, facing)
 	_offsets[item][facing][key] =[value.x, value.y]
 	_offsets[item][facing][key + "_rotation"] = rot
-	_offsets[item][facing][key + "_scale"] = scale
+	
+	# ONLY ever save scale data for the waist! Hands do not support overridden scaling inside the engine logic.
+	if key == "waist":
+		_offsets[item][facing][key + "_scale"] = scale
 
 func _store_clothing_field(item: String, facing: String, offset: Vector2, scale: float) -> void:
 	if not _clothing_offsets.has(item):
@@ -725,4 +740,3 @@ func _write_clothing_offsets() -> void:
 func _set_status(msg: String) -> void:
 	if _status_lbl != null:
 		_status_lbl.text = msg
-		
