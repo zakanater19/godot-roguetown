@@ -129,10 +129,17 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			elif next_tm.get_cell_source_id(old_tile) != -1:
 				next_z = current_z
 	
-	# Block Z-level changes if the destination tile on either the current or next floor is blocked by solid objects/walls
+	# Block Z-level changes if the destination tile is blocked by solid objects/walls.
+	# When going UP via stairs, only check the destination z-level: a solid tile on the
+	# current z directly in front of the stairs is irrelevant because the player is
+	# climbing, not walking into that tile on the same floor.
 	if next_z != current_z:
-		if is_solid(next_tile, current_z) or is_solid(next_tile, next_z):
-			next_z = current_z
+		if next_z > current_z:
+			if is_solid(next_tile, next_z):
+				next_z = current_z
+		else:
+			if is_solid(next_tile, current_z) or is_solid(next_tile, next_z):
+				next_z = current_z
 
 	if is_solid(next_tile, next_z):
 		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
