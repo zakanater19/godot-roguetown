@@ -7,10 +7,10 @@ extends Node2D
 func _ready() -> void:
 	var main: Node2D = get_parent()
 	if main and main.get("HIDE_OUTLINES_AT_RUNTIME") and not Engine.is_editor_hint():
-		set_process(false)
 		hide()
-
-func _process(_delta: float) -> void:
+		return
+	# The grid is static world-space geometry — queue one draw and it persists.
+	# There is no need to call queue_redraw() every frame from _process.
 	queue_redraw()
 
 func _draw() -> void:

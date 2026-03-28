@@ -203,15 +203,15 @@ z_index = 402
 position = Vector2(31637, 32279)
 
 [node name="Door" parent="." instance=ExtResource("4_ryguw")]
-z_index = 1605
+z_index = 2005
 position = Vector2(31135, 32160)
 
 [node name="Door2" parent="." instance=ExtResource("4_ryguw")]
-z_index = 1605
+z_index = 2005
 position = Vector2(30815, 32288)
 
 [node name="Door3" parent="." instance=ExtResource("4_ryguw")]
-z_index = 1605
+z_index = 2005
 position = Vector2(32351, 32862)
 
 [node name="Spawner" parent="." instance=ExtResource("23_d13ii")]
@@ -255,7 +255,7 @@ z_index = 402
 position = Vector2(31395, 32228)
 
 [node name="MerchantVendor" parent="." instance=ExtResource("29_qsp4k")]
-z_index = 1605
+z_index = 2005
 position = Vector2(30560, 32095)
 scale = Vector2(1.5, 1.5)
 

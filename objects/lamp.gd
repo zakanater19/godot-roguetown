@@ -26,14 +26,17 @@ func _ready() -> void:
 		return
 	add_to_group("pickable")
 	_set_sprite(is_on)
+	# Connect to the Lighting signal instead of polling in _process every frame.
+	# Godot 4 auto-disconnects when this node is freed.
+	Lighting.sun_weight_updated.connect(_on_sun_weight_updated)
+	# Apply the current lighting state immediately on spawn.
+	_on_sun_weight_updated(Lighting.sun_weight)
 
-func _process(_delta: float) -> void:
-	if Engine.is_editor_hint():
-		return
+func _on_sun_weight_updated(weight: float) -> void:
 	var light = get_node_or_null("PointLight2D")
 	if light:
-		light.energy = 1.2 * (1.0 - Lighting.sun_weight)
-		light.enabled = (Lighting.sun_weight < 0.8) and is_on
+		light.energy = 1.2 * (1.0 - weight)
+		light.enabled = (weight < 0.8) and is_on
 
 func _set_sprite(on: bool) -> void:
 	is_on = on
@@ -43,6 +46,8 @@ func _set_sprite(on: bool) -> void:
 
 func interact_in_hand(player: Node) -> void:
 	_set_sprite(not is_on)
+	# Update light state immediately without waiting for the next signal tick.
+	_on_sun_weight_updated(Lighting.sun_weight)
 	if player != null and player._is_local_authority():
 		player._update_hands_ui()
 		var state_str = "ON" if is_on else "OFF"
