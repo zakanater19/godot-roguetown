@@ -14,6 +14,7 @@ texture_region_size = Vector2i(64, 64)
 4:0/0 = 0
 5:0/0 = 0
 8:0/0 = 0
+9:0/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7y6if"]
 resource_name = "Solid Tiles"

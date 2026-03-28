@@ -1,4 +1,4 @@
-# res://main.gd
+# project/main.gd
 @tool
 extends Node2D
 
@@ -68,6 +68,7 @@ func _build_tileset() -> void:
 		floor_atlas.create_tile(Vector2i(4, 0))  
 		floor_atlas.create_tile(Vector2i(5, 0))  
 		floor_atlas.create_tile(Vector2i(8, 0))  
+		floor_atlas.create_tile(Vector2i(9, 0)) 
 		
 		var solid_atlas := TileSetAtlasSource.new()
 		solid_atlas.resource_name = "Solid Tiles"

@@ -1,4 +1,4 @@
-# res://world_tiles.gd
+# project/world_tiles.gd
 extends RefCounted
 
 var world: Node
@@ -39,7 +39,7 @@ func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "") -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
-	tm.set_cell(pos, 0, Vector2i(1, 0))
+	tm.set_cell(pos, 0, Vector2i(9, 0)) 
 	var scene = load("res://objects/rock.tscn") as PackedScene
 	if scene:
 		var rock: Node2D = scene.instantiate()
@@ -58,6 +58,7 @@ func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 				Vector2i(4, 0): return "worn wooden planks, creaking underfoot"
 				Vector2i(5, 0): return "cobblestone floor, rough and uneven"
 				Vector2i(8, 0): return "greenblocks, a green patterned floor"
+				Vector2i(9, 0): return "loose rock, scattered debris on the floor"
 				_: return "floor, some kind of stone"
 		1:
 			match atlas_coords:
@@ -255,7 +256,7 @@ func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: Strin
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main != null:
 		break_wall(pos, z_level, main, rock_name)
-		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(1, 0))
+		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(9, 0))
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	var tm = world.get_tilemap(z_level)
