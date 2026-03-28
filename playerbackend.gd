@@ -1,3 +1,4 @@
+
 # res://playerbackend.gd
 extends RefCounted
 
@@ -131,6 +132,19 @@ func inspect_at(world_pos: Vector2) -> void:
 				if p > 0: short_desc += "[Price: " + str(p) + "]"
 				
 			var detailed_desc = best_npc.get_detailed_description() if best_npc.has_method("get_detailed_description") else ""
+			
+			if best_npc.is_in_group("player") and best_npc != player:
+				var outsiders = ["adventurer", "bandit"]
+				if best_npc.character_class == "king":
+					detailed_desc += "\n[color=#88ccaa]I know them as the king.[/color]"
+				elif not (player.character_class in outsiders):
+					if best_npc.character_class in outsiders:
+						detailed_desc += "\n[color=#88ccaa]I know them as an outsider.[/color]"
+					else:
+						detailed_desc += "\n[color=#88ccaa]I know them as a " + best_npc.character_class + ".[/color]"
+				else:
+					detailed_desc += "\n[color=#88ccaa]I don't recognize them.[/color]"
+			
 			show_inspect_text(short_desc, detailed_desc)
 		return
 
@@ -674,3 +688,4 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				World.rpc_damage_wall(target_tile)
 			else:
 				World.rpc_damage_wall.rpc_id(1, target_tile)
+

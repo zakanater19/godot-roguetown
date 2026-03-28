@@ -1045,11 +1045,11 @@ func _show_chat_message(text: String) -> void:
 	container.position = Vector2(0, -40); container.z_index  = (z_level - 1) * 200 + 100
 	add_child(container)
 	var label := Label.new()
-	label.text = text
-	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-	label.add_theme_font_size_override("font_size", 14)
+	label.text = "\"" + text + "\""
+	label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95, 1))
+	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 3)
 	label.custom_minimum_size  = Vector2(400, 0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM

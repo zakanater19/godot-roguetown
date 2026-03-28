@@ -1,3 +1,4 @@
+# res://world_utils.gd
 extends RefCounted
 
 var world: Node
@@ -198,7 +199,9 @@ func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile
 			world.get_node("/root/Sidebar").add_message("[color=#aaaaaa]you hear someone talking...[/color]")
 		return
 	if sender_node.has_method("_show_chat_message"): sender_node._show_chat_message(message)
-	if local_player.has_method("_show_inspect_text"): local_player._show_inspect_text(sender_node.get("character_name") + " says: " + message, "")
+	if local_player.has_method("_show_inspect_text"):
+		var formatted_chat = "[color=#e0e0e0][b]" + sender_node.get("character_name") + "[/b] says, \"" + message + "\"[/color]"
+		local_player._show_inspect_text(formatted_chat, "")
 
 func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool, is_shove: bool, targeted_limb: String, block_type: String) -> void:
 	var local_player := get_local_player()

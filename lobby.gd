@@ -283,7 +283,7 @@ func rpc_send_lobby_chat(message: String) -> void:
 	if ready_players.has(peer_id):
 		sender_name = ready_players[peer_id].get("name", "noob")
 		
-	var formatted = "[color=#88ccff]lobby - " + str(peer_id) + " " + sender_name + ": " + message + "[/color]"
+	var formatted = "[color=#88ccff][b][Lobby][/b] " + sender_name + ": " + message + "[/color]"
 	
 	rpc_receive_lobby_chat.rpc(formatted)
 
