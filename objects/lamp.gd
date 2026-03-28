@@ -32,6 +32,16 @@ func _ready() -> void:
 	# Apply the current lighting state immediately on spawn.
 	_on_sun_weight_updated(Lighting.sun_weight)
 
+func _set_fov_visibility(p_visible: bool) -> void:
+	# Specifically hide the sprite and interaction capabilities, but leave 
+	# the root node visible so the PointLight2D remains active in FOV shadow.
+	var sprite = get_node_or_null("Sprite2D")
+	if sprite != null and sprite.visible != p_visible:
+		sprite.visible = p_visible
+		
+	if input_pickable != p_visible:
+		input_pickable = p_visible
+
 func _on_sun_weight_updated(weight: float) -> void:
 	var light = get_node_or_null("PointLight2D")
 	if light:

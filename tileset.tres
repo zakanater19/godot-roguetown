@@ -1,8 +1,8 @@
-[gd_resource type="TileSet" load_steps=8 format=3 uid="uid://cw61g5pcymavf"]
+[gd_resource type="TileSet" load_steps=8 format=3]
 
-[ext_resource type="Texture2D" uid="uid://bheu3np1etlwp" path="res://tiles.png" id="1_14fb3"]
-[ext_resource type="Texture2D" uid="uid://bxyh8myxk32b4" path="res://doors/stairs.png" id="2_p0366"]
-[ext_resource type="Texture2D" uid="uid://dxo1qyl685x72" path="res://animated/water_sheet.png" id="3_hobn4"]
+[ext_resource type="Texture2D" path="res://tiles.png" id="1_14fb3"]
+[ext_resource type="Texture2D" path="res://doors/stairs.png" id="2_p0366"]
+[ext_resource type="Texture2D" path="res://animated/water_sheet.png" id="3_hobn4"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_mjrc7"]
 resource_name = "Floor Tiles"

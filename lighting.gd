@@ -91,11 +91,18 @@ func _process(delta: float) -> void:
 		sun_weight_updated.emit(sun_weight)
 
 	# Manage the local player's sight light.
-	# Only call _update_player_light when the day/night threshold actually flips.
 	var should_be_night: bool = (sun_weight < 0.5)
-	if should_be_night != _player_light_night:
-		_player_light_night = should_be_night
-		_update_player_light()
+	_player_light_night = should_be_night
+	
+	# Continually make sure the light exists/is appropriately enabled in case 
+	# the player spawned after the day/night threshold originally flipped.
+	var local_player = World.get_local_player()
+	if local_player != null:
+		var light = local_player.get_node_or_null("PlayerLight")
+		if light == null:
+			_update_player_light()
+		elif light.enabled != _player_light_night:
+			light.enabled = _player_light_night
 
 func _update_player_light() -> void:
 	var local_player = World.get_local_player()

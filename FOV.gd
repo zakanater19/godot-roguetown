@@ -114,8 +114,11 @@ func _apply_fov_hiding() -> void:
 			var ent_tile := Vector2i(int(ent.global_position.x / 64.0), int(ent.global_position.y / 64.0))
 			is_visible = _visible_tiles.has(ent_tile)
 			
-		# Avoid triggering engine redraws unless visibility status actually changed
-		if "visible" in ent and ent.visible != is_visible:
-			ent.visible = is_visible
-		if "input_pickable" in ent and ent.get("input_pickable") != is_visible:
-			ent.input_pickable = is_visible
+		if ent.has_method("_set_fov_visibility"):
+			ent._set_fov_visibility(is_visible)
+		else:
+			# Avoid triggering engine redraws unless visibility status actually changed
+			if "visible" in ent and ent.visible != is_visible:
+				ent.visible = is_visible
+			if "input_pickable" in ent and ent.get("input_pickable") != is_visible:
+				ent.input_pickable = is_visible
