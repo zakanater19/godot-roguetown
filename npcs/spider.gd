@@ -15,6 +15,7 @@ const WANDER_INTERVAL: float = 10.0
 const BloodSpray = preload("res://npcs/blood_spray.gd")
 
 @export var z_level: int = 3
+var blocks_fov: bool = false
 
 var health:       int   = 80
 var dead: bool = false :
@@ -41,6 +42,9 @@ var facing: int = 0 :
 var attack_timer: float = 0.0
 var move_timer:   float = 0.0
 var wander_timer: float = 0.0
+
+var ai_timer: float = 0.0
+var current_target: Node2D = null
 
 func get_description() -> String:
 	if dead:
@@ -121,20 +125,14 @@ func _process(delta: float) -> void:
 			position  = pixel_pos
 		return
 
-	# Find the nearest player
-	var players = get_tree().get_nodes_in_group("player")
-	var target_player = null
-	var min_dist = INF
+	# OPTIMIZATION: Target acquisition throttled to 4 times a second
+	ai_timer -= delta
+	if ai_timer <= 0.0:
+		ai_timer = 0.25
+		_find_target()
 
-	for p in players:
-		if p.dead or p.z_level != z_level: continue
-		var d = (p.tile_pos - tile_pos).length_squared()
-		if d < min_dist:
-			min_dist = d
-			target_player = p
-
-	if target_player != null:
-		var diff:  Vector2i = target_player.tile_pos - tile_pos
+	if current_target != null and is_instance_valid(current_target) and not current_target.dead and current_target.z_level == z_level:
+		var diff:  Vector2i = current_target.tile_pos - tile_pos
 		var cheby: int      = max(abs(diff.x), abs(diff.y))
 
 		if cheby <= DETECTION_RANGE:
@@ -143,17 +141,30 @@ func _process(delta: float) -> void:
 
 			if cheby <= ATTACK_RANGE:
 				if attack_timer <= 0.0:
-					_attack_player(target_player)
+					_attack_player(current_target)
 			elif move_timer <= 0.0:
-				_move_toward_player(target_player)
+				_move_toward_player(current_target)
 		else:
-			# If player is far away, try to wander
+			# Lost aggro
+			current_target = null
 			if wander_timer >= WANDER_INTERVAL:
 				_wander()
 	else:
-		# If no player found, try to wander
+		current_target = null
 		if wander_timer >= WANDER_INTERVAL:
 			_wander()
+
+func _find_target() -> void:
+	var players = get_tree().get_nodes_in_group("player")
+	var min_dist = INF
+	current_target = null
+
+	for p in players:
+		if p.dead or p.z_level != z_level: continue
+		var d = (p.tile_pos - tile_pos).length_squared()
+		if d < min_dist:
+			min_dist = d
+			current_target = p
 
 func _attack_player(player: Node) -> void:
 	attack_timer = ATTACK_COOLDOWN

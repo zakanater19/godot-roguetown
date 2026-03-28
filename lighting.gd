@@ -64,30 +64,24 @@ func _process(_delta: float) -> void:
 	var night_color = Color(0.0, 0.0, 0.0, 1.0) 
 	canvas_mod.color = night_color.lerp(Color.WHITE, sun_weight)
 
-	# Manage player "sight" lights
-	var players = get_tree().get_nodes_in_group("player")
+	# Manage player "sight" lights - Optimized to only check the local player
 	var local_player = World.get_local_player()
 	
-	for p in players:
-		var light = p.get_node_or_null("PlayerLight")
+	if local_player != null:
+		var light = local_player.get_node_or_null("PlayerLight")
 		
-		# If this is the local player, ensure the light exists and is configured
-		if p == local_player:
-			if light == null:
-				light = PointLight2D.new()
-				light.name = "PlayerLight"
-				light.texture = light_texture
-				# Use MIX blend mode so lights don't blow out into pure white when stacked
-				light.blend_mode = PointLight2D.BLEND_MODE_MIX
-				light.z_index = 15
-				p.add_child(light)
-			
-			light.energy = 0.4 # Halved from 0.8
-			light.enabled = (sun_weight < 0.5)
-			
-		# If this is a remote player, ensure their light is removed
-		elif light != null:
-			light.queue_free()
+		# Ensure the light exists and is configured
+		if light == null:
+			light = PointLight2D.new()
+			light.name = "PlayerLight"
+			light.texture = light_texture
+			# Use MIX blend mode so lights don't blow out into pure white when stacked
+			light.blend_mode = PointLight2D.BLEND_MODE_MIX
+			light.z_index = 15
+			local_player.add_child(light)
+		
+		light.energy = 0.4 # Halved from 0.8
+		light.enabled = (sun_weight < 0.5)
 
 # Called by the UI button
 func toggle_time_of_day() -> void:
@@ -111,4 +105,3 @@ func rpc_add_time_offset(amount: float) -> void:
 @rpc("authority", "call_local", "reliable")
 func sync_time_multiplier(val: float) -> void:
 	time_multiplier = val
-	

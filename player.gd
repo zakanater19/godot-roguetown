@@ -41,6 +41,7 @@ var sleep_state: SleepState = SleepState.AWAKE
 var sleep_timer: float = 0.0
 var health_regen_accumulator: float = 0.0
 var _sleep_blackout: ColorRect = null
+var _sleeping_on_bed: bool = false
 
 @export var character_name: String = "noob"
 @export var character_class: String = "peasant"
@@ -702,6 +703,7 @@ func _process(delta: float) -> void:
 			sleep_timer -= delta
 			if sleep_timer <= 0.0:
 				sleep_state = SleepState.ASLEEP
+				_sleeping_on_bed = _is_on_bed()
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are now fast asleep.[/color]")
 					_sync_sleep_state_update(sleep_state)
@@ -714,7 +716,7 @@ func _process(delta: float) -> void:
 					_sync_sleep_state_update(sleep_state)
 		elif sleep_state == SleepState.ASLEEP:
 			if is_local:
-				var regen_rate = 4.0 if _is_on_bed() else 2.0
+				var regen_rate = 4.0 if _sleeping_on_bed else 2.0
 				health_regen_accumulator += regen_rate * delta
 				if health_regen_accumulator >= 1.0:
 					var heal_amount = int(health_regen_accumulator)

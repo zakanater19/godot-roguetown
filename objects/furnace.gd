@@ -12,10 +12,11 @@ var _fuel_type:    String = ""
 var _smelting:     bool  = false
 
 @export var z_level: int = 3
+var blocks_fov: bool = false
 
 func get_description() -> String:
 	if _smelting: return "a furnace, roaring hot — smelting in progress"
-	var parts: Array = []
+	var parts: Array =[]
 	if _coal_count > 0: parts.append("fuel loaded")
 	if _ironore_count > 0: parts.append("iron ore loaded")
 	if parts.is_empty(): return "a furnace, cold and empty"
@@ -115,7 +116,7 @@ func _consume_held(player: Node, hand_idx: int) -> void:
 			player._apply_action_cooldown(null)
 
 func _eject_contents(player: Node, generated_names: Array) -> void:
-	var drop_offsets := [Vector2(-TILE_SIZE, 0), Vector2(TILE_SIZE, 0), Vector2(0, TILE_SIZE), Vector2(-TILE_SIZE, TILE_SIZE)]
+	var drop_offsets :=[Vector2(-TILE_SIZE, 0), Vector2(TILE_SIZE, 0), Vector2(0, TILE_SIZE), Vector2(-TILE_SIZE, TILE_SIZE)]
 	var slot := 0
 	var name_idx := 0
 	if _coal_count > 0:
@@ -154,7 +155,7 @@ func _start_smelting() -> void:
 
 func _on_server_smelt_finished() -> void:
 	var ingot_name = "Ingot_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
-	World.rpc_confirm_furnace_action.rpc(1, get_path(), "finish_smelt", -1, [ingot_name])
+	World.rpc_confirm_furnace_action.rpc(1, get_path(), "finish_smelt", -1,[ingot_name])
 
 func _finish_smelting(generated_names: Array) -> void:
 	_smelting      = false

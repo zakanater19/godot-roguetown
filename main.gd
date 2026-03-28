@@ -9,6 +9,7 @@ const OUTLINE_WIDTH: float = 1.0
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
 var target_fps: int = 60
+var _last_z: int = -1
 
 func _ready() -> void:
 	_build_tileset()
@@ -127,20 +128,16 @@ func _process(_delta: float) -> void:
 	if local_player != null:
 		current_z = local_player.z_level
 
-	for z in range(1, 6):
-		var tm = get_node_or_null("TileMapLayer_Z" + str(z))
-		if tm:
-			tm.visible = (z <= current_z)
-			
-		var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
-		if darken:
-			# Darken everything below the current player level
-			darken.visible = (z < current_z)
-
-	for ent in get_tree().get_nodes_in_group("z_entity"):
-		var ez = ent.get("z_level")
-		if ez != null:
-			if ez > current_z:
-				ent.visible = false
-			else:
-				ent.visible = true
+	# OPTIMIZATION: Only update map layers when the player's floor actively changes
+	if current_z != _last_z:
+		_last_z = current_z
+		
+		for z in range(1, 6):
+			var tm = get_node_or_null("TileMapLayer_Z" + str(z))
+			if tm:
+				tm.visible = (z <= current_z)
+				
+			var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
+			if darken:
+				# Darken everything below the current player level
+				darken.visible = (z < current_z)

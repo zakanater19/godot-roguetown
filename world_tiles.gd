@@ -19,6 +19,16 @@ func is_solid(pos: Vector2i, z_level: int) -> bool:
 	if tm != null and tm.get_cell_source_id(pos) == 1: return true
 	return world.solid_grid[z_level].has(pos)
 
+func is_opaque(pos: Vector2i, z_level: int) -> bool:
+	var tm = world.get_tilemap(z_level)
+	if tm != null and tm.get_cell_source_id(pos) == 1: return true
+	if world.solid_grid[z_level].has(pos):
+		for obj in world.solid_grid[z_level][pos]:
+			# If it doesn't explicitly declare blocks_fov = false, assume it blocks vision
+			if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
+				return true
+	return false
+
 func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	if dir == Vector2i.ZERO: return from
 	var next := from + dir

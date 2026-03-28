@@ -5,6 +5,7 @@ extends Area2D
 const TILE_SIZE: int = 64
 
 @export var z_level: int = 3
+var blocks_fov: bool = false
 
 func get_description() -> String:
 	return "a merchant vendor, ready to trade"

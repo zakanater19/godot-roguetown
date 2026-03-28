@@ -97,6 +97,9 @@ func unregister_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
 func is_solid(pos: Vector2i, z_level: int) -> bool:
 	return tiles.is_solid(pos, z_level)
 
+func is_opaque(pos: Vector2i, z_level: int) -> bool:
+	return tiles.is_opaque(pos, z_level)
+
 func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	return tiles.try_move(from, z_level, dir)
 

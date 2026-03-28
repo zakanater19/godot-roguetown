@@ -41,12 +41,12 @@ func _process(delta: float) -> void:
 		_compute_fov()
 		_draw_node.queue_redraw()
 
-func _is_turf_solid(tile: Vector2i) -> bool:
+func _is_turf_opaque(tile: Vector2i) -> bool:
 	if _solid_cache.has(tile):
 		return _solid_cache[tile]
-	var solid = World.is_solid(tile, _player_z)
-	_solid_cache[tile] = solid
-	return solid
+	var opaque = World.is_opaque(tile, _player_z)
+	_solid_cache[tile] = opaque
+	return opaque
 
 func _ray_clear(from: Vector2, to: Vector2) -> bool:
 	var delta: Vector2 = to - from
@@ -61,10 +61,10 @@ func _ray_clear(from: Vector2, to: Vector2) -> bool:
 		var p: Vector2 = from + norm * t
 		var tile := Vector2i(int(floor(p.x)), int(floor(p.y)))
 		if tile != from_tile and tile != to_tile:
-			if _is_turf_solid(tile): return false
+			if _is_turf_opaque(tile): return false
 		if tile != prev_tile:
 			if tile.x != prev_tile.x and tile.y != prev_tile.y:
-				if _is_turf_solid(Vector2i(tile.x, prev_tile.y)) and _is_turf_solid(Vector2i(prev_tile.x, tile.y)):
+				if _is_turf_opaque(Vector2i(tile.x, prev_tile.y)) and _is_turf_opaque(Vector2i(prev_tile.x, tile.y)):
 					return false
 			prev_tile = tile
 		t += STEP_SIZE
@@ -72,7 +72,7 @@ func _ray_clear(from: Vector2, to: Vector2) -> bool:
 
 func _has_los(from_tile: Vector2i, to_tile: Vector2i) -> bool:
 	var targets: Array =[Vector2(to_tile.x + 0.5, to_tile.y + 0.5)]
-	if _is_turf_solid(to_tile):
+	if _is_turf_opaque(to_tile):
 		targets.append(Vector2(to_tile.x + 0.1, to_tile.y + 0.1))
 		targets.append(Vector2(to_tile.x + 0.9, to_tile.y + 0.1))
 		targets.append(Vector2(to_tile.x + 0.1, to_tile.y + 0.9))
@@ -96,15 +96,26 @@ func _compute_fov() -> void:
 	_apply_fov_hiding()
 
 func _apply_fov_hiding() -> void:
-	var target_groups =["player", "npc", "pickable", "minable_object", "choppable_object", "door", "breakable_object", "inspectable", "bed"]
 	var local_player = World.get_local_player()
 	
-	for g in target_groups:
-		for ent in get_tree().get_nodes_in_group(g):
-			if ent == local_player: continue
-			# Don't try to hide objects outside our Z layer via FOV (Main.gd handles macro visibility)
-			if ent.get("z_level") != null and ent.z_level != _player_z: continue
+	# OPTIMIZATION: Only search ONE group, and do Z-Level visibility testing here to avoid conflicts.
+	for ent in get_tree().get_nodes_in_group("z_entity"):
+		if ent == local_player: continue
+		
+		var ez = ent.get("z_level")
+		if ez == null: continue
+		
+		var is_visible = false
+		if ez > _player_z:
+			# Entites on floors above the player are completely hidden
+			is_visible = false
+		else:
+			# Entities on current or below floors use FOV logic
 			var ent_tile := Vector2i(int(ent.global_position.x / 64.0), int(ent.global_position.y / 64.0))
-			var is_visible = _visible_tiles.has(ent_tile)
-			if "visible" in ent: ent.visible = is_visible
-			if "input_pickable" in ent: ent.input_pickable = is_visible
+			is_visible = _visible_tiles.has(ent_tile)
+			
+		# Avoid triggering engine redraws unless visibility status actually changed
+		if "visible" in ent and ent.visible != is_visible:
+			ent.visible = is_visible
+		if "input_pickable" in ent and ent.get("input_pickable") != is_visible:
+			ent.input_pickable = is_visible
