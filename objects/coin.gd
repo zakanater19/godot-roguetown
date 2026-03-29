@@ -56,6 +56,12 @@ func _update_sprite() -> void:
 	if sprite == null:
 		return
 
+	# Set scale: double scale (1.0) for > 2, default (0.5) for <= 2
+	if amount > 2:
+		sprite.scale = Vector2(1.0, 1.0)
+	else:
+		sprite.scale = Vector2(0.5, 0.5)
+
 	var suffix =["copper", "silver", "gold"][metal_type]
 	var thresholds =[20, 15, 10, 5, 4, 3, 2, 1]
 	var target_amount = 1
