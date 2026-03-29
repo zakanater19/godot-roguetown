@@ -1,4 +1,4 @@
-
+# res://world.gd
 extends Node
 
 const TILE_SIZE:   int = 64
@@ -125,6 +125,11 @@ func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
 		var tm = get_tilemap(check_z)
 		if tm != null and tm.get_cell_source_id(tile_pos) != -1:
 			return check_z
+		
+		# If there is a solid object/wall on the level immediately below us, it acts as a floor.
+		if is_solid(tile_pos, check_z - 1):
+			return check_z
+			
 		check_z -= 1
 	return 1
 

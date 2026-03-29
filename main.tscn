@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=4 uid="uid://buhminxyg50to"]
+[gd_scene load_steps=34 format=4 uid="uid://buhminxyg50to"]
 
 [ext_resource type="Script" uid="uid://dn855v6uco7aq" path="res://main.gd" id="1_main"]
 [ext_resource type="Texture2D" uid="uid://bheu3np1etlwp" path="res://tiles.png" id="2_h2yge"]
@@ -13,7 +13,18 @@
 [ext_resource type="PackedScene" uid="uid://ccoal001sc" path="res://objects/coal.tscn" id="11_dg77c"]
 [ext_resource type="PackedScene" uid="uid://ddm0gd70hk077" path="res://objects/woodentable.tscn" id="17_yaehf"]
 [ext_resource type="PackedScene" uid="uid://tree001sc" path="res://objects/tree.tscn" id="18_074og"]
+[ext_resource type="PackedScene" path="res://clothing/apothshirt.tscn" id="18_xuqvo"]
+[ext_resource type="PackedScene" path="res://clothing/blackshirt.tscn" id="19_qsp4k"]
+[ext_resource type="PackedScene" uid="uid://circhest01sc" path="res://clothing/ironchestplate.tscn" id="20_kq58d"]
+[ext_resource type="PackedScene" uid="uid://dcpuejw2a6fes" path="res://clothing/ironhelmet.tscn" id="21_seu75"]
+[ext_resource type="PackedScene" uid="uid://b24fn6bnjrjm1" path="res://clothing/leatherboots.tscn" id="22_htxhm"]
 [ext_resource type="PackedScene" path="res://objects/spawner.tscn" id="23_d13ii"]
+[ext_resource type="PackedScene" uid="uid://cf74y84esef0i" path="res://clothing/leathertrousers.tscn" id="23_jq2sk"]
+[ext_resource type="PackedScene" path="res://clothing/plate.tscn" id="24_4k2k6"]
+[ext_resource type="PackedScene" path="res://clothing/satchel.tscn" id="25_0rl1p"]
+[ext_resource type="PackedScene" path="res://clothing/undershirt.tscn" id="26_ok6jj"]
+[ext_resource type="PackedScene" uid="uid://cdirk001sc" path="res://objects/dirk.tscn" id="27_facbu"]
+[ext_resource type="PackedScene" uid="uid://bed0000000000" path="res://objects/normal_bed.tscn" id="28_b1qrp"]
 [ext_resource type="PackedScene" path="res://objects/merchantvendor.tscn" id="29_qsp4k"]
 [ext_resource type="PackedScene" uid="uid://clamp001sc" path="res://objects/lamp.tscn" id="30_kq58d"]
 [ext_resource type="PackedScene" uid="uid://bkvmhw7qt51ly" path="res://objects/coin.tscn" id="31_seu75"]
@@ -104,7 +115,7 @@ color = Color(0, 0, 0, 0.4)
 
 [node name="TileMapLayer_Z4" type="TileMapLayer" parent="."]
 z_index = 600
-tile_map_data = PackedByteArray("AADxAa4AAAAFAAAAAADxAa8AAAAFAAAAAADyAa4AAAAFAAAAAADyAa8AAAAFAAAAAADzAa4AAAAFAAAAAADzAa8AAAAFAAAAAAD0Aa4AAAAFAAAAAAD0Aa8AAAAFAAAAAAD1Aa4AAAAFAAAAAAD1Aa8AAgAAAAAAAADxAbAAAAAFAAAAAADyAbAAAAAFAAAAAADzAbAAAAAFAAAAAAD0AbAAAAAFAAAAAADwAa0AAQAGAAAAAAD2Aa0AAQAGAAAAAAD2AbEAAQAGAAAAAADwAbEAAQAGAAAAAAD1AbEAAQAGAAAAAAD0AbEAAQAGAAAAAADxAbEAAQAGAAAAAADwAa4AAQAGAAAAAADwAbAAAQAGAAAAAAD1Aa0AAQAGAAAAAADzAa0AAQAGAAAAAAD2AbAAAQAGAAAAAAA=")
+tile_map_data = PackedByteArray("AADxAa4AAAAFAAAAAADxAa8AAAAFAAAAAADyAa4AAAAFAAAAAADyAa8AAAAFAAAAAADzAa4AAAAFAAAAAADzAa8AAAAFAAAAAAD0Aa4AAAAFAAAAAAD0Aa8AAAAFAAAAAAD1Aa4AAAAFAAAAAAD1Aa8AAgAAAAAAAADxAbAAAAAFAAAAAADyAbAAAAAFAAAAAADzAbAAAAAFAAAAAAD0AbAAAAAFAAAAAADwAa0AAQAGAAAAAAD2Aa0AAQAGAAAAAAD2AbEAAQAGAAAAAADwAbEAAQAGAAAAAAD1AbEAAQAGAAAAAAD0AbEAAQAGAAAAAADxAbEAAQAGAAAAAADwAa4AAQAGAAAAAADwAbAAAQAGAAAAAAD1Aa0AAQAGAAAAAADzAa0AAQAGAAAAAAD2AbAAAQAGAAAAAADjAbcAAQAHAAAAAADjAbgAAQAHAAAAAADjAbkAAQAHAAAAAADjAboAAQAHAAAAAADjAbsAAQAHAAAAAADjAbwAAQAHAAAAAADjAb0AAQAHAAAAAADkAbcAAQAHAAAAAADkAbgAAQAHAAAAAADkAbkAAQAHAAAAAADkAboAAQAHAAAAAADkAbsAAQAHAAAAAADkAbwAAQAHAAAAAADkAb0AAQAHAAAAAADlAbcAAQAHAAAAAADlAbgAAQAHAAAAAADlAbkAAQAHAAAAAADlAboAAQAHAAAAAADlAbsAAQAHAAAAAADlAbwAAQAHAAAAAADlAb0AAQAHAAAAAADmAbcAAQAHAAAAAADmAbgAAQAHAAAAAADmAbkAAQAHAAAAAADmAboAAQAHAAAAAADmAbsAAQAHAAAAAADmAbwAAQAHAAAAAADmAb0AAQAHAAAAAADnAbcAAQAHAAAAAADnAbgAAQAHAAAAAADnAbkAAQAHAAAAAADnAboAAQAHAAAAAADnAbsAAQAHAAAAAADnAbwAAQAHAAAAAADnAb0AAQAHAAAAAADoAbcAAQAHAAAAAADoAbgAAQAHAAAAAADoAbkAAQAHAAAAAADoAboAAQAHAAAAAADoAbsAAQAHAAAAAADoAbwAAQAHAAAAAADoAb0AAQAHAAAAAAD4AbwAAQAHAAAAAAD4Ab0AAQAHAAAAAAD4Ab4AAQAHAAAAAAD4Ab8AAQAHAAAAAAD4AcAAAQAHAAAAAAD5AbwAAQAHAAAAAAD5Ab0AAQAHAAAAAAD5Ab4AAQAHAAAAAAD5Ab8AAQAHAAAAAAD5AcAAAQAHAAAAAAD6AbwAAQAHAAAAAAD6Ab0AAQAHAAAAAAD6Ab4AAQAHAAAAAAD6Ab8AAQAHAAAAAAD6AcAAAQAHAAAAAAD7AbwAAQAHAAAAAAD7Ab0AAQAHAAAAAAD7Ab4AAQAHAAAAAAD7Ab8AAQAHAAAAAAD7AcAAAQAHAAAAAAD8AbwAAQAHAAAAAAD8Ab0AAQAHAAAAAAD8Ab4AAQAHAAAAAAD8Ab8AAQAHAAAAAAD8AcAAAQAHAAAAAAD9AcAAAQAHAAAAAAD+AbwAAQAHAAAAAAD+Ab0AAQAHAAAAAAD+Ab4AAQAHAAAAAAD+Ab8AAQAHAAAAAAD+AcAAAQAHAAAAAAD/AbwAAQAHAAAAAAD/Ab0AAQAHAAAAAAD/Ab4AAQAHAAAAAAD/Ab8AAQAHAAAAAAD/AcAAAQAHAAAAAAAAArwAAQAHAAAAAAAAAr0AAQAHAAAAAAAAAr4AAQAHAAAAAAAAAr8AAQAHAAAAAAAAAsAAAQAHAAAAAAA=")
 tile_set = SubResource("TileSet_yaehf")
 
 [node name="Darken_Z4_Z5" type="ColorRect" parent="."]
@@ -313,3 +324,64 @@ position = Vector2(32225, 12192)
 [node name="WoodenTable3" parent="." instance=ExtResource("17_yaehf")]
 z_index = 402
 position = Vector2(31775, 11297)
+
+[node name="WoodenTable4" parent="." instance=ExtResource("17_yaehf")]
+z_index = 402
+position = Vector2(31326, 12066)
+
+[node name="WoodenTable5" parent="." instance=ExtResource("17_yaehf")]
+z_index = 402
+position = Vector2(31327, 12130)
+
+[node name="Apothshirt" parent="." instance=ExtResource("18_xuqvo")]
+z_index = 402
+position = Vector2(32548, 12062)
+
+[node name="Blackshirt" parent="." instance=ExtResource("19_qsp4k")]
+z_index = 402
+position = Vector2(32489, 12075)
+
+[node name="IronChestplate" parent="." instance=ExtResource("20_kq58d")]
+z_index = 402
+position = Vector2(30977, 12035)
+
+[node name="IronHelmet" parent="." instance=ExtResource("21_seu75")]
+z_index = 402
+position = Vector2(31068, 12058)
+
+[node name="LeatherBoots" parent="." instance=ExtResource("22_htxhm")]
+z_index = 402
+position = Vector2(32447, 12127)
+
+[node name="LeatherTrousers" parent="." instance=ExtResource("23_jq2sk")]
+z_index = 402
+position = Vector2(32496, 12138)
+
+[node name="Plate" parent="." instance=ExtResource("24_4k2k6")]
+z_index = 402
+position = Vector2(31130, 12071)
+
+[node name="Satchel" parent="." instance=ExtResource("25_0rl1p")]
+z_index = 402
+position = Vector2(32417, 12073)
+
+[node name="Satchel2" parent="." instance=ExtResource("25_0rl1p")]
+z_index = 402
+position = Vector2(32365, 12076)
+
+[node name="Undershirt" parent="." instance=ExtResource("26_ok6jj")]
+z_index = 402
+position = Vector2(32542, 12093)
+
+[node name="Dirk" parent="." instance=ExtResource("27_facbu")]
+z_index = 402
+position = Vector2(31029, 11987)
+
+[node name="Lamp2" parent="." instance=ExtResource("30_kq58d")]
+z_index = 402
+position = Vector2(31254, 12063)
+
+[node name="NormalBed" parent="." instance=ExtResource("28_b1qrp")]
+z_index = 402
+position = Vector2(31848, 11179)
+z_level = 4

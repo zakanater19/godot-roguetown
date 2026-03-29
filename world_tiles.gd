@@ -121,12 +121,16 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			if tm.get_cell_source_id(next_tile) != -1:
 				next_z = current_z
 		elif next_z > current_z:
-			# Going UP: The upper level's destination MUST have a floor/tile to stand on.
+			# Going UP: The upper level's destination MUST have a floor/tile to stand on OR a solid block from below.
 			var next_tm = world.get_tilemap(next_z)
-			if next_tm == null or next_tm.get_cell_source_id(next_tile) == -1:
+			var has_floor = false
+			if next_tm != null and next_tm.get_cell_source_id(next_tile) != -1:
+				has_floor = true
+			var supports_from_below = is_solid(next_tile, current_z)
+			if not has_floor and not supports_from_below:
 				next_z = current_z
 			# Going UP: The tile directly above the stairs MUST be air (uncovered).
-			elif next_tm.get_cell_source_id(old_tile) != -1:
+			elif next_tm != null and next_tm.get_cell_source_id(old_tile) != -1:
 				next_z = current_z
 	
 	# Block Z-level changes if the destination tile is blocked by solid objects/walls.
