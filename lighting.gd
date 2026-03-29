@@ -23,7 +23,7 @@ var _last_player_z: int = -1
 
 # CPU Shadow mapping variables
 var roof_map_image: Image
-var active_lamps: Array[Node] = []
+var active_lamps: Array[Node] =[]
 
 # Precalculated kernel for CPU blur — surface only (z >= 3)
 var _blur_weights: Dictionary = {}
@@ -71,7 +71,9 @@ func unregister_lamp(lamp: Node) -> void:
 	active_lamps.erase(lamp)
 
 func rebuild_roof_map() -> void:
-	roof_map_image.fill(Color(0, 0, 0, 1))
+	var roof_data = PackedByteArray()
+	roof_data.resize(1000 * 1000 * 2)
+	roof_data.fill(0)
 
 	# 1. Iterate over used cells in TileMapLayers
 	for z in range(1, 6):
@@ -87,16 +89,11 @@ func rebuild_roof_map() -> void:
 						if source_id == 2:
 							continue
 
-						var current_col = roof_map_image.get_pixel(pos.x, pos.y)
-						var wall_z = int(round(current_col.r * 255.0))
-						var floor_z = int(round(current_col.g * 255.0))
-
+						var idx = (pos.y * 1000 + pos.x) * 2
 						if source_id == 1:
-							if z > wall_z: wall_z = z
+							if z > roof_data[idx]: roof_data[idx] = z
 						# All non-stair tiles count as a roof for levels below them
-						if z > floor_z: floor_z = z
-
-						roof_map_image.set_pixel(pos.x, pos.y, Color(wall_z / 255.0, floor_z / 255.0, 0, 1))
+						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
 
 	# 2. Iterate over solid_grid for dynamic opaque objects
 	for z in range(1, 6):
@@ -109,14 +106,11 @@ func rebuild_roof_map() -> void:
 							is_op = true
 							break
 					if is_op:
-						var current_col = roof_map_image.get_pixel(pos.x, pos.y)
-						var wall_z = int(round(current_col.r * 255.0))
-						var floor_z = int(round(current_col.g * 255.0))
+						var idx = (pos.y * 1000 + pos.x) * 2
+						if z > roof_data[idx]: roof_data[idx] = z
+						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
 
-						if z > wall_z: wall_z = z
-						if z > floor_z: floor_z = z
-
-						roof_map_image.set_pixel(pos.x, pos.y, Color(wall_z / 255.0, floor_z / 255.0, 0, 1))
+	roof_map_image = Image.create_from_data(1000, 1000, false, Image.FORMAT_RG8, roof_data)
 
 func update_roof_map_at(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.x >= 1000 or pos.y < 0 or pos.y >= 1000: return
@@ -194,7 +188,7 @@ func _process(delta: float) -> void:
 		_last_player_z = current_z
 
 	# Gather active lamps
-	var valid_lamps: Array[Node] = []
+	var valid_lamps: Array[Node] =[]
 	var lamp_positions: PackedVector2Array = PackedVector2Array()
 
 	for lamp in active_lamps:
@@ -207,6 +201,7 @@ func _process(delta: float) -> void:
 
 	# --- TILE GRID CPU LIGHTING ---
 	var new_cache: Dictionary = {}
+	var roof_data := roof_map_image.get_data()
 
 	if player_tile != Vector2i(-9999, -9999):
 		var ambient = 0.04
@@ -221,7 +216,7 @@ func _process(delta: float) -> void:
 		# we do a simple distance check to the nearest opening: O(N*M) where M is stair count
 		# (~1-4), vs O(N*K) for the full kernel (~72k calls). No kernel is used underground.
 		var is_underground = current_z < 3
-		var open_positions: Array[Vector2i] = []
+		var open_positions: Array[Vector2i] =[]
 
 		if is_underground and sun_weight > 0.001:
 			for dy in range(-view_radius_y, view_radius_y + 1):
@@ -229,9 +224,9 @@ func _process(delta: float) -> void:
 					var check = player_tile + Vector2i(dx, dy)
 					if check.x < 0 or check.x >= 1000 or check.y < 0 or check.y >= 1000:
 						continue
-					var pc = roof_map_image.get_pixel(check.x, check.y)
-					var fz = int(round(pc.g * 255.0))
-					var wz = int(round(pc.r * 255.0))
+					var idx = (check.y * 1000 + check.x) * 2
+					var wz = roof_data[idx]
+					var fz = roof_data[idx + 1]
 					# An open position has no ceiling above current_z and no wall blocking.
 					# Stair tiles have fz == 0 and wz == 0, so they always pass this check.
 					if fz <= current_z and wz < current_z:
@@ -246,9 +241,9 @@ func _process(delta: float) -> void:
 					new_cache[tile] = ambient
 					continue
 
-				var pixel_col = roof_map_image.get_pixel(tile.x, tile.y)
-				var wall_z = int(round(pixel_col.r * 255.0))
-				var floor_z = int(round(pixel_col.g * 255.0))
+				var idx = (tile.y * 1000 + tile.x) * 2
+				var wall_z = roof_data[idx]
+				var floor_z = roof_data[idx + 1]
 
 				var is_roofed = (wall_z > current_z) or (floor_z > current_z)
 				var sunlight: float = 0.0
@@ -286,9 +281,9 @@ func _process(delta: float) -> void:
 							if cx < 0 or cx >= 1000 or cy < 0 or cy >= 1000:
 								continue
 
-							var px_col = roof_map_image.get_pixel(cx, cy)
-							var c_wall_z = int(round(px_col.r * 255.0))
-							var c_floor_z = int(round(px_col.g * 255.0))
+							var c_idx = (cy * 1000 + cx) * 2
+							var c_wall_z = roof_data[c_idx]
+							var c_floor_z = roof_data[c_idx + 1]
 
 							# Blocks horizontal light bleed if it's an opaque wall at/above current Z,
 							# OR if it's a floor strictly above current Z (i.e. an indoor tile).

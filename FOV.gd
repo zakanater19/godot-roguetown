@@ -17,8 +17,10 @@ var _draw_node: Node2D = null
 var _time_since_update: float = 0.0
 
 var _solid_cache: Dictionary = {}
+var _precomputed_los: Dictionary = {}
 
 func _ready() -> void:
+	_precompute_rays()
 	await get_tree().process_frame
 	_draw_node = load("res://fov_draw.gd").new()
 	# FIX: Godot's maximum CanvasItem z_index is 4096.
@@ -48,39 +50,84 @@ func _is_turf_opaque(tile: Vector2i) -> bool:
 	_solid_cache[tile] = opaque
 	return opaque
 
-func _ray_clear(from: Vector2, to: Vector2) -> bool:
-	var delta: Vector2 = to - from
-	var dist: float = delta.length()
-	if dist < 0.001: return true
-	var norm: Vector2 = delta / dist
-	var from_tile := Vector2i(int(floor(from.x)), int(floor(from.y)))
-	var to_tile   := Vector2i(int(floor(to.x)),   int(floor(to.y)))
-	var prev_tile := from_tile
-	var t: float = STEP_SIZE
-	while t < dist - STEP_SIZE:
-		var p: Vector2 = from + norm * t
-		var tile := Vector2i(int(floor(p.x)), int(floor(p.y)))
-		if tile != from_tile and tile != to_tile:
-			if _is_turf_opaque(tile): return false
-		if tile != prev_tile:
-			if tile.x != prev_tile.x and tile.y != prev_tile.y:
-				if _is_turf_opaque(Vector2i(tile.x, prev_tile.y)) and _is_turf_opaque(Vector2i(prev_tile.x, tile.y)):
-					return false
-			prev_tile = tile
-		t += STEP_SIZE
-	return true
+func _precompute_rays() -> void:
+	var r2: int = FOV_RADIUS * FOV_RADIUS
+	for dy in range(-FOV_RADIUS, FOV_RADIUS + 1):
+		for dx in range(-FOV_RADIUS, FOV_RADIUS + 1):
+			if dx * dx + dy * dy > r2: continue
+			var dest = Vector2i(dx, dy)
+			_precomputed_los[dest] = _generate_ray_paths(dest)
+
+func _generate_ray_paths(dest: Vector2i) -> Array:
+	var rays = []
+	var base_targets =[Vector2(dest.x + 0.5, dest.y + 0.5)]
+	var extra_targets =[
+		Vector2(dest.x + 0.1, dest.y + 0.1),
+		Vector2(dest.x + 0.9, dest.y + 0.1),
+		Vector2(dest.x + 0.1, dest.y + 0.9),
+		Vector2(dest.x + 0.9, dest.y + 0.9)
+	]
+	
+	for is_extra in [false, true]:
+		var targs = extra_targets if is_extra else base_targets
+		for tc in targs:
+			for off in SOURCE_OFFSETS:
+				var fc = Vector2(0.5 + off.x, 0.5 + off.y)
+				var cells_to_check =[]
+				var delta: Vector2 = tc - fc
+				var dist: float = delta.length()
+				if dist >= 0.001:
+					var norm: Vector2 = delta / dist
+					var from_tile := Vector2i(0, 0)
+					var to_tile   := dest
+					var prev_tile := from_tile
+					var t: float = STEP_SIZE
+					while t < dist - STEP_SIZE:
+						var p: Vector2 = fc + norm * t
+						var tile := Vector2i(int(floor(p.x)), int(floor(p.y)))
+						if tile != from_tile and tile != to_tile:
+							if cells_to_check.is_empty():
+								cells_to_check.append(tile)
+							else:
+								var last = cells_to_check.back()
+								if typeof(last) == TYPE_DICTIONARY or last != tile:
+									cells_to_check.append(tile)
+						if tile != prev_tile:
+							if tile.x != prev_tile.x and tile.y != prev_tile.y:
+								cells_to_check.append({
+									"diag1": Vector2i(tile.x, prev_tile.y),
+									"diag2": Vector2i(prev_tile.x, tile.y)
+								})
+							prev_tile = tile
+						t += STEP_SIZE
+				rays.append({
+					"is_extra": is_extra,
+					"cells": cells_to_check
+				})
+	return rays
 
 func _has_los(from_tile: Vector2i, to_tile: Vector2i) -> bool:
-	var targets: Array =[Vector2(to_tile.x + 0.5, to_tile.y + 0.5)]
-	if _is_turf_opaque(to_tile):
-		targets.append(Vector2(to_tile.x + 0.1, to_tile.y + 0.1))
-		targets.append(Vector2(to_tile.x + 0.9, to_tile.y + 0.1))
-		targets.append(Vector2(to_tile.x + 0.1, to_tile.y + 0.9))
-		targets.append(Vector2(to_tile.x + 0.9, to_tile.y + 0.9))
-	for tc in targets:
-		for off in SOURCE_OFFSETS:
-			var fc := Vector2(from_tile.x + 0.5 + off.x, from_tile.y + 0.5 + off.y)
-			if _ray_clear(fc, tc): return true
+	var dest = to_tile - from_tile
+	if not _precomputed_los.has(dest): return false
+	var dest_opaque = _is_turf_opaque(to_tile)
+	
+	for ray in _precomputed_los[dest]:
+		if ray.is_extra and not dest_opaque:
+			continue
+			
+		var ray_clear = true
+		for cell in ray.cells:
+			if typeof(cell) == TYPE_DICTIONARY:
+				if _is_turf_opaque(from_tile + cell.diag1) and _is_turf_opaque(from_tile + cell.diag2):
+					ray_clear = false
+					break
+			else:
+				if _is_turf_opaque(from_tile + cell):
+					ray_clear = false
+					break
+		if ray_clear:
+			return true
+			
 	return false
 
 func _compute_fov() -> void:
