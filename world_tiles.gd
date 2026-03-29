@@ -9,11 +9,13 @@ func _init(p_world: Node) -> void:
 func register_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
 	if not world.solid_grid[z_level].has(pos): world.solid_grid[z_level][pos] =[]
 	if not obj in world.solid_grid[z_level][pos]: world.solid_grid[z_level][pos].append(obj)
+	Lighting.update_roof_map_at(pos)
 
 func unregister_solid(pos: Vector2i, z_level: int, obj: Node) -> void:
 	if world.solid_grid[z_level].has(pos):
 		world.solid_grid[z_level][pos].erase(obj)
 		if world.solid_grid[z_level][pos].is_empty(): world.solid_grid[z_level].erase(pos)
+	Lighting.update_roof_map_at(pos)
 
 func is_solid(pos: Vector2i, z_level: int) -> bool:
 	var tm = world.get_tilemap(z_level)
@@ -40,6 +42,7 @@ func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, 0, Vector2i(9, 0)) 
+	Lighting.update_roof_map_at(pos)
 	var scene = load("res://objects/rock.tscn") as PackedScene
 	if scene:
 		var rock: Node2D = scene.instantiate()
@@ -114,14 +117,11 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
 		return
 	
-	# Smart Z-level transitioning: Ensure we don't fall through floors or fly into the sky
 	if next_z != current_z:
 		if next_z < current_z:
-			# Going DOWN: If the current level's destination HAS a floor, you are stepping off the stairs. Stay on current floor.
 			if tm.get_cell_source_id(next_tile) != -1:
 				next_z = current_z
 		elif next_z > current_z:
-			# Going UP: The upper level's destination MUST have a floor/tile to stand on OR a solid block from below.
 			var next_tm = world.get_tilemap(next_z)
 			var has_floor = false
 			if next_tm != null and next_tm.get_cell_source_id(next_tile) != -1:
@@ -129,14 +129,9 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			var supports_from_below = is_solid(next_tile, current_z)
 			if not has_floor and not supports_from_below:
 				next_z = current_z
-			# Going UP: The tile directly above the stairs MUST be air (uncovered).
 			elif next_tm != null and next_tm.get_cell_source_id(old_tile) != -1:
 				next_z = current_z
 	
-	# Block Z-level changes if the destination tile is blocked by solid objects/walls.
-	# When going UP via stairs, only check the destination z-level: a solid tile on the
-	# current z directly in front of the stairs is irrelevant because the player is
-	# climbing, not walking into that tile on the same floor.
 	if next_z != current_z:
 		if next_z > current_z:
 			if is_solid(next_tile, next_z):
@@ -273,8 +268,10 @@ func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, source_id, atlas_coords)
+	Lighting.update_roof_map_at(pos)
 
 func handle_rpc_confirm_break_stone_wall(pos: Vector2i, z_level: int) -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, 0, Vector2i(5, 0))
+	Lighting.update_roof_map_at(pos)

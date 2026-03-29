@@ -17,10 +17,19 @@ func _ready() -> void:
 	_build_background()
 
 	if Engine.is_editor_hint():
+		# Hide the depth darken effects while working in the editor
+		for z in range(1, 6):
+			var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
+			if darken and darken.visible:
+				darken.visible = false
 		return
 
 	Engine.max_fps = target_fps
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+	
+	# Wait for grid to populate, then calculate global shadow mapping
+	await get_tree().process_frame
+	Lighting.rebuild_roof_map()
 
 func shake_tile(tile_pos: Vector2i, z_level: int = 3) -> void:
 	var tile_origin := Vector2(tile_pos.x * World.TILE_SIZE, tile_pos.y * World.TILE_SIZE)
@@ -131,11 +140,6 @@ func _build_tileset() -> void:
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
-		# Hide the depth darken effects while working in the editor
-		for z in range(1, 6):
-			var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
-			if darken and darken.visible:
-				darken.visible = false
 		return
 
 	var local_player = World.get_local_player()

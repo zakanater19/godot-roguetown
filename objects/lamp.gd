@@ -25,16 +25,18 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
 	add_to_group("pickable")
+	
+	# Eliminate the old PointLight2D entirely, the shader handles everything
+	var light = get_node_or_null("PointLight2D")
+	if light:
+		light.queue_free()
+		
 	_set_sprite(is_on)
-	# Connect to the Lighting signal instead of polling in _process every frame.
-	# Godot 4 auto-disconnects when this node is freed.
-	Lighting.sun_weight_updated.connect(_on_sun_weight_updated)
-	# Apply the current lighting state immediately on spawn.
-	_on_sun_weight_updated(Lighting.sun_weight)
+
+func _exit_tree() -> void:
+	Lighting.unregister_lamp(self)
 
 func _set_fov_visibility(p_visible: bool) -> void:
-	# Specifically hide the sprite and interaction capabilities, but leave 
-	# the root node visible so the PointLight2D remains active in FOV shadow.
 	var sprite = get_node_or_null("Sprite2D")
 	if sprite != null and sprite.visible != p_visible:
 		sprite.visible = p_visible
@@ -42,22 +44,19 @@ func _set_fov_visibility(p_visible: bool) -> void:
 	if input_pickable != p_visible:
 		input_pickable = p_visible
 
-func _on_sun_weight_updated(weight: float) -> void:
-	var light = get_node_or_null("PointLight2D")
-	if light:
-		light.energy = 1.2 * (1.0 - weight)
-		light.enabled = (weight < 0.8) and is_on
-
 func _set_sprite(on: bool) -> void:
 	is_on = on
 	var sprite = get_node_or_null("Sprite2D")
 	if sprite:
 		sprite.texture = load("res://objects/lampon.png") if is_on else load("res://objects/lampoff.png")
+		
+	if is_on:
+		Lighting.register_lamp(self)
+	else:
+		Lighting.unregister_lamp(self)
 
 func interact_in_hand(player: Node) -> void:
 	_set_sprite(not is_on)
-	# Update light state immediately without waiting for the next signal tick.
-	_on_sun_weight_updated(Lighting.sun_weight)
 	if player != null and player._is_local_authority():
 		player._update_hands_ui()
 		var state_str = "ON" if is_on else "OFF"
