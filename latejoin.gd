@@ -152,6 +152,9 @@ func _get_object_sync_data(obj: Node) -> Dictionary:
 	if "z_level" in obj:
 		data["z_level"] = obj.get("z_level")
 		
+	if "z_index" in obj:
+		data["z_index"] = obj.get("z_index")
+		
 	if "hits" in obj: data["hits"] = obj.get("hits")
 	if "state" in obj: data["state"] = obj.get("state")
 	if "is_on" in obj: data["is_on"] = obj.get("is_on")
@@ -580,6 +583,8 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 
 	if obj != null:
 		obj.position = obj_data["position"]
+		if obj_data.has("z_index"):
+			obj.z_index = obj_data["z_index"]
 		if obj_data.has("hits"):
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data["hits"])
 			else: obj.set("hits", obj_data["hits"])

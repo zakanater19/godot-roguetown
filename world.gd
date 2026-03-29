@@ -1,3 +1,4 @@
+
 extends Node
 
 const TILE_SIZE:   int = 64
@@ -507,3 +508,13 @@ func rpc_confirm_drag_object(obj_path: NodePath, new_pixel: Vector2) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_drag_corpse(corpse_path: NodePath, new_pos: Vector2i) -> void:
 	combat.handle_rpc_confirm_drag_corpse(corpse_path, new_pos)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_table_place(table_path: NodePath, hand_idx: int, place_pos: Vector2) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_table_place(sender_id, table_path, hand_idx, place_pos)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_table_place(peer_id: int, table_path: NodePath, hand_idx: int, place_pos: Vector2) -> void:
+	objects.handle_rpc_confirm_table_place(peer_id, table_path, hand_idx, place_pos)

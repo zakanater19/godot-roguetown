@@ -1,3 +1,4 @@
+
 # res://world_objects.gd
 extends RefCounted
 
@@ -696,3 +697,35 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, sl
 		if player._is_local_authority():
 			player._update_hands_ui()
 	if satchel.has_method("_refresh_ui"): satchel._refresh_ui()
+
+func handle_rpc_request_table_place(sender_id: int, table_path: NodePath, hand_idx: int, place_pos: Vector2) -> void:
+	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
+	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
+	if player == null or player.dead: return
+	if player.body != null and player.body.is_arm_broken(hand_idx): return
+	var table = world.get_node_or_null(table_path)
+	if table == null: return
+	if not world.utils.is_within_interaction_range(player, table.global_position): return
+	var item: Node = player.hands[hand_idx]
+	if item == null or not is_instance_valid(item): return
+	world.rpc_confirm_table_place.rpc(sender_id, table_path, hand_idx, place_pos)
+
+func handle_rpc_confirm_table_place(peer_id: int, table_path: NodePath, hand_idx: int, place_pos: Vector2) -> void:
+	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
+	if player == null: return
+	var item: Node = player.hands[hand_idx]
+	if item == null or not is_instance_valid(item): return
+	var table = world.get_node_or_null(table_path)
+	if table == null: return
+	player.hands[hand_idx] = null
+	if player._is_local_authority():
+		player._update_hands_ui()
+	var sprite: Node = item.get_node_or_null("Sprite2D")
+	if sprite != null:
+		sprite.rotation_degrees = 0.0
+		sprite.scale = Vector2(abs(sprite.scale.x), abs(sprite.scale.y))
+	item.global_position = place_pos
+	item.set("z_level", table.z_level)
+	item.z_index = (table.z_level - 1) * 200 + 3
+	for child in item.get_children():
+		if child is CollisionShape2D: child.disabled = false

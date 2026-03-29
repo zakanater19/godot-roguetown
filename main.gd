@@ -12,6 +12,7 @@ var target_fps: int = 60
 var _last_z: int = -1
 
 func _ready() -> void:
+	get_viewport().physics_object_picking_sort = true
 	_build_tileset()
 	_build_background()
 

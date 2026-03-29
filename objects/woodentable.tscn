@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3 uid="uid://woodentable01"]
+
+[ext_resource type="Script" path="res://objects/woodentable.gd" id="1_wtgd"]
+[ext_resource type="Texture2D" path="res://objects/woodentable.png" id="2_wttex"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(60, 60)
+
+[node name="WoodenTable" type="Area2D"]
+z_index = 5
+script = ExtResource("1_wtgd")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(2, 2)
+texture = ExtResource("2_wttex")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
