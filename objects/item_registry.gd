@@ -39,6 +39,7 @@ const ALL_ITEMS: Array =[
 	preload("res://items/satchel.tres"),
 	preload("res://items/king_cloak.tres"),
 	preload("res://items/crown.tres"),
+	preload("res://items/chaingloves.tres"),
 ]
 
 # Centralized texture lists for UI rendering
@@ -55,6 +56,7 @@ const HUD_TEXTURES: Dictionary = {
 	"Satchel":        "res://clothing/satchel.png",
 	"KingCloak":      "res://clothing/king_cloak.png",
 	"Crown":          "res://clothing/crownonmob.png",
+	"ChainGloves":    "res://clothing/chaingloves.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
 	"Dirk":           "res://objects/dirk.png",
@@ -75,6 +77,7 @@ const MOB_TEXTURES: Dictionary = {
 	"Satchel":        "res://clothing/satchelonmob.png",
 	"KingCloak":      "res://clothing/king_cloak_onmob.png",
 	"Crown":          "res://clothing/crownonmob.png",
+	"ChainGloves":    "res://clothing/chainglovesonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
 	"Dirk":           "res://objects/dirk.png",

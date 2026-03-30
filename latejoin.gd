@@ -258,6 +258,7 @@ func _capture_equipped_state(player_node: Node2D) -> Dictionary:
 		"Apothshirt": "res://clothing/apothshirt.tscn", "Blackshirt": "res://clothing/blackshirt.tscn",
 		"Undershirt": "res://clothing/undershirt.tscn", "Pickaxe": "res://objects/pickaxe.tscn",
 		"Sword": "res://objects/sword.tscn", "Dirk": "res://objects/dirk.tscn", "KingCloak": "res://clothing/king_cloak.tscn",
+		"ChainGloves": "res://clothing/chaingloves.tscn",
 	}
 	var equipped_state = {}
 	var eq = player_node.get("equipped")
@@ -582,9 +583,7 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 				obj.z_index = (obj.z_level - 1) * 200 + (obj.z_index % 200)
 
 	if obj != null:
-		obj.position = obj_data["position"]
-		if obj_data.has("z_index"):
-			obj.z_index = obj_data["z_index"]
+		if obj_data.has("position"): obj.position = obj_data["position"]
 		if obj_data.has("hits"):
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data["hits"])
 			else: obj.set("hits", obj_data["hits"])

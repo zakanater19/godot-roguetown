@@ -23,6 +23,7 @@ const CLOTHING_TEXTURES: Dictionary = {
 	"Satchel":        "res://clothing/satchelonmob.png",
 	"KingCloak":      "res://clothing/king_cloak_onmob.png",
 	"Crown":          "res://clothing/crownonmob.png",
+	"ChainGloves":    "res://clothing/chainglovesonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
 	"Dirk":           "res://objects/dirk.png"
@@ -113,8 +114,8 @@ var hands:        Array[Node] =[null, null]
 var active_hand:  int         = 0
 var _is_throwing: bool        = false
 
-var equipped: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null}
-var equipped_data: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null}
+var equipped: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null}
+var equipped_data: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null}
 
 var throwing_mode:     bool    = false
 var _throw_label:      Label   = null
@@ -496,7 +497,7 @@ func sync_hands(hand_names: Array) -> void:
 	_update_hands_ui()
 
 func _setup_clothing_sprites() -> void:
-	var layers = [["TrousersSprite", 1],["ClothingSprite", 2],["ChestSprite", 3],["BackpackSprite", 4],["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["CloakSprite", 7]
+	var layers = [["TrousersSprite", 1],["ClothingSprite", 2],["ChestSprite", 3],["GlovesSprite", 4],["BackpackSprite", 4],["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["CloakSprite", 7]
 	]
 	for spec in layers:
 		var s := Sprite2D.new()
@@ -518,7 +519,7 @@ func _update_clothing_sprites() -> void:
 		elif sleep_state == SleepState.ASLEEP: target_rot = 90.0
 	elif is_lying_down: target_rot = 90.0
 
-	var slots := [["HelmetSprite", "head"],["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["WaistSprite", "waist"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["TrousersSprite", "trousers"]]
+	var slots := [["HelmetSprite", "head"],["CloakSprite", "cloak"],["ChestSprite", "armor"],["BackpackSprite", "backpack"],["WaistSprite", "waist"],["BootsSprite", "feet"],["ClothingSprite", "clothing"],["TrousersSprite", "trousers"],["GlovesSprite", "gloves"]]
 
 	for slot in slots:
 		var sprite: Sprite2D = get_node_or_null(slot[0])
@@ -731,7 +732,7 @@ func _process(delta: float) -> void:
 							heal_amount -= missing
 					if heal_amount > 0:
 						rpc_heal_limbs.rpc(heal_amount)
-						
+					
 	if is_local and _sleep_blackout != null:
 		if sleep_state == SleepState.AWAKE: _sleep_blackout.color.a = 0.0
 		elif sleep_state == SleepState.FALLING_ASLEEP: _sleep_blackout.color.a = clamp(1.0 - (sleep_timer / 10.0), 0.0, 1.0)

@@ -7,7 +7,7 @@ const BOX:  int = 48
 const GAP:  int = 4
 const STEP: int = BOX + GAP   
 
-const SLOT_LAYOUT: Array =[["head",      1, 0],["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
+const SLOT_LAYOUT: Array =[["head",      1, 0],["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],["gloves",    0, 2],["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
 ]
 
 var _hud_tex:          Texture2D = null
@@ -866,4 +866,3 @@ func _on_toggle_gui_input(event: InputEvent) -> void:
 		if _toggle_label != null:
 			_toggle_label.text = "↑"
 			_toggle_label.add_theme_color_override("font_color", Color(0.15, 0.9, 0.25))
-			

@@ -7,6 +7,7 @@ const DRAG_THRESHOLD: float = 10.0
 
 var item_type: String = "Satchel"
 var slot: String = "backpack"
+var too_large_for_satchel: bool = true
 
 var contents: Array =[]
 var _ui_layer:  CanvasLayer = null

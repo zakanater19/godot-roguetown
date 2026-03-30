@@ -54,7 +54,7 @@ func get_detailed_description() -> String:
 			lhand_name = player.hands[1].name.get_slice("@", 0)
 		desc += "\n[color=gray]left hand:[/color] " + lhand_name
 
-	var slots_order: Array[String] =["head", "cloak", "armor", "backpack", "waist", "clothing", "trousers", "feet"]
+	var slots_order: Array[String] =["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet"]
 	for slot in slots_order:
 		var item = player.equipped.get(slot, null)
 		if item != null and item is String and item != "":
@@ -212,6 +212,7 @@ func apply_class_defaults() -> void:
 		"cloak":    null,
 		"armor":    null,
 		"backpack": null,
+		"gloves":   null,
 		"waist":    null,
 		"clothing": null,
 		"trousers": null,
@@ -223,6 +224,7 @@ func apply_class_defaults() -> void:
 		"cloak":    null,
 		"armor":    null,
 		"backpack": null,
+		"gloves":   null,
 		"waist":    null,
 		"clothing": null,
 		"trousers": null,
@@ -688,4 +690,3 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				World.rpc_damage_wall(target_tile)
 			else:
 				World.rpc_damage_wall.rpc_id(1, target_tile)
-
