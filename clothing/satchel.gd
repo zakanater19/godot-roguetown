@@ -142,8 +142,8 @@ func _open_ui() -> void:
 	panel.anchor_bottom = 0.5
 	panel.offset_left   = -120
 	panel.offset_right  = 120
-	panel.offset_top    = -170
-	panel.offset_bottom = 170
+	panel.offset_top    = -190
+	panel.offset_bottom = 190
 	_ui_layer.add_child(panel)
 
 	var vbox := VBoxContainer.new()
@@ -176,8 +176,11 @@ func _open_ui() -> void:
 	_slot_btns.clear()
 	for i in MAX_SLOTS:
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(100, 30)
+		btn.custom_minimum_size = Vector2(100, 40)
 		btn.add_theme_font_size_override("font_size", 10)
+		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		btn.expand_icon = true
+		
 		var si: int = i
 		btn.pressed.connect(func(): _on_slot_pressed(si))
 		grid.add_child(btn)
@@ -186,14 +189,29 @@ func _open_ui() -> void:
 	_refresh_ui()
 
 func _refresh_ui() -> void:
+	var item_registry = get_node_or_null("/root/ItemRegistry")
 	for i in _slot_btns.size():
 		var btn: Button     = _slot_btns[i]
 		var slot_entry      = contents[i] if i < contents.size() else null
 		if slot_entry != null:
-			btn.text     = slot_entry.get("item_type", "?")
+			var itype = slot_entry.get("item_type", "?")
+			var amt = slot_entry.get("state", {}).get("amount", 1)
+			
+			var icon_tex = null
+			if item_registry != null and item_registry.has_method("get_item_icon"):
+				icon_tex = item_registry.get_item_icon(itype)
+				
+			if icon_tex != null:
+				btn.text = str(amt) if amt > 1 else ""
+				btn.icon = icon_tex
+			else:
+				btn.text = (str(amt) + "x " + itype) if amt > 1 else itype
+				btn.icon = null
+				
 			btn.disabled = false
 		else:
 			btn.text     = "[empty]"
+			btn.icon     = null
 			btn.disabled = true
 
 func _close_ui() -> void:

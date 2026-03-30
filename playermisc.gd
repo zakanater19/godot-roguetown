@@ -56,8 +56,8 @@ func open_target_inventory(target: Node) -> void:
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.offset_left   = -110
 	panel.offset_right  = 110
-	panel.offset_top    = -120
-	panel.offset_bottom = 120
+	panel.offset_top    = -150
+	panel.offset_bottom = 150
 	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
 	loot_panel = panel
 	player._ui_root.add_child(panel)
@@ -133,8 +133,10 @@ func _build_slot_row(parent: Control, label_text: String, slot_key: String) -> D
 	var btn := Button.new()
 	btn.text                  = "empty"
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.custom_minimum_size.y = 22
+	btn.custom_minimum_size.y = 32
 	btn.add_theme_font_size_override("font_size", 10)
+	btn.icon_alignment        = HORIZONTAL_ALIGNMENT_CENTER
+	btn.expand_icon           = true
 	btn.disabled              = true
 	var sk := slot_key
 	btn.pressed.connect(func(): _on_loot_slot_pressed(sk))
@@ -147,6 +149,8 @@ func refresh_loot_panel() -> void:
 		close_target_inventory()
 		return
 
+	var item_registry = player.get_node_or_null("/root/ItemRegistry")
+
 	for i in range(2):
 		var sk: String = "hand_" + str(i)
 		if not loot_slot_controls.has(sk):
@@ -157,10 +161,23 @@ func refresh_loot_panel() -> void:
 		if obj != null and is_instance_valid(obj):
 			var item_name = obj.get("item_type")
 			if item_name == null: item_name = obj.name.get_slice("@", 0)
-			btn.text     = item_name
+			var amt = obj.get("amount") if "amount" in obj else 1
+			
+			var icon_tex = null
+			if item_registry != null and item_registry.has_method("get_item_icon"):
+				icon_tex = item_registry.get_item_icon(item_name)
+				
+			if icon_tex != null:
+				btn.text = str(amt) if amt > 1 else ""
+				btn.icon = icon_tex
+			else:
+				btn.text = (str(amt) + "x " + item_name) if amt > 1 else item_name
+				btn.icon = null
+
 			btn.disabled = false
 		else:
 			btn.text     = "empty"
+			btn.icon     = null
 			btn.disabled = true
 
 	var equip_slots :=["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet"]
@@ -172,10 +189,21 @@ func refresh_loot_panel() -> void:
 		var btn: Button  = ctrl["btn"]
 		var item = loot_target.equipped.get(es, null)
 		if item != null and item is String and item != "":
-			btn.text     = item
+			var icon_tex = null
+			if item_registry != null and item_registry.has_method("get_item_icon"):
+				icon_tex = item_registry.get_item_icon(item)
+
+			if icon_tex != null:
+				btn.text = ""
+				btn.icon = icon_tex
+			else:
+				btn.text = item
+				btn.icon = null
+
 			btn.disabled = false
 		else:
 			btn.text     = "empty"
+			btn.icon     = null
 			btn.disabled = true
 
 func close_target_inventory() -> void:

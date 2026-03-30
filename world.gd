@@ -78,7 +78,9 @@ func _world_to_tile(world_pos: Vector2) -> Vector2i:
 	return utils.world_to_tile(world_pos)
 
 func get_local_player() -> Node:
-	return utils.get_local_player()
+	if not multiplayer.has_multiplayer_peer(): return null
+	var local_id = multiplayer.get_unique_id()
+	return _find_player_by_peer(local_id)
 
 func cast_throw(from_tile: Vector2i, from_pixel: Vector2, z_level: int, dir: Vector2, max_tiles: int) -> Vector2i:
 	return utils.cast_throw(from_tile, from_pixel, z_level, dir, max_tiles)
@@ -463,8 +465,8 @@ func rpc_request_satchel_insert(satchel_path: NodePath, hand_idx: int) -> void:
 	objects.handle_rpc_request_satchel_insert(sender_id, satchel_path, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_satchel_insert(peer_id: int, satchel_path: NodePath, _item_path: NodePath, hand_idx: int, slot_index: int, scene_path: String, itype: String) -> void:
-	objects.handle_rpc_confirm_satchel_insert(peer_id, satchel_path, _item_path, hand_idx, slot_index, scene_path, itype)
+func rpc_confirm_satchel_insert(peer_id: int, satchel_path: NodePath, _item_path: NodePath, hand_idx: int, slot_index: int, scene_path: String, itype: String, item_state: Dictionary) -> void:
+	objects.handle_rpc_confirm_satchel_insert(peer_id, satchel_path, _item_path, hand_idx, slot_index, scene_path, itype, item_state)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_satchel_extract(satchel_path: NodePath, slot_index: int, hand_idx: int) -> void:
@@ -473,8 +475,8 @@ func rpc_request_satchel_extract(satchel_path: NodePath, slot_index: int, hand_i
 	objects.handle_rpc_request_satchel_extract(sender_id, satchel_path, slot_index, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int, new_node_name: String, scene_path: String) -> void:
-	objects.handle_rpc_confirm_satchel_extract(peer_id, satchel_path, slot_index, hand_idx, new_node_name, scene_path)
+func rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int, new_node_name: String, scene_path: String, item_state: Dictionary) -> void:
+	objects.handle_rpc_confirm_satchel_extract(peer_id, satchel_path, slot_index, hand_idx, new_node_name, scene_path, item_state)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_grab(target_path: NodePath, limb: String = "chest") -> void:

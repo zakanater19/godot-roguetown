@@ -60,7 +60,15 @@ const HUD_TEXTURES: Dictionary = {
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
 	"Dirk":           "res://objects/dirk.png",
-	"Lamp":           "res://objects/lampoff.png"
+	"Lamp":           "res://objects/lampoff.png",
+	"Pebble":         "res://objects/objects.png",
+	"Coal":           "res://objects/objects.png",
+	"IronOre":        "res://objects/objects.png",
+	"IronIngot":      "res://objects/objects.png",
+	"Log":            "res://objects/objects.png",
+	"CopperCoin":     "res://objects/coins/1copper.png",
+	"SilverCoin":     "res://objects/coins/1silver.png",
+	"GoldCoin":       "res://objects/coins/1gold.png"
 }
 
 # Centralized texture lists for on-mob sprite rendering
@@ -86,6 +94,7 @@ const MOB_TEXTURES: Dictionary = {
 
 var _scene_paths_cache: Dictionary = {}
 var _item_data_cache: Dictionary = {}
+var _icon_cache: Dictionary = {}
 
 func _ready() -> void:
 	# Build fast lookup caches for O(1) retrieval
@@ -100,3 +109,41 @@ func get_by_type(item_type: String) -> ItemData:
 
 func get_scene_path(item_type: String) -> String:
 	return _scene_paths_cache.get(item_type, "")
+
+func get_item_icon(item_type: String) -> Texture2D:
+	if _icon_cache.has(item_type):
+		return _icon_cache[item_type]
+
+	if not HUD_TEXTURES.has(item_type):
+		return null
+		
+	var tex = load(HUD_TEXTURES[item_type]) as Texture2D
+	if tex == null: 
+		return null
+
+	var region_rect = Rect2(0, 0, 32, 32)
+	var region_set = false
+	var scene_path = get_scene_path(item_type)
+	if scene_path != "":
+		var scene = load(scene_path) as PackedScene
+		if scene != null:
+			var state = scene.get_state()
+			for i in range(state.get_node_count()):
+				if state.get_node_name(i) == "Sprite2D":
+					for j in range(state.get_node_property_count(i)):
+						if state.get_node_property_name(i, j) == "region_rect":
+							region_rect = state.get_node_property_value(i, j)
+							region_set = true
+							break
+					if region_set:
+						break
+
+	if not region_set:
+		region_rect = Rect2(0, 0, tex.get_width(), tex.get_height())
+
+	var atlas = AtlasTexture.new()
+	atlas.atlas = tex
+	atlas.region = region_rect
+	
+	_icon_cache[item_type] = atlas
+	return atlas

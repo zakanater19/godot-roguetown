@@ -1,4 +1,3 @@
-
 # res://world_objects.gd
 extends RefCounted
 
@@ -533,7 +532,7 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 	var recipes = {
 		"sword": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/sword.tscn"},
 		"pickaxe": {"req": "IronIngot", "req_amt": 1, "scene": "res://objects/pickaxe.tscn"},
-		"wooden_floor": {"req": "Log", "req_amt": 1, "tile": [0, Vector2i(4, 0)]},
+		"wooden_floor": {"req": "Log", "req_amt": 1, "tile":[0, Vector2i(4, 0)]},
 		"cobble_floor": {"req": "Pebble", "req_amt": 1, "tile":[0, Vector2i(5, 0)]},
 		"stone_wall": {"req": "Pebble", "req_amt": 2, "tile":[1, Vector2i(6, 0)]}
 	}
@@ -643,13 +642,18 @@ func handle_rpc_request_satchel_insert(sender_id: int, satchel_path: NodePath, h
 			break
 	if slot_index == -1: return
 
-	world.rpc_confirm_satchel_insert.rpc(sender_id, satchel_path, item.get_path(), hand_idx, slot_index, scene_path, itype)
+	var item_state = {}
+	if "amount" in item: item_state["amount"] = item.get("amount")
+	if "metal_type" in item: item_state["metal_type"] = item.get("metal_type")
+	if "contents" in item: item_state["contents"] = item.get("contents").duplicate(true)
 
-func handle_rpc_confirm_satchel_insert(peer_id: int, satchel_path: NodePath, _item_path: NodePath, hand_idx: int, slot_index: int, scene_path: String, itype: String) -> void:
+	world.rpc_confirm_satchel_insert.rpc(sender_id, satchel_path, item.get_path(), hand_idx, slot_index, scene_path, itype, item_state)
+
+func handle_rpc_confirm_satchel_insert(peer_id: int, satchel_path: NodePath, _item_path: NodePath, hand_idx: int, slot_index: int, scene_path: String, itype: String, item_state: Dictionary) -> void:
 	var satchel: Node = world.get_node_or_null(satchel_path)
 	if satchel == null: return
 	if slot_index >= 0 and slot_index < satchel.contents.size():
-		satchel.contents[slot_index] = {"scene_path": scene_path, "item_type": itype}
+		satchel.contents[slot_index] = {"scene_path": scene_path, "item_type": itype, "state": item_state}
 	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 	if player != null:
 		if player.hands[hand_idx] != null and is_instance_valid(player.hands[hand_idx]):
@@ -674,10 +678,11 @@ func handle_rpc_request_satchel_extract(sender_id: int, satchel_path: NodePath, 
 	if slot == null: return
 	var scene_path: String = slot.get("scene_path", "")
 	if scene_path == "": return
+	var item_state: Dictionary = slot.get("state", {})
 	var new_node_name: String = "SatchelExtract_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
-	world.rpc_confirm_satchel_extract.rpc(sender_id, satchel_path, slot_index, hand_idx, new_node_name, scene_path)
+	world.rpc_confirm_satchel_extract.rpc(sender_id, satchel_path, slot_index, hand_idx, new_node_name, scene_path, item_state)
 
-func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int, new_node_name: String, scene_path: String) -> void:
+func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int, new_node_name: String, scene_path: String, item_state: Dictionary) -> void:
 	var satchel: Node = world.get_node_or_null(satchel_path)
 	if satchel == null: return
 	if slot_index >= 0 and slot_index < satchel.contents.size():
@@ -688,6 +693,11 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, sl
 	item.name = new_node_name
 	item.position = satchel.global_position
 	item.set("z_level", satchel.z_level)
+	
+	if item_state.has("amount") and "amount" in item: item.set("amount", item_state["amount"])
+	if item_state.has("metal_type") and "metal_type" in item: item.set("metal_type", item_state["metal_type"])
+	if item_state.has("contents") and "contents" in item: item.set("contents", item_state["contents"].duplicate(true))
+	
 	satchel.get_parent().add_child(item)
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = true
