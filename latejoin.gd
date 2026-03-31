@@ -204,6 +204,7 @@ func _get_object_sync_data(obj: Node) -> Dictionary:
 	if "_smelting" in obj: data["_smelting"] = obj.get("_smelting")
 	if "contents" in obj: data["contents"] = obj.get("contents").duplicate(true)
 	if "amount" in obj: data["amount"] = obj.get("amount")
+	if "metal_type" in obj: data["metal_type"] = obj.get("metal_type")
 	
 	if obj is Area2D:
 		var script_str = str(obj.get_script())
@@ -332,6 +333,7 @@ func _capture_hands_state(player_node: Node2D) -> Array:
 			item_data["script_path"] = hand_item.get_script().resource_path if hand_item.get_script() != null else ""
 			if "contents" in hand_item: item_data["contents"] = hand_item.get("contents").duplicate(true)
 			if "amount" in hand_item: item_data["amount"] = hand_item.get("amount")
+			if "metal_type" in hand_item: item_data["metal_type"] = hand_item.get("metal_type")
 			hands_state.append(item_data)
 		else: hands_state.append(null)
 	return hands_state
@@ -482,6 +484,7 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 		fallback.name = hand_data["name"]; fallback.position = hand_data["position"]
 		if hand_data.has("contents") and "contents" in fallback: fallback.set("contents", hand_data["contents"].duplicate(true))
 		if hand_data.has("amount") and "amount" in fallback: fallback.set("amount", hand_data["amount"])
+		if hand_data.has("metal_type") and "metal_type" in fallback: fallback.set("metal_type", hand_data["metal_type"])
 		main_node.add_child(fallback); return fallback
 	var scene = load(scene_path) as PackedScene
 	if scene == null: return null
@@ -489,6 +492,7 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	item.name = hand_data["name"]; item.position = hand_data["position"]
 	if hand_data.has("contents") and "contents" in item: item.set("contents", hand_data["contents"].duplicate(true))
 	if hand_data.has("amount") and "amount" in item: item.set("amount", hand_data["amount"])
+	if hand_data.has("metal_type") and "metal_type" in item: item.set("metal_type", hand_data["metal_type"])
 	main_node.add_child(item); return item
 
 func _reassign_player_node(player_node: Node, new_peer_id: int) -> void:
@@ -561,6 +565,7 @@ func _retry_receive_object_states(object_states: Dictionary, retries: int) -> vo
 		if obj != null:
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
 			if obj_data.has("amount") and "amount" in obj: obj.set("amount", obj_data["amount"])
+			if obj_data.has("metal_type") and "metal_type" in obj: obj.set("metal_type", obj_data["metal_type"])
 		else:
 			missing[obj_path] = obj_data
 
@@ -662,6 +667,7 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data["hits"])
 			else: obj.set("hits", obj_data["hits"])
 		if obj_data.has("amount"): obj.set("amount", obj_data["amount"])
+		if obj_data.has("metal_type"): obj.set("metal_type", obj_data["metal_type"])
 		if obj_data.has("state"):
 			obj.set("state", obj_data["state"])
 			if obj.has_method("_update_sprite"): obj.call("_update_sprite")

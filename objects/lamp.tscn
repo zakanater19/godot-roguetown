@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=4 uid="uid://clamp001sc"]
+[gd_scene load_steps=5 format=4 uid="uid://clamp001sc"]
 
 [ext_resource type="Script" path="res://objects/lamp.gd" id="1_lampgd"]
 [ext_resource type="Texture2D" path="res://objects/lampoff.png" id="2_lampoff"]
@@ -17,11 +17,6 @@ fill_to = Vector2(1, 0.5)
 width = 640
 height = 640
 
-[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_lamp"]
-properties/0/path = NodePath(".:is_on")
-properties/0/spawn = true
-properties/0/replication_mode = 1
-
 [node name="Lamp" type="Area2D"]
 z_index = 5
 script = ExtResource("1_lampgd")
@@ -39,6 +34,3 @@ texture = SubResource("GradientTexture2D_lamp")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_1")
-
-[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
-replication_config = SubResource("SceneReplicationConfig_lamp")

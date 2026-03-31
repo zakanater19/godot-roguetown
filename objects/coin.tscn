@@ -1,17 +1,9 @@
-[gd_scene load_steps=5 format=3 uid="uid://c1coinbase01sc"]
+[gd_scene load_steps=3 format=3 uid="uid://c1coinbase01sc"]
 
 [ext_resource type="Script" path="res://objects/coin.gd" id="1_coingd"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(24, 24)
-
-[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_coin"]
-properties/0/path = NodePath(".:amount")
-properties/0/spawn = true
-properties/0/replication_mode = 1
-properties/1/path = NodePath(".:metal_type")
-properties/1/spawn = true
-properties/1/replication_mode = 1
 
 [node name="Coin" type="Area2D"]
 z_index = 5
@@ -26,6 +18,3 @@ region_rect = Rect2(0, 0, 64, 64)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_1")
-
-[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
-replication_config = SubResource("SceneReplicationConfig_coin")

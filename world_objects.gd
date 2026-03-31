@@ -337,7 +337,7 @@ func handle_rpc_confirm_combine_ground_coin(peer_id: int, coin_path: NodePath, h
 			if is_instance_valid(ground_coin): ground_coin.queue_free()
 		else:
 			if world.has_node("/root/LateJoin"):
-				world.get_node("/root/LateJoin").register_object_state(coin_path, {"amount": ground_coin.amount, "type": "coin"})
+				world.get_node("/root/LateJoin").register_object_state(coin_path, {"amount": ground_coin.amount, "metal_type": ground_coin.metal_type, "type": "coin"})
 	if player and player._is_local_authority():
 		player._update_hands_ui()
 
@@ -515,8 +515,13 @@ func handle_rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: Str
 	item.set("z_level", land_z)
 	
 	if "equipped_data" in target and target.equipped_data.get(equip_slot) != null:
-		if "contents" in target.equipped_data[equip_slot] and "contents" in item:
-			item.set("contents", target.equipped_data[equip_slot]["contents"].duplicate(true))
+		var edata = target.equipped_data[equip_slot]
+		if "contents" in edata and "contents" in item:
+			item.set("contents", edata["contents"].duplicate(true))
+		if "amount" in edata and "amount" in item:
+			item.set("amount", edata["amount"])
+		if "metal_type" in edata and "metal_type" in item:
+			item.set("metal_type", edata["metal_type"])
 		target.equipped_data[equip_slot] = null
 		
 	target.get_parent().add_child(item)
