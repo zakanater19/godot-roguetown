@@ -8,12 +8,12 @@ const GAP:  int = 4
 const STEP: int = BOX + GAP   
 
 const SLOT_LAYOUT: Array = [
-	["cloak",     0, 0],["head",      1, 0],
-	["backpack",  2, 0],["gloves",    0, 1],
-	["armor",     1, 1],["trousers",  2, 1],
-	["feet",      0, 2],["clothing",  1, 2],
-	["waist",     0, 3],["pocket_l",  1, 3],
-	["pocket_r",  2, 3],
+	["head",      1, 0],
+	["cloak",     0, 1],["face",      1, 1],["backpack",  2, 1],
+	["gloves",    0, 2],["armor",     1, 2],["trousers",  2, 2],
+	["feet",      0, 3],["clothing",  1, 3],
+	["waist",     0, 4],["pocket_l",  1, 4],
+	["pocket_r",  2, 4],
 ]
 
 var _hud_tex:          Texture2D = null
@@ -82,7 +82,7 @@ func _build() -> void:
 
 func _build_clothing_panel(parent: Control) -> void:
 	var panel_w: int = 3 * STEP
-	var panel_h: int = 4 * STEP
+	var panel_h: int = 5 * STEP
 
 	_clothing_panel = Control.new()
 	_clothing_panel.anchor_left   = 0.5
@@ -102,7 +102,7 @@ func _build_clothing_panel(parent: Control) -> void:
 		var row:       int    = slot_data[2]
 		_create_slot_box(slot_name, col, row)
 
-	_create_toggle_box(2, 2)
+	_create_toggle_box(2, 3)
 
 func _create_slot_box(slot_name: String, col: int, row: int) -> void:
 	var ctrl := Control.new()
@@ -120,6 +120,7 @@ func _create_slot_box(slot_name: String, col: int, row: int) -> void:
 	if slot_name == "clothing": label_text = "clothing\n/torso"
 	elif slot_name == "pocket_l": label_text = "L. Pocket"
 	elif slot_name == "pocket_r": label_text = "R. Pocket"
+	elif slot_name == "face": label_text = "face"
 	
 	var lbl := Label.new()
 	lbl.text = label_text
@@ -299,7 +300,7 @@ func _build_hand_boxes(parent: Control) -> void:
 	_release_ctrl.add_child(release_lbl)
 	_release_ctrl.gui_input.connect(_on_release_gui_input)
 
-	# --- Resist indicator (above hand slot 1 / left hand) ---
+	# --- Resist grab button (above hand slot 1 / left hand) ---
 	# Visible only when the local player is being grabbed by someone.
 	_resist_ctrl = Control.new()
 	_resist_ctrl.position            = Vector2(2, -(BOX + GAP))
@@ -687,6 +688,26 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 		var amt_lbl: Label = _slot_amt_labels[slot_name]
 		var item_name      = equipped.get(slot_name, null)
 		if item_name != null and ItemRegistry.HUD_TEXTURES.has(item_name):
+			# Hood: pick icon based on hood_up state stored in equipped_data
+			if item_name == "Hood" and slot_name == "face":
+				var face_data = equipped_data.get("face", null)
+				var hood_up: bool = false
+				if face_data is Dictionary:
+					hood_up = face_data.get("hood_up", false)
+				var hood_tex_path: String = "res://clothing/hoodup.png" if hood_up else "res://clothing/hooddown.png"
+				var hood_tex := load(hood_tex_path) as Texture2D
+				if hood_tex != null:
+					icon.texture        = hood_tex
+					icon.region_enabled = true
+					icon.region_rect    = Rect2(0, 0, hood_tex.get_width(), hood_tex.get_height())
+					var max_dim = max(hood_tex.get_width(), hood_tex.get_height())
+					icon.scale = Vector2(32.0 / max_dim, 32.0 / max_dim) if max_dim > 0 else Vector2(1.0, 1.0)
+					icon.visible = true
+				else:
+					icon.visible = false
+				amt_lbl.visible = false
+				continue
+
 			var tex := load(ItemRegistry.HUD_TEXTURES[item_name]) as Texture2D
 			if tex != null:
 				icon.texture        = tex
@@ -799,11 +820,11 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 			else:
 				clicked_item._open_ui()
 			return
-            
+			
 		if player.body != null and player.body.is_arm_broken(player.active_hand):
 			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
 			return
-            
+			
 		if player.multiplayer.has_multiplayer_peer():
 			if player.multiplayer.is_server():
 				player.rpc_transfer_to_hand(hand_idx, player.active_hand)
@@ -869,6 +890,15 @@ func _on_sleep_gui_input(event: InputEvent) -> void:
 	if player != null and player.has_method("toggle_sleep"): player.toggle_sleep()
 
 func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
+	# Right-click on the face slot toggles hood up/down state
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if slot_name == "face" and player != null:
+			var face_item = player.equipped.get("face", null)
+			if face_item == "Hood":
+				if player.has_method("toggle_hood_state"):
+					player.toggle_hood_state()
+		return
+
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
 	if player == null: return
 	var held: Node         = player.hands[player.active_hand]

@@ -300,6 +300,7 @@ func _capture_equipped_state(player_node: Node2D) -> Dictionary:
 		"Undershirt": "res://clothing/undershirt.tscn", "Pickaxe": "res://objects/pickaxe.tscn",
 		"Sword": "res://objects/sword.tscn", "Dirk": "res://objects/dirk.tscn", "KingCloak": "res://clothing/king_cloak.tscn",
 		"ChainGloves": "res://clothing/chaingloves.tscn",
+		"Hood": "res://clothing/hood.tscn",
 	}
 	var equipped_state = {}
 	var eq = player_node.get("equipped")

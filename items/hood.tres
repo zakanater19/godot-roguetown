@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://item_data.gd" id="1_hood01"]
+
+[resource]
+script = ExtResource("1_hood01")
+item_type = "Hood"
+scene_path = "res://clothing/hood.tscn"
+sprite_col = -1
+description = "a cloth hood, can be pulled up or down"
+slot = "face"
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true

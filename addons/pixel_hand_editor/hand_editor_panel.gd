@@ -28,11 +28,12 @@ const CLOTHING_ITEMS: Dictionary = {
 	"Blackshirt":      "res://clothing/blackshirt.png",
 	"Undershirt":      "res://clothing/undershirt.png",
 	"Merchantrobe":    "res://clothing/merchantrobe.png",
-	"Plate": "res://clothing/plate.png",
-	"Satchel": "res://clothing/satchelonmob.png",
-	"KingCloak": "res://clothing/king_cloak_onmob.png",
-	"Crown": "res://clothing/crownonmob.png",
-	"ChainGloves": "res://clothing/chainglovesonmob.png",
+	"Plate":           "res://clothing/plate.png",
+	"Satchel":         "res://clothing/satchelonmob.png",
+	"KingCloak":       "res://clothing/king_cloak_onmob.png",
+	"Crown":           "res://clothing/crownonmob.png",
+	"ChainGloves":     "res://clothing/chainglovesonmob.png",
+	"Hood":            "res://clothing/hoodonmob.png",
 }
 
 const DEFAULT_RIGHT: Dictionary = {

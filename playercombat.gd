@@ -105,11 +105,11 @@ func die_visuals() -> void:
 	if sprite != null:
 		sprite.rotation_degrees = 90.0
 
-	for slot in["HelmetSprite", "ChestSprite", "TrousersSprite", "BootsSprite", "ClothingSprite", "WaistSprite", "GlovesSprite"]:
+	for slot in ["HelmetSprite", "FaceSprite", "ChestSprite", "TrousersSprite", "BootsSprite", "ClothingSprite", "WaistSprite", "GlovesSprite"]:
 		var s: Sprite2D = player.get_node_or_null(slot)
 		if s != null:
 			s.rotation_degrees = 90.0
-			if slot == "HelmetSprite":
+			if slot == "HelmetSprite" or slot == "FaceSprite":
 				s.position = Vector2(0, -10)
 
 	if player._dead_container != null:

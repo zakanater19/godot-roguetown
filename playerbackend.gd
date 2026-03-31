@@ -15,8 +15,21 @@ func _init(p_player: Node2D) -> void:
 # Description / Inspection
 # ===========================================================================
 
+func is_disguised() -> bool:
+	if player.equipped.get("face") == "Hood":
+		var face_data = player.equipped_data.get("face", null)
+		if face_data is Dictionary and face_data.get("hood_up", false):
+			return true
+	return false
+
 func get_description() -> String:
+	var peer_id: int = player.get_multiplayer_authority()
+	var is_me: bool  = (player.multiplayer.get_unique_id() == peer_id)
+	
 	var desc: String = player.character_name
+	if not is_me and is_disguised():
+		desc = "You cannot see their face"
+		
 	if player.dead:
 		desc += " (dead)"
 	elif player.sleep_state != player.SleepState.AWAKE:
@@ -29,6 +42,11 @@ func get_detailed_description() -> String:
 
 	var title_col: String = get_inspect_color().to_html(false)
 	var name_str = player.character_name
+	
+	if not is_me and is_disguised():
+		name_str = "You cannot see their face"
+		title_col = "888888"
+
 	if is_me:
 		name_str += " (You)"
 
@@ -39,8 +57,9 @@ func get_detailed_description() -> String:
 	elif player.sleep_state != player.SleepState.AWAKE:
 		desc += " (sleeping)"
 		
-	if player.character_class == "bandit":
-		desc += "\n[color=purple][b][font_size=24]BANDIT!!![/font_size][/b][/color]"
+	if not (not is_me and is_disguised()):
+		if player.character_class == "bandit":
+			desc += "\n[color=purple][b][font_size=24]BANDIT!!![/font_size][/b][/color]"
 
 	if player.hands[0] != null:
 		var rhand_name = player.hands[0].get("item_type")
@@ -53,7 +72,7 @@ func get_detailed_description() -> String:
 			lhand_name = player.hands[1].name.get_slice("@", 0)
 		desc += "\n[color=gray]left hand:[/color] " + lhand_name
 
-	var slots_order: Array[String] =["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
+	var slots_order: Array[String] =["head", "face", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
 	for slot in slots_order:
 		var item = player.equipped.get(slot, null)
 		if item != null and item is String and item != "":
@@ -133,16 +152,21 @@ func inspect_at(world_pos: Vector2) -> void:
 			var detailed_desc = best_npc.get_detailed_description() if best_npc.has_method("get_detailed_description") else ""
 			
 			if best_npc.is_in_group("player") and best_npc != player:
-				var outsiders =["adventurer", "bandit"]
-				if best_npc.character_class == "king":
-					detailed_desc += "\n[color=#88ccaa]I know them as the king.[/color]"
-				elif not (player.character_class in outsiders):
-					if best_npc.character_class in outsiders:
-						detailed_desc += "\n[color=#88ccaa]I know them as an outsider.[/color]"
+				var is_npc_disguised = false
+				if best_npc.get("backend") != null and best_npc.backend.has_method("is_disguised"):
+					is_npc_disguised = best_npc.backend.is_disguised()
+				
+				if not is_npc_disguised:
+					var outsiders =["adventurer", "bandit"]
+					if best_npc.character_class == "king":
+						detailed_desc += "\n[color=#88ccaa]I know them as the king.[/color]"
+					elif not (player.character_class in outsiders):
+						if best_npc.character_class in outsiders:
+							detailed_desc += "\n[color=#88ccaa]I know them as an outsider.[/color]"
+						else:
+							detailed_desc += "\n[color=#88ccaa]I know them as a " + best_npc.character_class + ".[/color]"
 					else:
-						detailed_desc += "\n[color=#88ccaa]I know them as a " + best_npc.character_class + ".[/color]"
-				else:
-					detailed_desc += "\n[color=#88ccaa]I don't recognize them.[/color]"
+						detailed_desc += "\n[color=#88ccaa]I don't recognize them.[/color]"
 			
 			show_inspect_text(short_desc, detailed_desc)
 		return
@@ -208,6 +232,7 @@ func apply_class_defaults() -> void:
 	
 	player.equipped = {
 		"head":     null,
+		"face":     null,
 		"cloak":    null,
 		"armor":    null,
 		"backpack": null,
@@ -222,6 +247,7 @@ func apply_class_defaults() -> void:
 	
 	player.equipped_data = {
 		"head":     null,
+		"face":     null,
 		"cloak":    null,
 		"armor":    null,
 		"backpack": null,

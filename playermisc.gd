@@ -120,12 +120,14 @@ func open_target_inventory(target: Node) -> void:
 	equip_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(equip_lbl)
 
-	var equip_slots := [["head", "Head"], 
+	var equip_slots := [
+		["head", "Head"],
+		["face", "Face"],
 		["cloak", "Cloak"],["armor", "Chest"],
 		["backpack", "Backpack"],
 		["gloves", "Gloves"],["waist", "Waist"],["clothing", "Clothing"],
-		["trousers", "Trousers"], 
-		["feet", "Feet"], 
+		["trousers", "Trousers"],
+		["feet", "Feet"],
 		["pocket_l", "L. Pocket"],
 		["pocket_r", "R. Pocket"]
 	]
@@ -197,7 +199,7 @@ func refresh_loot_panel() -> void:
 			btn.icon     = null
 			btn.disabled = true
 
-	var equip_slots :=["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
+	var equip_slots := ["head", "face", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
 	for es in equip_slots:
 		var sk: String = "equip_" + es
 		if not loot_slot_controls.has(sk):

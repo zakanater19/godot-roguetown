@@ -59,6 +59,36 @@
 			"scale": 1.2
 		}
 	},
+	"ChainGloves": {
+		"east": {
+			"offset": [
+				0.0,
+				0.0
+			],
+			"scale": 1.0
+		},
+		"north": {
+			"offset": [
+				0.0,
+				0.0
+			],
+			"scale": 1.0
+		},
+		"south": {
+			"offset": [
+				0.0,
+				0.0
+			],
+			"scale": 1.0
+		},
+		"west": {
+			"offset": [
+				0.0,
+				0.0
+			],
+			"scale": 1.0
+		}
+	},
 	"Crown": {
 		"east": {
 			"offset": [
@@ -85,6 +115,36 @@
 			"offset": [
 				1.0,
 				-32.0
+			],
+			"scale": 0.4
+		}
+	},
+	"Hood": {
+		"east": {
+			"offset": [
+				-1.0,
+				-24.0
+			],
+			"scale": 0.4
+		},
+		"north": {
+			"offset": [
+				-1.0,
+				-26.0
+			],
+			"scale": 0.4
+		},
+		"south": {
+			"offset": [
+				-1.0,
+				-25.0
+			],
+			"scale": 0.4
+		},
+		"west": {
+			"offset": [
+				1.0,
+				-23.0
 			],
 			"scale": 0.4
 		}

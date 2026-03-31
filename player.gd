@@ -24,6 +24,7 @@ const CLOTHING_TEXTURES: Dictionary = {
 	"KingCloak":      "res://clothing/king_cloak_onmob.png",
 	"Crown":          "res://clothing/crownonmob.png",
 	"ChainGloves":    "res://clothing/chainglovesonmob.png",
+	"Hood":           "res://clothing/hoodonmob.png",
 	"Pickaxe":        "res://objects/objects.png",
 	"Sword":          "res://objects/objects.png",
 	"Dirk":           "res://objects/dirk.png"
@@ -114,8 +115,8 @@ var hands:        Array[Node] =[null, null]
 var active_hand:  int         = 0
 var _is_throwing: bool        = false
 
-var equipped: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
-var equipped_data: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
+var equipped: Dictionary = {"head": null, "face": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
+var equipped_data: Dictionary = {"head": null, "face": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
 
 var throwing_mode:     bool    = false
 var _throw_label:      Label   = null
@@ -248,6 +249,47 @@ func _sync_combat_stance(stance: String) -> void:
 	else:
 		if sender_id == 1:
 			if combat: combat.set_combat_stance_local(stance)
+
+# ── Hood toggle ───────────────────────────────────────────────────────────────
+
+func toggle_hood_state() -> void:
+	if not _is_local_authority(): return
+	if equipped.get("face") != "Hood": return
+	var data = equipped_data.get("face", null)
+	if not data is Dictionary: data = {}
+	var hood_up: bool = not data.get("hood_up", false)
+	data["hood_up"] = hood_up
+	equipped_data["face"] = data
+	_update_clothing_sprites()
+	if _hud != null:
+		_hud.update_clothing_display(equipped, equipped_data)
+	if multiplayer.has_multiplayer_peer():
+		if multiplayer.is_server():
+			rpc("_sync_hood_state", hood_up)
+		else:
+			rpc_id(1, "_sync_hood_state", hood_up)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _sync_hood_state(hood_up: bool) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	if multiplayer.is_server():
+		if sender_id == get_multiplayer_authority():
+			var data = equipped_data.get("face", null)
+			if not data is Dictionary: data = {}
+			data["hood_up"] = hood_up
+			equipped_data["face"] = data
+			_update_clothing_sprites()
+			rpc("_sync_hood_state", hood_up)
+	else:
+		if sender_id == 1:
+			var data = equipped_data.get("face", null)
+			if not data is Dictionary: data = {}
+			data["hood_up"] = hood_up
+			equipped_data["face"] = data
+			_update_clothing_sprites()
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 func toggle_sleep() -> void:
 	if not _is_local_authority() or dead: return
@@ -497,7 +539,7 @@ func sync_hands(hand_names: Array) -> void:
 	_update_hands_ui()
 
 func _setup_clothing_sprites() -> void:
-	var layers = [["TrousersSprite", 1],["ClothingSprite", 2],["ChestSprite", 3],["GlovesSprite", 4],["BackpackSprite", 4],["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["CloakSprite", 7]
+	var layers = [["TrousersSprite", 1],["ClothingSprite", 2],["ChestSprite", 3],["GlovesSprite", 4],["BackpackSprite", 4],["WaistSprite", 5],["BootsSprite", 5],["HelmetSprite", 6],["FaceSprite", 6],["CloakSprite", 7]
 	]
 	for spec in layers:
 		var s := Sprite2D.new()
@@ -560,6 +602,29 @@ func _update_clothing_sprites() -> void:
 			sprite.rotation_degrees = target_rot
 			sprite.visible          = true
 		else: sprite.visible = false
+
+	# ── Face slot / Hood sprite ───────────────────────────────────────────────
+	var face_sprite: Sprite2D = get_node_or_null("FaceSprite")
+	if face_sprite != null:
+		var face_item = equipped.get("face", null)
+		if face_item == "Hood":
+			var face_data = equipped_data.get("face", null)
+			var hood_up: bool = false
+			if face_data is Dictionary:
+				hood_up = face_data.get("hood_up", false)
+			if hood_up and CLOTHING_TEXTURES.has("Hood"):
+				face_sprite.texture = load(CLOTHING_TEXTURES["Hood"])
+				var cd = backend.get_clothing_transform("Hood", facing_name)
+				if target_rot == 90.0: face_sprite.position = Vector2(0, -10)
+				else: face_sprite.position = cd.offset
+				face_sprite.scale            = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
+				face_sprite.region_rect      = Rect2(facing * 32, 0, 32, 32)
+				face_sprite.rotation_degrees = target_rot
+				face_sprite.visible          = true
+			else:
+				face_sprite.visible = false
+		else:
+			face_sprite.visible = false
 
 	_update_water_submerge()
 
