@@ -31,6 +31,11 @@ func _ready() -> void:
 	await get_tree().process_frame
 	Lighting.rebuild_roof_map()
 
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		# Flag the map as fully loaded for latejoin to handle safely
+		if has_node("/root/LateJoin"):
+			get_node("/root/LateJoin").map_loaded = true
+
 func shake_tile(tile_pos: Vector2i, z_level: int = 3) -> void:
 	var tile_origin := Vector2(tile_pos.x * World.TILE_SIZE, tile_pos.y * World.TILE_SIZE)
 	var shaker := Node2D.new()

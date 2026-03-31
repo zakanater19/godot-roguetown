@@ -262,7 +262,7 @@ func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: Strin
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main != null:
 		break_wall(pos, z_level, main, rock_name)
-		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, 0, Vector2i(9, 0))
+		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, z_level, 0, Vector2i(9, 0))
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	var tm = world.get_tilemap(z_level)

@@ -617,7 +617,7 @@ func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos
 	if tm != null:
 		tm.set_cell(tile_pos, source_id, atlas_coords)
 		if world.has_node("/root/LateJoin"):
-			world.get_node("/root/LateJoin").register_tile_change(tile_pos, source_id, atlas_coords)
+			world.get_node("/root/LateJoin").register_tile_change(tile_pos, z_level, source_id, atlas_coords)
 
 func handle_rpc_request_satchel_insert(sender_id: int, satchel_path: NodePath, hand_idx: int) -> void:
 	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return

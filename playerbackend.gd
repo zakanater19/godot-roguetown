@@ -1,4 +1,3 @@
-
 # res://playerbackend.gd
 extends RefCounted
 
@@ -54,7 +53,7 @@ func get_detailed_description() -> String:
 			lhand_name = player.hands[1].name.get_slice("@", 0)
 		desc += "\n[color=gray]left hand:[/color] " + lhand_name
 
-	var slots_order: Array[String] =["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet"]
+	var slots_order: Array[String] =["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
 	for slot in slots_order:
 		var item = player.equipped.get(slot, null)
 		if item != null and item is String and item != "":
@@ -134,7 +133,7 @@ func inspect_at(world_pos: Vector2) -> void:
 			var detailed_desc = best_npc.get_detailed_description() if best_npc.has_method("get_detailed_description") else ""
 			
 			if best_npc.is_in_group("player") and best_npc != player:
-				var outsiders = ["adventurer", "bandit"]
+				var outsiders =["adventurer", "bandit"]
 				if best_npc.character_class == "king":
 					detailed_desc += "\n[color=#88ccaa]I know them as the king.[/color]"
 				elif not (player.character_class in outsiders):
@@ -217,6 +216,8 @@ func apply_class_defaults() -> void:
 		"clothing": null,
 		"trousers": null,
 		"feet":     null,
+		"pocket_l": null,
+		"pocket_r": null
 	}
 	
 	player.equipped_data = {
@@ -229,6 +230,8 @@ func apply_class_defaults() -> void:
 		"clothing": null,
 		"trousers": null,
 		"feet":     null,
+		"pocket_l": null,
+		"pocket_r": null
 	}
 	
 	for slot in class_data["equipment"]:
@@ -236,7 +239,7 @@ func apply_class_defaults() -> void:
 		
 	player._update_clothing_sprites()
 	if player._is_local_authority() and player._hud != null:
-		player._hud.update_clothing_display(player.equipped)
+		player._hud.update_clothing_display(player.equipped, player.equipped_data)
 
 # ===========================================================================
 # Stamina Logic
@@ -354,8 +357,16 @@ func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:
 	if item_name == null: item_name = item.name.get_slice("@", 0)
 	player.equipped[slot_name] = item_name
 	
+	var data_to_save = {}
 	if "contents" in item:
-		player.equipped_data[slot_name] = {"contents": item.get("contents").duplicate(true)}
+		data_to_save["contents"] = item.get("contents").duplicate(true)
+	if "amount" in item:
+		data_to_save["amount"] = item.get("amount")
+	if "metal_type" in item:
+		data_to_save["metal_type"] = item.get("metal_type")
+		
+	if not data_to_save.is_empty():
+		player.equipped_data[slot_name] = data_to_save
 	else:
 		player.equipped_data[slot_name] = null
 		
@@ -366,7 +377,7 @@ func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:
 		player._update_hands_ui()
 		apply_action_cooldown(null)
 		if player._hud != null:
-			player._hud.update_clothing_display(player.equipped)
+			player._hud.update_clothing_display(player.equipped, player.equipped_data)
 
 	player._update_clothing_sprites()
 
@@ -400,8 +411,14 @@ func perform_unequip(slot_name: String, new_node_name: String, hand_index: int) 
 	item.set("z_level", player.z_level)
 	
 	if player.equipped_data.get(slot_name) != null:
-		if "contents" in player.equipped_data[slot_name] and "contents" in item:
-			item.set("contents", player.equipped_data[slot_name]["contents"].duplicate(true))
+		var data = player.equipped_data[slot_name]
+		if "contents" in data and "contents" in item:
+			item.set("contents", data["contents"].duplicate(true))
+		if "amount" in data and "amount" in item:
+			item.set("amount", data["amount"])
+		if "metal_type" in data and "metal_type" in item:
+			item.set("metal_type", data["metal_type"])
+
 	player.equipped_data[slot_name] = null
 	
 	player.get_parent().add_child(item)
@@ -415,7 +432,7 @@ func perform_unequip(slot_name: String, new_node_name: String, hand_index: int) 
 	if player._is_local_authority():
 		player._update_hands_ui()
 		if player._hud != null:
-			player._hud.update_clothing_display(player.equipped)
+			player._hud.update_clothing_display(player.equipped, player.equipped_data)
 
 	player._update_clothing_sprites()
 

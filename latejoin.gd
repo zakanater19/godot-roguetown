@@ -9,7 +9,7 @@ const SYNC_INTERVAL: float = 1.0  # How often to check for state changes
 
 # --- STATE TRACKING ---
 var _world_state: Dictionary = {
-	"tiles": {},      # Vector2i -> {source_id, atlas_coords}
+	"tiles": {},      # String (x_y_z) -> {tile_pos, z_level, source_id, atlas_coords}
 	"objects": {},    # NodePath -> {type, position, state, ...}
 	"players": {},    # peer_id -> {position, health, equipment, ...}
 }
@@ -18,6 +18,11 @@ var _pending_joins: Array[int] =[]  # peer_ids waiting for world state
 var _state_dirty: bool = false
 var _sync_timer: float = 0.0
 
+# Client-side connection safety guards
+var client_connected: bool = false
+var map_loaded: bool = false
+var sync_requested: bool = false
+
 # Store all disconnected players with their full state
 var _disconnected_players: Dictionary = {}  # peer_id -> {node_path, state, timestamp}
 
@@ -25,8 +30,19 @@ func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	
+	multiplayer.connected_to_server.connect(_on_connected_to_server)
+	multiplayer.server_disconnected.connect(_on_server_disconnected)
+	
 	if not multiplayer.is_server():
 		print("LateJoin: Client mode - Press F5 to manually attempt reconnection")
+
+func _on_connected_to_server() -> void:
+	client_connected = true
+
+func _on_server_disconnected() -> void:
+	client_connected = false
+	map_loaded = false
+	sync_requested = false
 
 func _process(delta: float) -> void:
 	if multiplayer.multiplayer_peer == null:
@@ -34,6 +50,12 @@ func _process(delta: float) -> void:
 
 	if not multiplayer.is_server() and Input.is_key_pressed(KEY_F5):
 		_attempt_manual_reconnection()
+		
+	# Safely poll for sync only when both ENet and the Map are truly ready
+	if not multiplayer.is_server():
+		if client_connected and map_loaded and not sync_requested:
+			sync_requested = true
+			_send_sync_request_deferred()
 	
 	_sync_timer += delta
 	if _sync_timer >= SYNC_INTERVAL:
@@ -42,8 +64,17 @@ func _process(delta: float) -> void:
 			_broadcast_state_updates()
 			_state_dirty = false
 
-func register_tile_change(tile_pos: Vector2i, source_id: int, atlas_coords: Vector2i) -> void:
-	_world_state["tiles"][tile_pos] = {
+func _send_sync_request_deferred() -> void:
+	# Give ENet an extra 0.2s to fully map peer ID 1 in Godot's RPC system
+	await get_tree().create_timer(0.2).timeout
+	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		request_sync.rpc_id(1)
+
+func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	var key = str(tile_pos.x) + "_" + str(tile_pos.y) + "_" + str(z_level)
+	_world_state["tiles"][key] = {
+		"tile_pos": tile_pos,
+		"z_level": z_level,
 		"source_id": source_id,
 		"atlas_coords": atlas_coords
 	}
@@ -64,13 +95,22 @@ func update_player_state(peer_id: int, player_data: Dictionary) -> void:
 func _on_peer_connected(id: int) -> void:
 	if not multiplayer.is_server():
 		return
-	
-	print("LateJoin: Peer connected - ", id)
-	_pending_joins.append(id)
-	_send_world_state_to_peer(id)
-	
-	if _handle_reconnection(id):
+	print("LateJoin: Peer connected - ", id, " (waiting for client sync request)")
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_sync() -> void:
+	if not multiplayer.is_server():
 		return
+	var peer_id = multiplayer.get_remote_sender_id()
+	if peer_id == 0: peer_id = multiplayer.get_unique_id()
+	
+	print("LateJoin: Peer requested sync - ", peer_id)
+	
+	if not _pending_joins.has(peer_id):
+		_pending_joins.append(peer_id)
+		
+	_send_world_state_to_peer(peer_id)
+	_handle_reconnection(peer_id)
 
 func _send_world_state_to_peer(peer_id: int) -> void:
 	var tile_changes = _world_state["tiles"]
@@ -454,58 +494,86 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 func _reassign_player_node(player_node: Node, new_peer_id: int) -> void:
 	Host.peers[new_peer_id] = player_node
 	rpc_update_player_authority.rpc(player_node.get_path(), new_peer_id)
-	rpc_id(new_peer_id, "reconnection_confirmed", player_node.get_path())
+	reconnection_confirmed.rpc_id(new_peer_id, player_node.get_path())
 
 func _attempt_manual_reconnection() -> void:
 	if multiplayer.is_server(): return
 	var enet = ENetMultiplayerPeer.new()
-	var err = enet.create_client("127.0.0.1", Host.PORT)
+	var err = enet.create_client("127.0.0.1", Host.PORT, 3)
 	if err == OK: multiplayer.multiplayer_peer = enet
 
 @rpc("authority", "call_local", "reliable")
 func rpc_update_player_authority(player_path: NodePath, new_peer_id: int) -> void:
+	_retry_update_authority(player_path, new_peer_id, 20)
+
+func _retry_update_authority(player_path: NodePath, new_peer_id: int, retries: int) -> void:
 	var player = get_node_or_null(player_path)
 	if player != null:
 		player.set_multiplayer_authority(new_peer_id)
 		if player.has_method("_on_authority_changed"): player.call("_on_authority_changed")
+	elif retries > 0:
+		await get_tree().create_timer(0.1).timeout
+		_retry_update_authority(player_path, new_peer_id, retries - 1)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_set_disconnect_indicator(player_path: NodePath, show: bool) -> void:
+	_retry_set_disconnect_indicator(player_path, show, 20)
+
+func _retry_set_disconnect_indicator(player_path: NodePath, show: bool, retries: int) -> void:
 	var player = get_node_or_null(player_path)
-	if not player: return
-	var existing = player.get_node_or_null("DisconnectIndicator")
-	if existing: existing.queue_free()
-	if show:
-		var indicator = Node2D.new(); indicator.name = "DisconnectIndicator"
-		indicator.position = Vector2(0, -50); player.add_child(indicator)
-		var label = Label.new(); label.text = " ?! "
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_color_override("font_color", Color.YELLOW)
-		label.add_theme_color_override("font_outline_color", Color.BLACK)
-		label.add_theme_constant_override("outline_size", 3)
-		indicator.add_child(label)
-		var tween = indicator.create_tween().set_loops(20)
-		tween.tween_property(label, "modulate:a", 0.3, 0.5)
-		tween.tween_property(label, "modulate:a", 1.0, 0.5)
+	if player != null:
+		var existing = player.get_node_or_null("DisconnectIndicator")
+		if existing: existing.queue_free()
+		if show:
+			var indicator = Node2D.new(); indicator.name = "DisconnectIndicator"
+			indicator.position = Vector2(0, -50); player.add_child(indicator)
+			var label = Label.new(); label.text = " ?! "
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.add_theme_color_override("font_color", Color.YELLOW)
+			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_constant_override("outline_size", 3)
+			indicator.add_child(label)
+			var tween = indicator.create_tween().set_loops(20)
+			tween.tween_property(label, "modulate:a", 0.3, 0.5)
+			tween.tween_property(label, "modulate:a", 1.0, 0.5)
+	elif retries > 0:
+		await get_tree().create_timer(0.1).timeout
+		_retry_set_disconnect_indicator(player_path, show, retries - 1)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_tile_changes(tile_changes: Dictionary) -> void:
-	if World.tilemap == null: return
-	for tile_pos in tile_changes:
-		var change = tile_changes[tile_pos]
-		World.tilemap.set_cell(Vector2i(tile_pos.x, tile_pos.y), change["source_id"], change["atlas_coords"])
+	for key in tile_changes:
+		var change = tile_changes[key]
+		var z_level = change.get("z_level", 3)
+		var tm = World.get_tilemap(z_level)
+		if tm != null:
+			tm.set_cell(change["tile_pos"], change["source_id"], change["atlas_coords"])
 
 @rpc("authority", "call_remote", "reliable") 
 func receive_object_states(object_states: Dictionary) -> void:
+	_retry_receive_object_states(object_states, 20)
+
+func _retry_receive_object_states(object_states: Dictionary, retries: int) -> void:
+	var missing = {}
 	for obj_path in object_states:
 		var obj_data = object_states[obj_path]
 		var obj = get_node_or_null(obj_path)
 		if obj != null:
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
 			if obj_data.has("amount") and "amount" in obj: obj.set("amount", obj_data["amount"])
+		else:
+			missing[obj_path] = obj_data
+
+	if not missing.is_empty() and retries > 0:
+		await get_tree().create_timer(0.1).timeout
+		_retry_receive_object_states(missing, retries - 1)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_player_states(player_states: Dictionary) -> void:
+	_retry_receive_player_states(player_states, 20)
+
+func _retry_receive_player_states(player_states: Dictionary, retries: int) -> void:
+	var missing = {}
 	for peer_id in player_states:
 		var p_data = player_states[peer_id]
 		var node = _find_player_by_peer(peer_id) as Node2D
@@ -532,6 +600,12 @@ func receive_player_states(player_states: Dictionary) -> void:
 				if node.has_method("_update_water_submerge"): node.call("_update_water_submerge")
 			if node.has_method("_update_hands_ui"): node.call("_update_hands_ui")
 			if node.get("_hud") != null: node.get("_hud").update_stats(node.get("health"), node.get("stamina"))
+		else:
+			missing[peer_id] = p_data
+
+	if not missing.is_empty() and retries > 0:
+		await get_tree().create_timer(0.1).timeout
+		_retry_receive_player_states(missing, retries - 1)
 
 @rpc("authority", "call_remote", "reliable")
 func purge_missing_objects(valid_names: Array) -> void:
@@ -607,16 +681,28 @@ func receive_laws(laws: Array) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func reconnection_confirmed(player_path: NodePath) -> void:
+	_retry_reconnection_confirmed(player_path, 20)
+
+func _retry_reconnection_confirmed(player_path: NodePath, retries: int) -> void:
 	var player = get_node_or_null(player_path)
-	if player != null and player.has_method("_on_reconnection_confirmed"): player.call("_on_reconnection_confirmed")
+	if player != null and player.has_method("_on_reconnection_confirmed"):
+		player.call("_on_reconnection_confirmed")
+	elif retries > 0:
+		await get_tree().create_timer(0.1).timeout
+		_retry_reconnection_confirmed(player_path, retries - 1)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_reconnect_state(player_path: NodePath, player_state: Dictionary) -> void:
-	await get_tree().create_timer(0.1).timeout
+	_retry_receive_reconnect_state(player_path, player_state, 20)
+
+func _retry_receive_reconnect_state(player_path: NodePath, player_state: Dictionary, retries: int) -> void:
 	var node = get_node_or_null(player_path) as Node2D
 	if node != null:
 		_restore_player_state(node, player_state)
 		if node.get("is_lying_down") == true and node.has_method("toggle_lying_down"): node.call("toggle_lying_down")
+	elif retries > 0:
+		await get_tree().create_timer(0.1).timeout
+		_retry_receive_reconnect_state(player_path, player_state, retries - 1)
 
 func _find_player_by_peer(peer_id: int) -> Node:
 	for p in get_tree().get_nodes_in_group("player"):

@@ -7,7 +7,13 @@ const BOX:  int = 48
 const GAP:  int = 4
 const STEP: int = BOX + GAP   
 
-const SLOT_LAYOUT: Array =[["head",      1, 0],["cloak",     2, 0],["armor",     1, 1],["backpack",  2, 1],["gloves",    0, 2],["clothing",  1, 2],["trousers",  2, 2],["feet",      1, 3],["waist",     0, 3],
+const SLOT_LAYOUT: Array = [
+	["cloak",     0, 0],["head",      1, 0],
+	["backpack",  2, 0],["gloves",    0, 1],
+	["armor",     1, 1],["trousers",  2, 1],
+	["feet",      0, 2],["clothing",  1, 2],
+	["waist",     0, 3],["pocket_l",  1, 3],
+	["pocket_r",  2, 3],
 ]
 
 var _hud_tex:          Texture2D = null
@@ -16,6 +22,7 @@ var _clothing_panel:   Control   = null
 
 var _slot_boxes: Dictionary = {}
 var _slot_icons: Dictionary = {}
+var _slot_amt_labels: Dictionary = {} # new label for stack amounts in pockets/clothing
 
 var _hand_highlights:    Array =[]
 var _hand_icons:         Array =[]
@@ -95,7 +102,7 @@ func _build_clothing_panel(parent: Control) -> void:
 		var row:       int    = slot_data[2]
 		_create_slot_box(slot_name, col, row)
 
-	_create_toggle_box(2, 3)
+	_create_toggle_box(2, 2)
 
 func _create_slot_box(slot_name: String, col: int, row: int) -> void:
 	var ctrl := Control.new()
@@ -104,13 +111,16 @@ func _create_slot_box(slot_name: String, col: int, row: int) -> void:
 	ctrl.custom_minimum_size = Vector2(BOX, BOX)
 	ctrl.clip_contents       = true
 	ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
-	ctrl.visible             = true if slot_name == "waist" else _clothing_visible
+	ctrl.visible             = true if slot_name in["waist", "pocket_l", "pocket_r"] else _clothing_visible
 	_clothing_panel.add_child(ctrl)
 
 	_add_bg(ctrl)
 
 	var label_text := slot_name
 	if slot_name == "clothing": label_text = "clothing\n/torso"
+	elif slot_name == "pocket_l": label_text = "L. Pocket"
+	elif slot_name == "pocket_r": label_text = "R. Pocket"
+	
 	var lbl := Label.new()
 	lbl.text = label_text
 	lbl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75, 0.5))
@@ -127,9 +137,23 @@ func _create_slot_box(slot_name: String, col: int, row: int) -> void:
 	icon.scale    = Vector2(0.75, 0.75)
 	icon.visible  = false
 	ctrl.add_child(icon)
+	
+	var amt_lbl := Label.new()
+	amt_lbl.text = ""
+	amt_lbl.add_theme_color_override("font_color", Color.WHITE)
+	amt_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+	amt_lbl.add_theme_constant_override("outline_size", 3)
+	amt_lbl.add_theme_font_size_override("font_size", 10)
+	amt_lbl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	amt_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	amt_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM
+	amt_lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+	amt_lbl.visible              = false
+	ctrl.add_child(amt_lbl)
 
 	_slot_boxes[slot_name] = ctrl
 	_slot_icons[slot_name] = icon
+	_slot_amt_labels[slot_name] = amt_lbl
 	ctrl.gui_input.connect(func(event: InputEvent): _on_slot_gui_input(event, slot_name))
 
 func _create_toggle_box(col: int, row: int) -> void:
@@ -651,16 +675,16 @@ func update_hands_display(hands: Array, active_hand: int) -> void:
 				else: 
 					icon.visible = false
 					
-				# Removed logic that set amt_lbl.visible = true
 				if amt_lbl != null:
 					amt_lbl.visible = false
 			else: 
 				icon.visible = false
 				if amt_lbl != null: amt_lbl.visible = false
 
-func update_clothing_display(equipped: Dictionary) -> void:
+func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {}) -> void:
 	for slot_name in _slot_icons.keys():
 		var icon: Sprite2D = _slot_icons[slot_name]
+		var amt_lbl: Label = _slot_amt_labels[slot_name]
 		var item_name      = equipped.get(slot_name, null)
 		if item_name != null and ItemRegistry.HUD_TEXTURES.has(item_name):
 			var tex := load(ItemRegistry.HUD_TEXTURES[item_name]) as Texture2D
@@ -685,12 +709,28 @@ func update_clothing_display(equipped: Dictionary) -> void:
 									break
 				
 				if not region_set:
-					icon.region_rect = Rect2(0, 0, 32, 32)
+					icon.region_rect = Rect2(0, 0, tex.get_width(), tex.get_height())
+				
+				var w = icon.region_rect.size.x
+				var h = icon.region_rect.size.y
+				var max_dim = max(w, h)
+				if max_dim > 0:
+					var s = 32.0 / max_dim
+					icon.scale = Vector2(s, s)
+				else:
+					icon.scale = Vector2(1.0, 1.0)
 					
-				icon.scale          = Vector2(1.0, 1.0)
-				icon.visible        = true
+				icon.visible = true
+				
+				var data = equipped_data.get(slot_name)
+				if typeof(data) == TYPE_DICTIONARY and data.has("amount") and data["amount"] > 1:
+					amt_lbl.text = str(data["amount"])
+					amt_lbl.visible = true
+				else:
+					amt_lbl.visible = false
 				continue
 		icon.visible = false
+		amt_lbl.visible = false
 
 # ── Input handlers ────────────────────────────────────────────────────────────
 
@@ -840,8 +880,16 @@ func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
 		return
 
 	if held != null:
-		var item_slot = held.get("slot")
-		if item_slot == slot_name and currently_equipped == null: player._equip_clothing_to_slot(held, slot_name)
+		if slot_name in["pocket_l", "pocket_r"]:
+			if held.get("too_large_for_satchel") == true:
+				var item_label = held.get("item_type") if held.get("item_type") != null else held.name
+				Sidebar.add_message("[color=#ffaaaa]" + item_label + " is too large to fit in your pocket.[/color]")
+				return
+			if currently_equipped == null:
+				player._equip_clothing_to_slot(held, slot_name)
+		else:
+			var item_slot = held.get("slot")
+			if item_slot == slot_name and currently_equipped == null: player._equip_clothing_to_slot(held, slot_name)
 	elif held == null and currently_equipped != null: 
 		if player.body != null and player.body.is_arm_broken(player.active_hand):
 			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
@@ -852,7 +900,7 @@ func _on_toggle_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
 	_clothing_visible = not _clothing_visible
 	for slot_name in _slot_boxes.keys():
-		if slot_name != "waist":
+		if slot_name not in["waist", "pocket_l", "pocket_r"]:
 			_slot_boxes[slot_name].visible = _clothing_visible
 	if _clothing_visible:
 		if _toggle_bg    != null: _toggle_bg.visible    = true

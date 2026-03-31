@@ -265,7 +265,7 @@ func _on_chat_submitted(text: String) -> void:
 		
 	if multiplayer.is_server():
 		rpc_send_lobby_chat(text)
-	else:
+	elif multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
 		rpc_send_lobby_chat.rpc_id(1, text)
 
 @rpc("any_peer", "call_local", "reliable")
@@ -374,14 +374,18 @@ func _on_subclass_chosen(subclass: String) -> void:
 func _send_ready_request(is_ready: bool, p_name: String, p_class: String) -> void:
 	if multiplayer.is_server():
 		request_set_ready(is_ready, p_name, p_class)
-	else:
+	elif multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
 		request_set_ready.rpc_id(1, is_ready, p_name, p_class)
+	else:
+		_show_error("Connecting to server... Please try again in a moment.")
 
 func _send_latejoin_request(p_name: String, p_class: String) -> void:
 	if multiplayer.is_server():
 		request_latejoin(p_name, p_class)
-	else:
+	elif multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
 		request_latejoin.rpc_id(1, p_name, p_class)
+	else:
+		_show_error("Connecting to server... Please try again in a moment.")
 
 func _get_validation_error(p_name: String) -> String:
 	if p_name.length() > 30:

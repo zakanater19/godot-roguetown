@@ -52,27 +52,27 @@ func open_target_inventory(target: Node) -> void:
 	loot_slot_controls.clear()
 
 	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2(220, 240)
+	panel.custom_minimum_size = Vector2(230, 240)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.offset_left   = -110
-	panel.offset_right  = 110
-	panel.offset_top    = -150
-	panel.offset_bottom = 150
+	panel.offset_left   = -115
+	panel.offset_right  = 115
+	panel.offset_top    = -200 # Shifted higher to avoid overlapping the hotbar
+	panel.offset_bottom = 160
 	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
 	loot_panel = panel
 	player._ui_root.add_child(panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.offset_left   = 6
-	vbox.offset_right  = -6
-	vbox.offset_top    = 6
-	vbox.offset_bottom = -6
-	vbox.add_theme_constant_override("separation", 4)
-	panel.add_child(vbox)
+	var main_vbox := VBoxContainer.new()
+	main_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	main_vbox.offset_left   = 6
+	main_vbox.offset_right  = -6
+	main_vbox.offset_top    = 6
+	main_vbox.offset_bottom = -6
+	main_vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(main_vbox)
 
 	var title_row := HBoxContainer.new()
-	vbox.add_child(title_row)
+	main_vbox.add_child(title_row)
 
 	var target_peer: int = target.get_multiplayer_authority()
 	var target_name: String = target.character_name if "character_name" in target else "Player " + str(target_peer)
@@ -89,7 +89,16 @@ func open_target_inventory(target: Node) -> void:
 	close_btn.pressed.connect(close_target_inventory)
 	title_row.add_child(close_btn)
 
-	vbox.add_child(HSeparator.new())
+	main_vbox.add_child(HSeparator.new())
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_vbox.add_child(scroll)
+	
+	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 4)
+	scroll.add_child(vbox)
 
 	var hands_lbl := Label.new()
 	hands_lbl.text = "Hands"
@@ -111,7 +120,15 @@ func open_target_inventory(target: Node) -> void:
 	equip_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(equip_lbl)
 
-	var equip_slots :=[["head", "Head"], ["cloak", "Cloak"], ["armor", "Chest"],["backpack", "Backpack"], ["gloves", "Gloves"], ["waist", "Waist"],["clothing", "Clothing"],["trousers", "Trousers"], ["feet", "Feet"]]
+	var equip_slots := [["head", "Head"], 
+		["cloak", "Cloak"],["armor", "Chest"],
+		["backpack", "Backpack"],
+		["gloves", "Gloves"],["waist", "Waist"],["clothing", "Clothing"],
+		["trousers", "Trousers"], 
+		["feet", "Feet"], 
+		["pocket_l", "L. Pocket"],
+		["pocket_r", "R. Pocket"]
+	]
 	for es in equip_slots:
 		var slot_key: String = "equip_" + es[0]
 		var row := _build_slot_row(vbox, es[1], slot_key)
@@ -133,7 +150,7 @@ func _build_slot_row(parent: Control, label_text: String, slot_key: String) -> D
 	var btn := Button.new()
 	btn.text                  = "empty"
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.custom_minimum_size.y = 32
+	btn.custom_minimum_size.y = 26 # Reduced to compress the list size
 	btn.add_theme_font_size_override("font_size", 10)
 	btn.icon_alignment        = HORIZONTAL_ALIGNMENT_CENTER
 	btn.expand_icon           = true
@@ -180,7 +197,7 @@ func refresh_loot_panel() -> void:
 			btn.icon     = null
 			btn.disabled = true
 
-	var equip_slots :=["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet"]
+	var equip_slots :=["head", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
 	for es in equip_slots:
 		var sk: String = "equip_" + es
 		if not loot_slot_controls.has(sk):
@@ -272,7 +289,7 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 		World.rpc_notify_loot_warning.rpc_id(1, target_path, my_peer_id, item_desc)
 
 func _update_loot_attempts(delta: float) -> void:
-	var completed_keys: Array =[]
+	var completed_keys: Array = []
 	var cancelled_keys: Array =[]
 
 	for attempt in active_loot_attempts:

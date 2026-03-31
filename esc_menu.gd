@@ -65,11 +65,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_quit_pressed() -> void:
 	visible = false
 	
-	# 1. Close Networking
-	if multiplayer.multiplayer_peer != null:
-		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
-			multiplayer.multiplayer_peer.close()
-		multiplayer.multiplayer_peer = null
+	# 1. Close Networking cleanly by invoking the Godot destructor
+	# This avoids the "peer->close()" bug which skips the disconnect notification
+	multiplayer.multiplayer_peer = null
 		
 	# 2. Clean up Host state
 	Host.peers.clear()
@@ -88,6 +86,9 @@ func _on_quit_pressed() -> void:
 	LateJoin._pending_joins.clear()
 	LateJoin._disconnected_players.clear()
 	LateJoin._state_dirty = false
+	LateJoin.client_connected = false
+	LateJoin.map_loaded = false
+	LateJoin.sync_requested = false
 	
 	# 5. Clean up Sidebar state
 	Sidebar._messages.clear()

@@ -114,8 +114,8 @@ var hands:        Array[Node] =[null, null]
 var active_hand:  int         = 0
 var _is_throwing: bool        = false
 
-var equipped: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null}
-var equipped_data: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null}
+var equipped: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
+var equipped_data: Dictionary = {"head": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
 
 var throwing_mode:     bool    = false
 var _throw_label:      Label   = null
@@ -652,7 +652,7 @@ func _build_ui() -> void:
 	_hud.set_script(load("res://HUD.gd"))
 	add_child(_hud)
 	_hud.setup(self)
-	_hud.update_clothing_display(equipped)
+	_hud.update_clothing_display(equipped, equipped_data)
 	_hud.update_combat_display(combat_mode)
 	_hud.update_stance_display(combat_stance)
 
@@ -1126,7 +1126,7 @@ func _on_reconnection_confirmed() -> void:
 	_update_sprite()
 	_update_clothing_sprites()
 	_update_hands_ui()
-	if _is_local_authority() and _hud != null: _hud.update_clothing_display(equipped)
+	if _is_local_authority() and _hud != null: _hud.update_clothing_display(equipped, equipped_data)
 	if dead: _die_visuals()
 	elif sleep_state != SleepState.AWAKE: _set_lying_down_visuals(true)
 	if _is_local_authority(): Sidebar.add_message("[color=#aaffaa]You have reconnected to your body![/color]")

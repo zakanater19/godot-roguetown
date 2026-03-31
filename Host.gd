@@ -23,7 +23,8 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 	if bind_ip != "" and bind_ip != "*":
 		enet.set_bind_ip(bind_ip)
 
-	var err: int = enet.create_server(PORT, max_clients)
+	# Explicitly enforce 3 channels to prevent Godot 4 default routing bugs
+	var err: int = enet.create_server(PORT, max_clients, 3)
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
 		print("Host: server listening on %s:%d with max players %d" % [bind_ip, PORT, max_clients])
@@ -39,7 +40,9 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 
 func start_client_custom(ip: String, port: int) -> void:
 	var enet := ENetMultiplayerPeer.new()
-	var err: int = enet.create_client(ip, port)
+	
+	# Explicitly enforce 3 channels to prevent Godot 4 default routing bugs
+	var err: int = enet.create_client(ip, port, 3)
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
 		print("Host: joined as client to %s:%d" % [ip, port])
@@ -110,9 +113,13 @@ func _normalize_ip(ip: String) -> String:
 	return normalized
 
 
-func _is_loopback_ip(ip: String) -> bool:
+func _is_local_ip(ip: String) -> bool:
 	var normalized := _normalize_ip(ip)
-	return normalized == "::1" or normalized.begins_with("127.")
+	return normalized == "::1" or \
+		   normalized.begins_with("127.") or \
+		   normalized.begins_with("192.168.") or \
+		   normalized.begins_with("10.") or \
+		   normalized.begins_with("172.")
 
 
 func _get_peer_ip(peer_id: int) -> String:
@@ -144,9 +151,9 @@ func _assign_session_id(peer_id: int) -> void:
 		_disconnect_peer(peer_id)
 		return
 
-	var is_local := _is_loopback_ip(ip)
+	var is_local := _is_local_ip(ip)
 
-	# Non-loopback peers are limited to one active client per public IP.
+	# Non-local peers are limited to one active client per public IP.
 	if not is_local and _ip_sessions.has(ip):
 		var session: Dictionary = _ip_sessions[ip]
 
@@ -195,11 +202,7 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 
 	var player: Node2D = player_scene.instantiate()
 
-	# Ensures completely unique names for players upon respawning, which fixes the
-	# MultiplayerSpawner collision errors. The client reads to_int() up to the first
-	# non-digit and accurately finds their peer ID logic anyway (e.g.
-	# Player_1_248434 to_int() returns 1)
-	player.name = "Player_%d_%d" % [peer_id, Time.get_ticks_usec()]
+	player.name = "Player_%d_%d" %[peer_id, Time.get_ticks_usec()]
 	player.set_multiplayer_authority(peer_id)
 	player.character_name = p_name
 	player.character_class = p_class
@@ -207,10 +210,10 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 	var preferred_spawns: Array[String] = []
 
 	if is_latejoin:
-		if p_class in ["swordsman", "miner", "adventurer"]:
+		if p_class in["swordsman", "miner", "adventurer"]:
 			preferred_spawns = [p_class, "adventurer", "latejoin"]
 		elif p_class == "bandit":
-			preferred_spawns = ["antag latejoin", "bandit", "latejoin"]
+			preferred_spawns =["antag latejoin", "bandit", "latejoin"]
 		else:
 			preferred_spawns = ["latejoin", p_class]
 	else:
@@ -220,7 +223,7 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 			preferred_spawns = [p_class, "latejoin"]
 
 	var spawners = get_tree().get_nodes_in_group("spawners")
-	var valid_spawners = []
+	var valid_spawners =[]
 
 	for pref in preferred_spawns:
 		for spawner in spawners:
