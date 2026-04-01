@@ -133,7 +133,8 @@ func update_water_submerge() -> void:
 	var stamina_penalty = 2.0 if player.exhausted else 1.0
 	var sprint_mult = (1.0 / 1.5) if player.is_sprinting else 1.0
 	var lying_mult = 3.0 if player.is_lying_down else 1.0
-	var sneak_mult = 2.0 if player.is_sneaking else 1.0
+	var sneak_level: int = player.skills.get("sneaking", 0)
+	var sneak_mult = max(1.0, 2.0 - sneak_level * 0.25) if player.is_sneaking else 1.0
 	if player.grabbed_by != null and is_instance_valid(player.grabbed_by):
 		stamina_penalty = 1.0
 		lying_mult = 1.0

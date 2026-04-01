@@ -427,6 +427,18 @@ func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount
 	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, source_z, blocked, is_shove, targeted_limb, block_type)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	var requester = utils.find_player_by_peer(sender_id)
+	if requester == null: return
+	rpc_broadcast_sneak_reveal.rpc(character_name, source_tile, source_z)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_broadcast_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
+	utils.handle_rpc_broadcast_sneak_reveal(character_name, source_tile, source_z)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_notify_loot_warning(target_path: NodePath, looter_peer_id: int, item_desc: String) -> void:
 	objects.handle_rpc_notify_loot_warning(target_path, looter_peer_id, item_desc)
 

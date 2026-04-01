@@ -86,6 +86,7 @@ var skills: Dictionary = {"sword_fighting": 0, "blacksmithing": 0, "sneaking": 0
 var is_sneaking: bool = false
 var sneak_alpha: float = 1.0
 var _last_synced_sneak_alpha: float = 1.0
+var _sneak_was_hidden: bool = false
 var prices_shown: bool = false
 var stats: Dictionary = {"strength": 10, "agility": 10}
 var health: int = 100
@@ -211,6 +212,7 @@ func _set_sneak_mode_local(val: bool) -> void:
 	is_sneaking = val
 	if not is_sneaking:
 		sneak_alpha = 1.0
+		_sneak_was_hidden = false
 		_apply_sneak_alpha(1.0)
 		if multiplayer.has_multiplayer_peer() and _is_local_authority():
 			_rpc_sync_sneak_alpha.rpc(1.0)
@@ -923,25 +925,44 @@ func _process_sneak_alpha(delta: float) -> void:
 	# ambient sight glow doesn't prevent them from going invisible in the dark.
 	var tile_light: float = Lighting.get_tile_world_light(tile_pos)
 
-	# Threshold: at full day need to be in genuine shadow (<0.5 light);
-	# at night the sun contributes nothing so use a fixed floor so any
-	# unlit area (ambient-only ≈ 0.04) still qualifies.
-	var dark_threshold: float = max(0.15, Lighting.sun_weight * 0.5)
-
 	var sneak_level: int = skills.get("sneaking", 0)
-	# Slow fade OUT into darkness; snap instantly back to visible when exposed.
-	var fade_speed: float = 0.05 + sneak_level * 0.09
 
-	if tile_light >= dark_threshold:
-		# Exposed to light — snap visible immediately
+	# Threshold scales purely with skill: level 0 is exposed by the faintest light,
+	# level 5 requires roughly half of full daylight brightness to be revealed.
+	var dark_threshold: float = 0.10 + sneak_level * 0.08
+
+	# Slow fade OUT into darkness; snap instantly back to visible when exposed.
+	# Level 0: ~0.3/sec (≈3s to invisible). Each level speeds it up.
+	var fade_speed: float = 0.3 + sneak_level * 0.15
+
+	# Proximity reveal: nearby players expose the sneaker.
+	# Level 0 = 5-tile radius; each level reduces by 2. Minimum is always 1
+	# so bumping into someone (same or adjacent tile) always reveals you.
+	var reveal_radius: int = max(1, 5 - sneak_level * 2)
+	var proximity_revealed: bool = false
+	if reveal_radius > 0:
+		for p in get_tree().get_nodes_in_group("player"):
+			if p == self or p.get("dead") == true: continue
+			if p.get("z_level") != z_level: continue
+			var dist: int = (p.get("tile_pos") - tile_pos).abs().x + (p.get("tile_pos") - tile_pos).abs().y
+			if dist <= reveal_radius:
+				proximity_revealed = true
+				break
+
+	if tile_light >= dark_threshold or proximity_revealed:
+		# Exposed — snap visible immediately
 		if sneak_alpha < 1.0:
 			sneak_alpha = 1.0
 			_apply_sneak_alpha(1.0)
 			_last_synced_sneak_alpha = 1.0
 			if multiplayer.has_multiplayer_peer():
 				_rpc_sync_sneak_alpha.rpc(1.0)
+		# Fire "revealed!" notification on first frame of exposure after being hidden
+		if _sneak_was_hidden:
+			_sneak_was_hidden = false
+			_broadcast_sneak_revealed()
 	else:
-		# Dark enough — fade slowly toward invisible
+		# Dark enough and no one nearby — fade slowly toward invisible
 		var new_alpha := move_toward(sneak_alpha, 0.0, fade_speed * delta)
 		if abs(new_alpha - sneak_alpha) > 0.001:
 			sneak_alpha = new_alpha
@@ -950,6 +971,18 @@ func _process_sneak_alpha(delta: float) -> void:
 				_last_synced_sneak_alpha = sneak_alpha
 				if multiplayer.has_multiplayer_peer():
 					_rpc_sync_sneak_alpha.rpc(sneak_alpha)
+		# Track when we are meaningfully hidden (alpha <= 0.5)
+		if sneak_alpha <= 0.5:
+			_sneak_was_hidden = true
+
+func _broadcast_sneak_revealed() -> void:
+	if not multiplayer.has_multiplayer_peer():
+		if has_node("/root/Sidebar"):
+			get_node("/root/Sidebar").add_message("[color=#ff4444][font_size=28]" + character_name + " is revealed!![/font_size][/color]")
+	elif multiplayer.is_server():
+		World.rpc_broadcast_sneak_reveal.rpc(character_name, tile_pos, z_level)
+	else:
+		World.rpc_request_sneak_reveal.rpc_id(1, character_name, tile_pos, z_level)
 
 func _on_chat_submitted(text: String) -> void:
 	_chat_input.visible = false; _chat_input.clear(); _chat_input.release_focus()

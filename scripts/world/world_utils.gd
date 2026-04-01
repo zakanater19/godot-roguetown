@@ -180,6 +180,15 @@ func handle_rpc_update_laws(new_laws: Array) -> void:
 		var sidebar = world.get_node("/root/Sidebar")
 		if sidebar.has_method("refresh_laws_ui"): sidebar.refresh_laws_ui()
 
+func handle_rpc_broadcast_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
+	var local_player := get_local_player()
+	if local_player == null: return
+	if local_player.get("z_level") != source_z: return
+	var diff: Vector2i = local_player.get("tile_pos") - source_tile
+	if diff.length_squared() > 144: return
+	var Sidebar = world.get_node("/root/Sidebar") if world.has_node("/root/Sidebar") else null
+	if Sidebar: Sidebar.add_message("[color=#ff4444][font_size=28]" + character_name + " is revealed!![/font_size][/color]")
+
 func handle_rpc_send_chat(sender_id: int, message: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var sender := find_player_by_peer(sender_id)
