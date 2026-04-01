@@ -38,6 +38,7 @@ var _limb_highlights:       Dictionary = {}
 var _limb_broken_overlays:  Dictionary = {}
 
 var _stance_icon: TextureRect = null
+var _sneak_icon:  TextureRect = null
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,13 @@ func update_stance_display(stance: String) -> void:
 	var tex := load(tex_path) as Texture2D
 	if tex != null:
 		_stance_icon.texture = tex
+
+func update_sneak_display(sneaking: bool) -> void:
+	if _sneak_icon == null: return
+	var tex_path: String = "res://ui/sneakon.png" if sneaking else "res://ui/sneakoff.png"
+	var tex := load(tex_path) as Texture2D
+	if tex != null:
+		_sneak_icon.texture = tex
 
 func update_grab_display(is_grabbing: bool, is_grabbed: bool) -> void:
 	if _release_ctrl != null: _release_ctrl.visible = is_grabbing
@@ -330,6 +338,11 @@ func _on_stance_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if player != null and player.has_method("toggle_combat_stance"):
 			player.toggle_combat_stance()
+
+func _on_sneak_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if player != null and player.has_method("toggle_sneak_mode"):
+			player.toggle_sneak_mode()
 
 func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:

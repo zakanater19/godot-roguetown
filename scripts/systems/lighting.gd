@@ -42,6 +42,8 @@ class LightDrawNode extends Node2D:
 				draw_rect(Rect2(tile.x * 64, tile.y * 64, 64, 64), Color(0, 0, 0, alpha))
 
 var _draw_node: LightDrawNode = null
+# Light cache excluding the local player's personal vision radius (used for sneak checks)
+var world_light_cache: Dictionary = {}
 
 func _ready() -> void:
 	# 1. Setup the heightmap image tracking opaque blocks on the CPU
@@ -63,6 +65,13 @@ func _ready() -> void:
 	_draw_node.position = Vector2.ZERO
 	_draw_node.z_index = 3998
 	add_child(_draw_node)
+
+func get_tile_light(tile: Vector2i) -> float:
+	if _draw_node == null: return 1.0
+	return _draw_node.light_cache.get(tile, 1.0)
+
+func get_tile_world_light(tile: Vector2i) -> float:
+	return world_light_cache.get(tile, 1.0)
 
 func register_lamp(lamp: Node) -> void:
 	if not active_lamps.has(lamp): active_lamps.append(lamp)
@@ -412,6 +421,11 @@ func _process(delta: float) -> void:
 				var final_light = clamp(ambient + combined_light, 0.0, 1.0)
 
 				new_cache[tile] = final_light
+
+				# World light: same but without personal player vision light
+				var world_combined = max(sunlight, lamplight)
+				new_cache[tile] = final_light
+				world_light_cache[tile] = clamp(ambient + world_combined, 0.0, 1.0)
 
 	# Submit to draw node
 	_draw_node.light_cache = new_cache

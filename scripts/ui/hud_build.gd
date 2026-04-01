@@ -34,6 +34,7 @@ func build_all(root: Control) -> void:
 	build_hand_boxes(root)
 	build_limb_panel(root)
 	build_stance_icon(root)
+	build_sneak_button(root)
 
 # ── Clothing panel ────────────────────────────────────────────────────────────
 
@@ -489,6 +490,36 @@ func build_stance_icon(parent: Control) -> void:
 	panel.add_child(hud._stance_icon)
 
 	panel.gui_input.connect(hud._on_stance_gui_input)
+
+# ── Sneak button (bottom-left of stance panel) ───────────────────────────────
+
+func build_sneak_button(parent: Control) -> void:
+	# Same size and style as the stance icon (64x64 with dark background),
+	# placed directly to the left of it, touching, no gap.
+	# Stance icon: offset_left=-524, offset_right=-460, offset_top=-80, offset_bottom=-16
+	const SNEAK_SIZE: int = 64
+	var panel := Control.new()
+	panel.anchor_left   = 0.5
+	panel.anchor_right  = 0.5
+	panel.anchor_top    = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_right  = -524
+	panel.offset_left   = -524 - SNEAK_SIZE
+	panel.offset_bottom = -16
+	panel.offset_top    = -16 - SNEAK_SIZE
+	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
+	parent.add_child(panel)
+
+	var sneak_off_tex := load("res://ui/sneakoff.png") as Texture2D
+	hud._sneak_icon = TextureRect.new()
+	hud._sneak_icon.texture      = sneak_off_tex
+	hud._sneak_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hud._sneak_icon.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	hud._sneak_icon.size         = Vector2(SNEAK_SIZE, SNEAK_SIZE)
+	hud._sneak_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(hud._sneak_icon)
+
+	panel.gui_input.connect(hud._on_sneak_gui_input)
 
 # ── Shared helper ─────────────────────────────────────────────────────────────
 

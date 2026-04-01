@@ -81,7 +81,11 @@ func _sync_exhausted(val: bool) -> void:
 	exhausted = val
 	_update_water_submerge() 
 
-var skills: Dictionary = {"sword_fighting": 0, "blacksmithing": 0}
+var skills: Dictionary = {"sword_fighting": 0, "blacksmithing": 0, "sneaking": 0}
+
+var is_sneaking: bool = false
+var sneak_alpha: float = 1.0
+var _last_synced_sneak_alpha: float = 1.0
 var prices_shown: bool = false
 var stats: Dictionary = {"strength": 10, "agility": 10}
 var health: int = 100
@@ -194,6 +198,48 @@ func _interact_held_object() -> void: if backend: backend.interact_held_object()
 func toggle_crafting_menu() -> void: if crafting: crafting.toggle_crafting_menu()
 func toggle_combat_mode() -> void: if combat: combat.toggle_combat_mode()
 func toggle_combat_stance() -> void: if combat: combat.toggle_combat_stance()
+
+func toggle_sneak_mode() -> void:
+	if not _is_local_authority(): return
+	var new_val := not is_sneaking
+	if multiplayer.has_multiplayer_peer():
+		_rpc_sync_sneak_mode.rpc(new_val)  # call_local applies it here too
+	else:
+		_set_sneak_mode_local(new_val)
+
+func _set_sneak_mode_local(val: bool) -> void:
+	is_sneaking = val
+	if not is_sneaking:
+		sneak_alpha = 1.0
+		_apply_sneak_alpha(1.0)
+		if multiplayer.has_multiplayer_peer() and _is_local_authority():
+			_rpc_sync_sneak_alpha.rpc(1.0)
+	_update_water_submerge()
+	if _hud != null and _is_local_authority():
+		_hud.update_sneak_display(is_sneaking)
+
+# Broadcasts sneak on/off to all peers (call_local so it runs here too)
+@rpc("authority", "call_local", "reliable")
+func _rpc_sync_sneak_mode(val: bool) -> void:
+	_set_sneak_mode_local(val)
+
+# Broadcasts sneak alpha to all remote peers only (we apply locally ourselves)
+@rpc("authority", "call_remote", "reliable")
+func _rpc_sync_sneak_alpha(alpha: float) -> void:
+	sneak_alpha = alpha
+	_apply_sneak_alpha(alpha)
+
+func _apply_sneak_alpha(alpha: float) -> void:
+	var all_sprites: Array[String] = [
+		"Sprite2D", "TrousersSprite", "ClothingSprite", "ChestSprite",
+		"GlovesSprite", "BackpackSprite", "WaistSprite", "BootsSprite",
+		"HelmetSprite", "FaceSprite", "CloakSprite"
+	]
+	for sname in all_sprites:
+		var s: Node = get_node_or_null(sname)
+		if s != null:
+			s.self_modulate = Color(1.0, 1.0, 1.0, alpha)
+
 func show_loot_warning(looter_peer_id: int, item_desc: String) -> void: if misc: misc.show_loot_warning(looter_peer_id, item_desc)
 func get_strength_damage_modifier() -> float: return combat.get_strength_damage_modifier() if combat else 0.0
 func _get_weapon_damage(item: Node) -> int: return combat.get_weapon_damage(item) if combat else 5
@@ -615,6 +661,10 @@ func _process(delta: float) -> void:
 			get_parent().add_child(drip)
 
 	if is_local and _hud: _hud.update_stats(health, stamina)
+
+	# Sneak invisibility processing (local authority only)
+	if is_local and is_sneaking and not dead:
+		_process_sneak_alpha(delta)
 	
 	if is_possessed:
 		if misc: misc.update(delta)
@@ -867,6 +917,39 @@ func rpc_transfer_to_hand(from_idx: int, to_idx: int) -> void:
 		hands[to_idx]   = hands[from_idx]
 		hands[from_idx] = null
 		if _is_local_authority(): _update_hands_ui()
+
+func _process_sneak_alpha(delta: float) -> void:
+	# Use world light (excludes our own personal vision radius) so the player's
+	# ambient sight glow doesn't prevent them from going invisible in the dark.
+	var tile_light: float = Lighting.get_tile_world_light(tile_pos)
+
+	# Threshold: at full day need to be in genuine shadow (<0.5 light);
+	# at night the sun contributes nothing so use a fixed floor so any
+	# unlit area (ambient-only ≈ 0.04) still qualifies.
+	var dark_threshold: float = max(0.15, Lighting.sun_weight * 0.5)
+
+	var sneak_level: int = skills.get("sneaking", 0)
+	# Slow fade OUT into darkness; snap instantly back to visible when exposed.
+	var fade_speed: float = 0.05 + sneak_level * 0.09
+
+	if tile_light >= dark_threshold:
+		# Exposed to light — snap visible immediately
+		if sneak_alpha < 1.0:
+			sneak_alpha = 1.0
+			_apply_sneak_alpha(1.0)
+			_last_synced_sneak_alpha = 1.0
+			if multiplayer.has_multiplayer_peer():
+				_rpc_sync_sneak_alpha.rpc(1.0)
+	else:
+		# Dark enough — fade slowly toward invisible
+		var new_alpha := move_toward(sneak_alpha, 0.0, fade_speed * delta)
+		if abs(new_alpha - sneak_alpha) > 0.001:
+			sneak_alpha = new_alpha
+			_apply_sneak_alpha(sneak_alpha)
+			if abs(sneak_alpha - _last_synced_sneak_alpha) >= 0.04:
+				_last_synced_sneak_alpha = sneak_alpha
+				if multiplayer.has_multiplayer_peer():
+					_rpc_sync_sneak_alpha.rpc(sneak_alpha)
 
 func _on_chat_submitted(text: String) -> void:
 	_chat_input.visible = false; _chat_input.clear(); _chat_input.release_focus()

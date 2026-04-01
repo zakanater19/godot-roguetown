@@ -9,7 +9,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 0,
-			"blacksmithing": 0
+			"blacksmithing": 0,
+			"sneaking": 0
 		},
 		"equipment": {
 			"clothing": "Undershirt",
@@ -24,7 +25,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 1,
-			"blacksmithing": 0
+			"blacksmithing": 0,
+			"sneaking": 0
 		},
 		"prices_shown": true,
 		"equipment": {
@@ -41,7 +43,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 2,
-			"blacksmithing": 0
+			"blacksmithing": 0,
+			"sneaking": 2
 		},
 		"equipment": {
 			"clothing": "Blackshirt",
@@ -58,7 +61,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 0,
-			"blacksmithing": 0
+			"blacksmithing": 0,
+			"sneaking": 0
 		},
 		"equipment": {
 			"clothing": "Undershirt",
@@ -73,7 +77,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 3,
-			"blacksmithing": 0
+			"blacksmithing": 0,
+			"sneaking": 0
 		},
 		"equipment": {
 			"clothing": "Undershirt",
@@ -89,7 +94,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 1,
-			"blacksmithing": 2
+			"blacksmithing": 2,
+			"sneaking": 0
 		},
 		"equipment": {
 			"clothing": "Undershirt",
@@ -105,7 +111,8 @@ const DATA: Dictionary = {
 		},
 		"skills": {
 			"sword_fighting": 2,
-			"blacksmithing": 0
+			"blacksmithing": 0,
+			"sneaking": 0
 		},
 		"equipment": {
 			"clothing": "Apothshirt",

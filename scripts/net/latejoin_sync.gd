@@ -43,7 +43,9 @@ func send_world_state_to_peer(peer_id: int) -> void:
 			"hands":        hand_names,
 			"equipped":     equipped_data,
 			"equipped_data": eq_data_state,
-			"is_lying_down": node.get("is_lying_down") == true
+			"is_lying_down": node.get("is_lying_down") == true,
+			"is_sneaking":  node.get("is_sneaking") == true,
+			"sneak_alpha":  node.get("sneak_alpha") if "sneak_alpha" in node else 1.0
 		}
 
 	if not player_states.is_empty():
@@ -169,6 +171,12 @@ func _retry_receive_player_states(player_states: Dictionary, retries: int) -> vo
 			if p_data.has("is_lying_down"):
 				node.set("is_lying_down", p_data["is_lying_down"])
 				if node.has_method("_update_sprite"):          node.call("_update_sprite")
+				if node.has_method("_update_water_submerge"):  node.call("_update_water_submerge")
+			if p_data.has("is_sneaking"):
+				node.set("is_sneaking", p_data["is_sneaking"])
+				var alpha: float = p_data.get("sneak_alpha", 1.0)
+				node.set("sneak_alpha", alpha)
+				if node.has_method("_apply_sneak_alpha"):      node.call("_apply_sneak_alpha", alpha)
 				if node.has_method("_update_water_submerge"):  node.call("_update_water_submerge")
 			if node.has_method("_update_hands_ui"): node.call("_update_hands_ui")
 			if node.get("_hud") != null: node.get("_hud").update_stats(node.get("health"), node.get("stamina"))

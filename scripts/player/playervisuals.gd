@@ -133,11 +133,12 @@ func update_water_submerge() -> void:
 	var stamina_penalty = 2.0 if player.exhausted else 1.0
 	var sprint_mult = (1.0 / 1.5) if player.is_sprinting else 1.0
 	var lying_mult = 3.0 if player.is_lying_down else 1.0
+	var sneak_mult = 2.0 if player.is_sneaking else 1.0
 	if player.grabbed_by != null and is_instance_valid(player.grabbed_by):
 		stamina_penalty = 1.0
 		lying_mult = 1.0
-	if on_water: player.current_move_duration = (player.MOVE_TIME * 2.0 * stamina_penalty) * sprint_mult * lying_mult
-	else: player.current_move_duration = (player.MOVE_TIME * stamina_penalty) * sprint_mult * lying_mult
+	if on_water: player.current_move_duration = (player.MOVE_TIME * 2.0 * stamina_penalty) * sprint_mult * lying_mult * sneak_mult
+	else: player.current_move_duration = (player.MOVE_TIME * stamina_penalty) * sprint_mult * lying_mult * sneak_mult
 	var h            := CLIP_H if on_water else FULL_H
 	var compensate_y := (FULL_H - h) / 2.0
 	var sprite: Sprite2D = player.get_node_or_null("Sprite2D")
