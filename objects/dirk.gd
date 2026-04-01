@@ -3,7 +3,7 @@ extends Area2D
 
 const TILE_SIZE: int = 64
 var item_type: String = "Dirk"
-var tool_type: String = "sword"
+var tool_type: String = "stabbing"
 
 var weaponizable: bool = true
 var force: int = 30

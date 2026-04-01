@@ -423,8 +423,8 @@ func rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vecto
 	utils.handle_rpc_broadcast_chat(sender_peer_id, message, sender_tile, sender_z)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "", block_type: String = "") -> void:
-	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, source_z, blocked, is_shove, targeted_limb, block_type)
+func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "", block_type: String = "", weapon_type: String = "") -> void:
+	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, source_z, blocked, is_shove, targeted_limb, block_type, weapon_type)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:

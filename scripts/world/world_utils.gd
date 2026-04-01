@@ -212,7 +212,7 @@ func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile
 		var formatted_chat = "[color=#e0e0e0][b]" + sender_node.get("character_name") + "[/b] says, \"" + message + "\"[/color]"
 		local_player._show_inspect_text(formatted_chat, "")
 
-func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool, is_shove: bool, targeted_limb: String, block_type: String) -> void:
+func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String, _amount: int, source_tile: Vector2i, source_z: int, blocked: bool, is_shove: bool, targeted_limb: String, block_type: String, weapon_type: String = "") -> void:
 	var local_player := get_local_player()
 	if local_player == null: return
 	if local_player.get("z_level") != source_z: return
@@ -232,10 +232,16 @@ func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String,
 		"l_arm": limb_str = "left arm"
 		"r_leg": limb_str = "right leg"
 		"l_leg": limb_str = "left leg"
+	var verb: String
+	match weapon_type:
+		"slashing": verb = "slashed"
+		"stabbing": verb = "stabbed"
+		"pickaxe":  verb = "impaled"
+		_:          verb = "hit"
 	var log_text = ""
 	if is_shove: log_text = "[color=#ffcc00][font_size=14]" + disp_attacker + " shoved " + disp_target + "![/font_size][/color]"
 	elif blocked: log_text = "[color=#aaaaaa][font_size=14]" + disp_target + " " + ("parried" if block_type == "parried" else "dodged") + " " + disp_attacker + "'s attack![/font_size][/color]"
 	else:
-		if limb_str != "": log_text = "[color=#ff4444][font_size=14]" + disp_attacker + " hit " + disp_target + " in the " + limb_str + " for " + str(amount) + " damage[/font_size][/color]"
-		else: log_text = "[color=#ff4444][font_size=14]" + disp_attacker + " hit " + disp_target + " for " + str(amount) + " damage[/font_size][/color]"
+		if limb_str != "": log_text = "[color=#ff4444][font_size=14]" + disp_attacker + " " + verb + " " + disp_target + " in the " + limb_str + "[/font_size][/color]"
+		else: log_text = "[color=#ff4444][font_size=14]" + disp_attacker + " " + verb + " " + disp_target + "[/font_size][/color]"
 	Sidebar.add_message(log_text)

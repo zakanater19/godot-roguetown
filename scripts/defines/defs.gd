@@ -1,6 +1,6 @@
 # res://scripts/defines/defs.gd
 # Central definitions file. All magic strings live here as named constants.
-# Reference via Defs.GROUP_PICKABLE, Defs.SLOT_HEAD, Defs.TOOL_SWORD, etc.
+# Reference via Defs.GROUP_PICKABLE, Defs.SLOT_HEAD, Defs.TOOL_SLASHING, etc.
 class_name Defs
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,8 @@ const SLOT_WAIST    = "waist"
 # ---------------------------------------------------------------------------
 # Tool types — matches ItemData.tool_type values
 # ---------------------------------------------------------------------------
-const TOOL_SWORD   = "sword"
+const TOOL_SLASHING = "slashing"
+const TOOL_STABBING = "stabbing"
 const TOOL_PICKAXE = "pickaxe"
 
 # ---------------------------------------------------------------------------

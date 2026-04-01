@@ -242,7 +242,8 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 			t_name = entity.name.get_slice("@", 0)
 			if roll.damage > 0: entity.receive_damage(roll.damage)
 		else: continue
-		world.rpc_broadcast_damage_log.rpc(attacker.get("character_name"), t_name, roll.damage, attacker.get("tile_pos"), attacker.get("z_level"), roll.blocked, false, "", roll.get("block_type", ""))
+		var w_type: String = held_item.get("tool_type") if held_item != null else ""
+		world.rpc_broadcast_damage_log.rpc(attacker.get("character_name"), t_name, roll.damage, attacker.get("tile_pos"), attacker.get("z_level"), roll.blocked, false, targeted_limb, roll.get("block_type", ""), w_type)
 
 func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String) -> void:
 	if not world.multiplayer.is_server(): return

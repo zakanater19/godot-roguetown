@@ -112,11 +112,13 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var held_item    = player.hands[player.active_hand]
 	var is_pickaxe:  bool = false
 	var is_sword:    bool = false
+	var is_slashing: bool = false
 	var is_clothing: bool = false
 
 	if held_item != null:
 		var t_type = held_item.get("tool_type")
-		is_sword    = (t_type == Defs.TOOL_SWORD)
+		is_slashing = (t_type == Defs.TOOL_SLASHING)
+		is_sword    = (is_slashing or t_type == Defs.TOOL_STABBING)
 		is_pickaxe  = (t_type == Defs.TOOL_PICKAXE)
 		is_clothing = held_item.get("slot") != null and held_item.get("slot") != ""
 
@@ -131,7 +133,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	else:
 		if is_sword:
 			can_attack = true
-			can_chop   = true
+			can_chop   = is_slashing
 			can_break  = true
 		elif is_pickaxe:
 			can_mine = true
