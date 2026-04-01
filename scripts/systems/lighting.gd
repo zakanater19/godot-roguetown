@@ -258,19 +258,20 @@ func _process(delta: float) -> void:
 
 	# Gather active lamps and categorize them by Z-level
 	var valid_lamps: Array[Node] =[]
-	var same_z_lamps: PackedVector2Array = PackedVector2Array()
+	var same_z_lamps: Array[Dictionary] = []
 	var other_z_lamps: Array[Dictionary] =[]
 
 	for lamp in active_lamps:
 		if is_instance_valid(lamp):
 			valid_lamps.append(lamp)
 			if lamp.is_on and local_player != null:
+				var li: float = lamp.get("light_intensity") if lamp.get("light_intensity") != null else 1.0
 				if lamp.z_level == current_z:
 					if same_z_lamps.size() < 30:
-						same_z_lamps.append(lamp.global_position)
+						same_z_lamps.append({"pos": lamp.global_position, "intensity": li})
 				else:
 					if other_z_lamps.size() < 15:
-						other_z_lamps.append({"pos": lamp.global_position, "z": lamp.z_level})
+						other_z_lamps.append({"pos": lamp.global_position, "z": lamp.z_level, "intensity": li})
 	active_lamps = valid_lamps
 
 	# --- TILE GRID CPU LIGHTING ---
@@ -319,7 +320,8 @@ func _process(delta: float) -> void:
 									valid_holes_for_lamps.append({
 										"op_px": check_px,
 										"lamp_pos": l_info.pos,
-										"d_lamp": d_lamp
+										"d_lamp": d_lamp,
+										"intensity": l_info.intensity
 									})
 
 		for dy in range(-view_radius_y, view_radius_y + 1):
@@ -394,11 +396,11 @@ func _process(delta: float) -> void:
 
 				# Lamp light distance calculation (Same Z)
 				var lamplight = 0.0
-				for l_pos in same_z_lamps:
-					var d = global_px.distance_to(l_pos)
+				for l_data in same_z_lamps:
+					var d = global_px.distance_to(l_data.pos)
 					if d < 450.0:
-						if not _is_line_blocked(l_pos, global_px, current_z):
-							var intensity = 1.0 - smoothstep(150.0, 450.0, d)
+						if not _is_line_blocked(l_data.pos, global_px, current_z):
+							var intensity = (1.0 - smoothstep(150.0, 450.0, d)) * l_data.intensity
 							lamplight = max(lamplight, intensity)
 
 				# Lamp light filtering up/down from transit holes (Other Z-levels)
@@ -407,7 +409,7 @@ func _process(delta: float) -> void:
 					var total_d = hole_info.d_lamp + d_hole
 					if total_d < 450.0:
 						if not _is_line_blocked(hole_info.op_px, global_px, current_z):
-							var intensity = 1.0 - smoothstep(150.0, 450.0, total_d)
+							var intensity = (1.0 - smoothstep(150.0, 450.0, total_d)) * hole_info.intensity
 							lamplight = max(lamplight, intensity)
 
 				# Personal player light

@@ -10,6 +10,7 @@ var too_large_for_satchel: bool = false
 var slot: String = ""
 
 var is_on: bool = false
+var light_intensity: float = 1.0
 @export var z_level: int = 3
 
 func get_description() -> String:

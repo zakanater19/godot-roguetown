@@ -3,9 +3,10 @@
 extends Area2D
 
 const TILE_SIZE:   int   = 64
-const SMELT_TIME:  float = 4.0
+const SMELT_TIME:  float = 20.0
 
 var is_on:         bool  = false
+var light_intensity: float = 0.7
 var _coal_count:   int   = 0
 var _ironore_count: int  = 0
 var _fuel_type:    String = "" 
@@ -37,6 +38,7 @@ func _exit_tree() -> void:
 		return
 	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	World.unregister_solid(tile_pos, z_level, self)
+	Lighting.unregister_lamp(self)
 
 func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
 	if Engine.is_editor_hint():
@@ -171,3 +173,7 @@ func _finish_smelting(generated_names: Array) -> void:
 func _set_sprite(on: bool) -> void:
 	var sprite: Sprite2D = get_node_or_null("Sprite2D")
 	if sprite != null: sprite.region_rect = Rect2(512 if on else 448, 0, 64, 64)
+	if on:
+		Lighting.register_lamp(self)
+	else:
+		Lighting.unregister_lamp(self)
