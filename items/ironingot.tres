@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://item_data.gd" id="1_iing01"]
+[ext_resource type="Script" path="res://scripts/defines/item_data.gd" id="1_iing01"]
 
 [resource]
 script = ExtResource("1_iing01")
@@ -14,3 +14,4 @@ use_delay = 0.3
 weaponizable = false
 too_large_for_satchel = false
 pickable = true
+hud_texture_path = "res://objects/objects.png"

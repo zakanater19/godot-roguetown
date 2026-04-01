@@ -1,0 +1,45 @@
+[gd_scene load_steps=4 format=3 uid="uid://ct8x4xkroppgp"]
+
+[ext_resource type="Script" uid="uid://j1mq7seklwom" path="res://scripts/core/player.gd" id="1_onrkg"]
+[ext_resource type="Texture2D" uid="uid://3j4yymcxpsi8" path="res://assets/player.png" id="2_i3pqv"]
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_onrkg"]
+properties/0/path = NodePath(".:tile_pos")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:health")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:facing")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:dead")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:position")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+properties/5/path = NodePath(".:stamina")
+properties/5/spawn = true
+properties/5/replication_mode = 1
+properties/6/path = NodePath(".:character_name")
+properties/6/spawn = true
+properties/6/replication_mode = 1
+properties/7/path = NodePath(".:character_class")
+properties/7/spawn = true
+properties/7/replication_mode = 1
+properties/8/path = NodePath(".:z_level")
+properties/8/spawn = true
+properties/8/replication_mode = 1
+
+[node name="Player" type="Node2D"]
+script = ExtResource("1_onrkg")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(2, 2)
+texture = ExtResource("2_i3pqv")
+region_enabled = true
+region_rect = Rect2(0, 0, 32, 32)
+
+[node name="StateSync" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_onrkg")

@@ -11,23 +11,23 @@ config_version=5
 [application]
 
 config/name="roguetown ripoff"
-run/main_scene="res://main_menu.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://assets/icon.svg"
 
 [autoload]
 
-EscMenu="*res://esc_menu.gd"
+EscMenu="*res://scripts/ui/esc_menu.gd"
 ItemRegistry="*res://objects/item_registry.gd"
-World="*res://world.gd"
-Host="*res://Host.gd"
-Sidebar="*res://sidebar.gd"
-FOV="*res://FOV.gd"
-LateJoin="*res://latejoin.gd"
-Lobby="*res://lobby.gd"
-Trade="*res://trade.gd"
-ServerBrowser="*res://serverbrowser.gd"
-Lighting="*res://lighting.gd"
+World="*res://scripts/core/world.gd"
+Host="*res://scripts/net/Host.gd"
+Sidebar="*res://scripts/ui/sidebar.gd"
+FOV="*res://scripts/systems/FOV.gd"
+LateJoin="*res://scripts/net/latejoin.gd"
+Lobby="*res://scripts/net/lobby.gd"
+Trade="*res://scripts/ui/trade.gd"
+ServerBrowser="*res://scripts/net/serverbrowser.gd"
+Lighting="*res://scripts/systems/lighting.gd"
 
 [display]
 

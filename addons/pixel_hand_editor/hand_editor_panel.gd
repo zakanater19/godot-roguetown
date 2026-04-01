@@ -237,7 +237,7 @@ func _build_ui() -> void:
 
 	_canvas = Control.new()
 	_canvas.set_script(load("res://addons/pixel_hand_editor/hand_canvas.gd"))
-	_canvas.player_tex  = load("res://player.png")
+	_canvas.player_tex  = load("res://assets/player.png")
 	_canvas.objects_tex = load("res://objects/objects.png")
 	_canvas.offset_changed.connect(_on_canvas_offset_changed)
 	_canvas.clothing_offset_changed.connect(_on_canvas_clothing_offset_changed)
