@@ -131,6 +131,7 @@ func handle_rpc_drop_item_at(player_path: NodePath, item_path: NodePath, tile: V
 
 	var land_z = world.calculate_gravity_z(tile, player.z_level if player else obj.get("z_level"))
 	world.rpc_set_object_z_level.rpc(item_path, land_z)
+	obj.z_index = (land_z - 1) * 200 + 2
 
 	world.objects.drop_item_at(obj, tile, spread)
 	for child in obj.get_children():
@@ -174,7 +175,7 @@ func handle_rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int
 		if player and player._is_local_authority(): player._is_throwing = false
 
 		obj.set("z_level", land_z)
-		obj.z_index = (land_z - 1) * 200 + (obj.z_index % 200)
+		obj.z_index = (land_z - 1) * 200 + 2
 
 		for child in obj.get_children():
 			if child is CollisionShape2D: child.disabled = false
