@@ -33,6 +33,11 @@ extends Resource
 ## If true, this item counts as a weapon in combat checks.
 @export var weaponizable: bool = false
 
+## Tool category for action dispatch. Use Defs.TOOL_* constants.
+## "" = generic item, "sword" = blade weapon, "pickaxe" = mining tool.
+## Add new tool types in Defs.gd before referencing them here.
+@export var tool_type: String = ""
+
 ## If true, this item cannot be placed inside a satchel.
 @export var too_large_for_satchel: bool = false
 

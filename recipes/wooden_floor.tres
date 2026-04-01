@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="RecipeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defines/recipe_data.gd" id="1_recipe_wfloor"]
+
+[resource]
+script = ExtResource("1_recipe_wfloor")
+recipe_id = "wooden_floor"
+display_name = "Wooden Floor"
+req_item = "Log"
+req_amount = 1
+skill_requirements = {}
+result_type = "tile"
+result_tile_source = 0
+result_tile_coords = Vector2i(4, 0)

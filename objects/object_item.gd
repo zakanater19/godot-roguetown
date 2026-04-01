@@ -8,6 +8,7 @@ const TILE_SIZE: int = 64
 @export var z_level: int = 3
 
 var item_type: String = ""
+var tool_type: String = ""
 var slot: String = ""
 var weaponizable: bool = false
 var too_large_for_satchel: bool = false
@@ -25,6 +26,7 @@ func _ready() -> void:
 		push_error(name + ": item_data is not set — assign a .tres in the Inspector.")
 		return
 	item_type             = item_data.item_type
+	tool_type             = item_data.tool_type
 	slot                  = item_data.slot
 	weaponizable          = item_data.weaponizable
 	too_large_for_satchel = item_data.too_large_for_satchel

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="RecipeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defines/recipe_data.gd" id="1_recipe_pickaxe"]
+
+[resource]
+script = ExtResource("1_recipe_pickaxe")
+recipe_id = "pickaxe"
+display_name = "Pickaxe"
+req_item = "IronIngot"
+req_amount = 1
+skill_requirements = {"blacksmithing": 2}
+result_type = "item"
+result_scene_path = "res://objects/pickaxe.tscn"

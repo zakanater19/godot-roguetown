@@ -115,10 +115,10 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var is_clothing: bool = false
 
 	if held_item != null:
-		var i_type = held_item.get("item_type")
-		is_pickaxe = (i_type == "Pickaxe" or "Pickaxe" in held_item.name or "pickaxe" in held_item.name.to_lower())
-		is_sword = (i_type == "Sword" or "Sword" in held_item.name or "sword" in held_item.name.to_lower()) or (i_type == "Dirk" or "Dirk" in held_item.name or "dirk" in held_item.name.to_lower())
-		is_clothing = held_item.get("slot") != null
+		var t_type = held_item.get("tool_type")
+		is_sword    = (t_type == Defs.TOOL_SWORD)
+		is_pickaxe  = (t_type == Defs.TOOL_PICKAXE)
+		is_clothing = held_item.get("slot") != null and held_item.get("slot") != ""
 
 	var can_attack: bool = false
 	var can_mine:   bool = false
@@ -126,7 +126,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var can_break:  bool = false
 
 	if held_item == null:
-		if player.intent == "harm":
+		if player.intent == Defs.INTENT_HARM:
 			can_attack = true
 	else:
 		if is_sword:
@@ -135,10 +135,10 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			can_break  = true
 		elif is_pickaxe:
 			can_mine = true
-			if player.intent == "harm":
+			if player.intent == Defs.INTENT_HARM:
 				can_attack = true
 		else:
-			if player.intent == "harm" and not is_clothing:
+			if player.intent == Defs.INTENT_HARM and not is_clothing:
 				can_attack = true
 
 	var source_id = tm.get_cell_source_id(target_tile)
@@ -157,19 +157,19 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			is_attack_action = true
 
 	if not target_found:
-		for obj in player.get_tree().get_nodes_in_group("door"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_DOOR):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if held_item == null:
 					target_found = true
 					is_exerting = false
-				elif is_sword or (is_pickaxe and player.intent == "harm"):
+				elif is_sword or (is_pickaxe and player.intent == Defs.INTENT_HARM):
 					target_found = true
 					is_exerting = true
 				break
 
 	if not target_found and can_chop:
-		for obj in player.get_tree().get_nodes_in_group("choppable_object"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_CHOPPABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				target_found = true
@@ -177,7 +177,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				break
 
 	if not target_found and can_break:
-		for obj in player.get_tree().get_nodes_in_group("breakable_object"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_BREAKABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				target_found = true
@@ -185,7 +185,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				break
 
 	if not target_found and can_mine:
-		for obj in player.get_tree().get_nodes_in_group("minable_object"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_MINABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				target_found = true
@@ -230,7 +230,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	if acted:
 		return
 
-	for obj in player.get_tree().get_nodes_in_group("door"):
+	for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_DOOR):
 		if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 		if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 			if player.multiplayer.is_server():
@@ -240,7 +240,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			return
 
 	if can_chop:
-		for obj in player.get_tree().get_nodes_in_group("choppable_object"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_CHOPPABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if player.multiplayer.is_server():
@@ -250,7 +250,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				return
 
 	if can_break:
-		for obj in player.get_tree().get_nodes_in_group("breakable_object"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_BREAKABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if player.multiplayer.is_server():
@@ -260,7 +260,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				return
 
 	if can_mine or (is_sword and is_wooden_wall):
-		for obj in player.get_tree().get_nodes_in_group("minable_object"):
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_MINABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 			if Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE)) == target_tile:
 				if player.multiplayer.is_server():

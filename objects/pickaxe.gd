@@ -3,6 +3,7 @@ extends Area2D
 
 const TILE_SIZE: int = 64
 var item_type: String = "Pickaxe"
+var tool_type: String = "pickaxe"
 
 var force: int = 25
 var too_large_for_satchel: bool = true

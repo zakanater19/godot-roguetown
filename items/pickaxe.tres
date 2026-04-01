@@ -12,6 +12,7 @@ slot = "waist"
 base_damage = 25
 use_delay = 0.6
 weaponizable = false
+tool_type = "pickaxe"
 too_large_for_satchel = true
 pickable = true
 hud_texture_path = "res://objects/objects.png"
