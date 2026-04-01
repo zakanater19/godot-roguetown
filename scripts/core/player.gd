@@ -16,6 +16,7 @@ var combat = null
 var crafting = null
 var body = null
 var visuals = null
+var sleep_ = null
 
 var is_possessed: bool = true
 
@@ -24,6 +25,7 @@ var sleep_state: SleepState = SleepState.AWAKE
 var sleep_timer: float = 0.0
 var health_regen_accumulator: float = 0.0
 var _sleep_blackout: ColorRect = null
+@warning_ignore("unused_private_class_variable")
 var _sleeping_on_bed: bool = false
 
 @export var character_name: String = "noob"
@@ -64,6 +66,7 @@ var _awaiting_move_confirm: bool = false
 var is_sprinting: bool = false
 var is_lying_down: bool = false
 var _stand_up_timer: float = -1.0
+@warning_ignore("unused_private_class_variable")
 var _stand_up_label: Label = null
 
 var exhausted: bool = false :
@@ -272,38 +275,9 @@ func _sync_hood_state(hood_up: bool) -> void:
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-func toggle_sleep() -> void:
-	if not _is_local_authority() or dead: return
-	if sleep_state == SleepState.AWAKE:
-		if combat_mode: toggle_combat_mode()
-		if is_lying_down: toggle_lying_down()
-		sleep_state = SleepState.FALLING_ASLEEP
-		sleep_timer = 10.0
-		Sidebar.add_message("[color=#aaccff]You start falling asleep...[/color]")
-		_sync_sleep_state_update(sleep_state)
-	elif sleep_state == SleepState.FALLING_ASLEEP:
-		sleep_state = SleepState.AWAKE
-		sleep_timer = 0.0
-		Sidebar.add_message("[color=#aaccff]You jolt awake.[/color]")
-		_sync_sleep_state_update(sleep_state)
-	elif sleep_state == SleepState.ASLEEP:
-		sleep_state = SleepState.WAKING_UP
-		sleep_timer = 10.0
-		Sidebar.add_message("[color=#aaccff]You start waking up...[/color]")
-		_sync_sleep_state_update(sleep_state)
-
-func _is_on_bed() -> bool:
-	for obj in get_tree().get_nodes_in_group("bed"):
-		if obj.z_level != z_level: continue
-		var obj_tile = Vector2i(int(obj.global_position.x / World.TILE_SIZE), int(obj.global_position.y / World.TILE_SIZE))
-		if obj_tile == tile_pos: return true
-	return false
-
-func _sync_sleep_state_update(new_state: SleepState) -> void:
-	_set_lying_down_visuals(new_state != SleepState.AWAKE)
-	if multiplayer.has_multiplayer_peer():
-		if multiplayer.is_server(): rpc("_sync_sleep_state", new_state)
-		else: rpc_id(1, "_sync_sleep_state", new_state)
+func toggle_sleep() -> void: if sleep_: sleep_.toggle_sleep()
+func _is_on_bed() -> bool: return sleep_.is_on_bed() if sleep_ else false
+func _sync_sleep_state_update(new_state: SleepState) -> void: if sleep_: sleep_.sync_sleep_state_update(new_state)
 
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_sleep_state(new_state: int) -> void:
@@ -322,59 +296,11 @@ func _sync_sleep_state(new_state: int) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_heal_limbs(amount: int) -> void: if body != null: body.heal_limbs(amount)
 
-func _set_lying_down_visuals(_lying_down: bool) -> void:
-	if dead: return
-	_update_sprite()
-
-func toggle_lying_down() -> void:
-	if not _is_local_authority() or dead: return
-	if sleep_state != SleepState.AWAKE: return
-	
-	if not is_lying_down:
-		is_lying_down = true
-		_cancel_stand_up()
-		_update_sprite()
-		_update_water_submerge()
-		if multiplayer.has_multiplayer_peer():
-			if multiplayer.is_server(): rpc("_rpc_sync_lying_down", is_lying_down)
-			else: rpc_id(1, "_rpc_sync_lying_down", is_lying_down)
-	else:
-		if _stand_up_timer < 0.0:
-			_stand_up_timer = 0.0
-			Sidebar.add_message("[color=#aaccff]Stay still to stand up...[/color]")
-			_stand_up_label = _create_stand_up_label()
-
-func _cancel_stand_up() -> void:
-	if _stand_up_timer >= 0.0:
-		_stand_up_timer = -1.0
-		if _stand_up_label != null and is_instance_valid(_stand_up_label):
-			_stand_up_label.queue_free()
-		_stand_up_label = null
-
-func _create_stand_up_label() -> Label:
-	var lbl := Label.new()
-	lbl.name = "StandUpProg"
-	lbl.add_theme_font_size_override("font_size", 14)
-	lbl.add_theme_color_override("font_color", Color.WHITE)
-	lbl.add_theme_color_override("font_outline_color", Color.BLACK)
-	lbl.add_theme_constant_override("outline_size", 4)
-	lbl.position = Vector2(-20, -64)
-	lbl.text = "."
-	add_child(lbl)
-	return lbl
-
-func _complete_stand_up() -> void:
-	if body != null and body.are_legs_broken():
-		_cancel_stand_up()
-		if _is_local_authority(): Sidebar.add_message("[color=#ffaaaa]Your broken legs won't let you stand.[/color]")
-		return
-	_cancel_stand_up()
-	is_lying_down = false
-	_update_sprite()
-	_update_water_submerge()
-	if multiplayer.has_multiplayer_peer():
-		if multiplayer.is_server(): rpc("_rpc_sync_lying_down", is_lying_down)
-		else: rpc_id(1, "_rpc_sync_lying_down", is_lying_down)
+func _set_lying_down_visuals(_lying_down: bool) -> void: if sleep_: sleep_.set_lying_down_visuals(_lying_down)
+func toggle_lying_down() -> void: if sleep_: sleep_.toggle_lying_down()
+func _cancel_stand_up() -> void: if sleep_: sleep_.cancel_stand_up()
+func _create_stand_up_label() -> Label: return sleep_.create_stand_up_label() if sleep_ else null
+func _complete_stand_up() -> void: if sleep_: sleep_.complete_stand_up()
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_sync_lying_down(val: bool) -> void:
@@ -442,6 +368,7 @@ func _ready() -> void:
 	crafting = preload("res://scripts/player/playercrafting.gd").new(self)
 	body = preload("res://scripts/player/body.gd").new(self)
 	visuals = preload("res://scripts/player/playervisuals.gd").new(self)
+	sleep_ = preload("res://scripts/player/playersleep.gd").new(self)
 	
 	add_to_group("player")
 
@@ -662,45 +589,7 @@ func _process(delta: float) -> void:
 	if is_possessed:
 		_check_stamina_regen(delta)
 		
-	if sleep_state != SleepState.AWAKE and not dead and is_possessed:
-		if sleep_state == SleepState.FALLING_ASLEEP:
-			sleep_timer -= delta
-			if sleep_timer <= 0.0:
-				sleep_state = SleepState.ASLEEP
-				_sleeping_on_bed = _is_on_bed()
-				if is_local:
-					Sidebar.add_message("[color=#aaccff]You are now fast asleep.[/color]")
-					_sync_sleep_state_update(sleep_state)
-		elif sleep_state == SleepState.WAKING_UP:
-			sleep_timer -= delta
-			if sleep_timer <= 0.0:
-				sleep_state = SleepState.AWAKE
-				if is_local:
-					Sidebar.add_message("[color=#aaccff]You are fully awake.[/color]")
-					_sync_sleep_state_update(sleep_state)
-		elif sleep_state == SleepState.ASLEEP:
-			if is_local:
-				var regen_rate = 4.0 if _sleeping_on_bed else 2.0
-				health_regen_accumulator += regen_rate * delta
-				if health_regen_accumulator >= 1.0:
-					var heal_amount = int(health_regen_accumulator)
-					health_regen_accumulator -= heal_amount
-					if health < 100:
-						var missing = 100 - health
-						if heal_amount <= missing:
-							health += heal_amount
-							heal_amount = 0
-						else:
-							health = 100
-							heal_amount -= missing
-					if heal_amount > 0:
-						rpc_heal_limbs.rpc(heal_amount)
-					
-	if is_local and _sleep_blackout != null:
-		if sleep_state == SleepState.AWAKE: _sleep_blackout.color.a = 0.0
-		elif sleep_state == SleepState.FALLING_ASLEEP: _sleep_blackout.color.a = clamp(1.0 - (sleep_timer / 10.0), 0.0, 1.0)
-		elif sleep_state == SleepState.ASLEEP: _sleep_blackout.color.a = 1.0
-		elif sleep_state == SleepState.WAKING_UP: _sleep_blackout.color.a = 1.0 if sleep_timer > 2.0 else 0.0
+	if sleep_: sleep_.update(delta, is_local)
 
 	if not dead:
 		_blood_drip_timer += delta
@@ -751,18 +640,7 @@ func _process(delta: float) -> void:
 				elif Input.is_key_pressed(KEY_D): buffered_dir.x += 1
 
 	if is_local and _stand_up_timer >= 0.0:
-		const STAND_UP_DURATION: float = 2.0
-		if buffered_dir != Vector2i.ZERO:
-			_cancel_stand_up()
-			Sidebar.add_message("[color=#ffaaaa]Stand up cancelled.[/color]")
-		else:
-			_stand_up_timer += delta
-			var progress: float = clamp(_stand_up_timer / STAND_UP_DURATION, 0.0, 1.0)
-			var dot_count: int = clamp(int(progress * 5.0) + 1, 1, 5)
-			var dot_str: String = ""
-			for _d in range(dot_count): dot_str += "."
-			if _stand_up_label != null and is_instance_valid(_stand_up_label): _stand_up_label.text = dot_str
-			if _stand_up_timer >= STAND_UP_DURATION: _complete_stand_up()
+		if sleep_: sleep_.update_stand_up(delta, buffered_dir)
 
 	if moving:
 		move_elapsed += delta

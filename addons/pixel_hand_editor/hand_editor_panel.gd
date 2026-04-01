@@ -2,9 +2,6 @@
 extends Control
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-const OFFSETS_PATH:          String = "res://objects/hand_offsets.json"
-const CLOTHING_OFFSETS_PATH: String = "res://clothing/clothing_offsets.json"
-
 const FACING_NAMES:  Array  =["south", "north", "east", "west"]
 const FACING_LABELS: Array  =["S", "N", "E", "W"]
 
@@ -34,36 +31,6 @@ const CLOTHING_ITEMS: Dictionary = {
 	"Crown":           "res://clothing/crownonmob.png",
 	"ChainGloves":     "res://clothing/chainglovesonmob.png",
 	"Hood":            "res://clothing/hoodonmob.png",
-}
-
-const DEFAULT_RIGHT: Dictionary = {
-	"Pickaxe":   {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-	"Pebble":    {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-	"Sword":     {"south":[20.0, -2.0], "north":[20.0, -20.0], "east":[16.0, -2.0], "west":[-16.0, -2.0]},
-	"Coal":      {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-	"IronOre":   {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-	"IronIngot": {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-	"Lamp":      {"south":[20.0,  8.0], "north":[20.0, -10.0], "east":[16.0,  8.0], "west":[-16.0,  8.0]},
-}
-
-const DEFAULT_LEFT: Dictionary = {
-	"Pickaxe":   {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
-	"Pebble":    {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
-	"Sword":     {"south":[-20.0,  0.0], "north":[-20.0,-18.0], "east":[-16.0,  0.0], "west":[16.0,  0.0]},
-	"Coal":      {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
-	"IronOre":   {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
-	"IronIngot": {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
-	"Lamp":      {"south":[-20.0, 10.0], "north":[-20.0, -8.0], "east":[-16.0, 10.0], "west":[16.0, 10.0]},
-}
-
-const DEFAULT_WAIST: Dictionary = {
-	"Pickaxe":   {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"Pebble":    {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"Sword":     {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"Coal":      {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"IronOre":   {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"IronIngot": {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
-	"Lamp":      {"south":[12.0, 4.0], "north":[-12.0, 4.0], "east":[0.0, 4.0], "west":[0.0, 4.0]},
 }
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -105,12 +72,14 @@ var _sidebar_clothing: Control = null
 
 var _updating_ui:  bool = false
 
+var _offsets_helper = null
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(620, 400)
 	_build_ui()
+	_offsets_helper = preload("res://addons/pixel_hand_editor/hand_editor_offsets.gd").new(self)
 	_load_offsets()
 	_load_clothing_offsets()
 	_refresh_canvas()
@@ -625,120 +594,22 @@ func _refresh_clothing_canvas() -> void:
 
 	_canvas.queue_redraw()
 
-# ── Offset helpers ────────────────────────────────────────────────────────────
+# ── Offset helpers (delegated to hand_editor_offsets.gd) ──────────────────────
 
-func _ensure_entry(item: String, facing: String) -> void:
-	if not _offsets.has(item):
-		_offsets[item] = {}
-	if not _offsets[item].has(facing):
-		_offsets[item][facing] = {}
+func _ensure_entry(item: String, facing: String) -> void:                                        _offsets_helper.ensure_entry(item, facing)
+func _read_offset(item: String, facing: String, hand_key: String) -> Vector2:                    return _offsets_helper.read_offset(item, facing, hand_key)
+func _read_flipped(item: String, facing: String, flip_key: String) -> bool:                      return _offsets_helper.read_flipped(item, facing, flip_key)
+func _read_rotation(item: String, facing: String, rot_key: String) -> float:                     return _offsets_helper.read_rotation(item, facing, rot_key)
+func _read_scale(item: String, facing: String, scale_key: String, default: float) -> float:      return _offsets_helper.read_scale(item, facing, scale_key, default)
+func _read_clothing_data(item: String, facing: String) -> Dictionary:                            return _offsets_helper.read_clothing_data(item, facing)
+func _store_field(item: String, facing: String, key: String, v: Vector2, r: float, s: float) -> void: _offsets_helper.store_field(item, facing, key, v, r, s)
+func _store_clothing_field(item: String, facing: String, offset: Vector2, scale: float) -> void: _offsets_helper.store_clothing_field(item, facing, offset, scale)
+func _load_offsets() -> void:          _offsets_helper.load_offsets()
+func _write_offsets() -> void:         _offsets_helper.write_offsets()
+func _load_clothing_offsets() -> void: _offsets_helper.load_clothing_offsets()
+func _write_clothing_offsets() -> void: _offsets_helper.write_clothing_offsets()
+func _set_status(msg: String) -> void: _offsets_helper.set_status(msg)
 
-func _read_offset(item: String, facing: String, hand_key: String) -> Vector2:
-	if _offsets.has(item) and _offsets[item].has(facing):
-		var entry = _offsets[item][facing]
-		if entry.has(hand_key):
-			var arr = entry[hand_key]
-			return Vector2(float(arr[0]), float(arr[1]))
-	return _default_offset(item, facing, hand_key)
+# (kept for callers that still access _offsets directly, e.g. _on_flip_pressed)
+func _default_offset(item: String, facing: String, hand_key: String) -> Vector2:                return _offsets_helper.default_offset(item, facing, hand_key)
 
-func _read_flipped(item: String, facing: String, flip_key: String) -> bool:
-	if _offsets.has(item) and _offsets[item].has(facing):
-		return _offsets[item][facing].get(flip_key, false)
-	return false
-
-func _read_rotation(item: String, facing: String, rot_key: String) -> float:
-	if _offsets.has(item) and _offsets[item].has(facing):
-		return float(_offsets[item][facing].get(rot_key, 45.0 if item == "Sword" and rot_key.begins_with("waist") else 0.0))
-	return 45.0 if item == "Sword" and rot_key.begins_with("waist") else 0.0
-
-func _read_scale(item: String, facing: String, scale_key: String, default: float) -> float:
-	if _offsets.has(item) and _offsets[item].has(facing):
-		return float(_offsets[item][facing].get(scale_key, default))
-	return default
-
-func _read_clothing_data(item: String, facing: String) -> Dictionary:
-	if _clothing_offsets.has(item) and _clothing_offsets[item].has(facing):
-		var entry = _clothing_offsets[item][facing]
-		return {
-			"offset": Vector2(float(entry.get("offset",[0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
-			"scale": float(entry.get("scale", 1.0))
-		}
-	return {"offset": Vector2.ZERO, "scale": 1.0}
-
-func _store_field(item: String, facing: String, key: String, value: Vector2, rot: float, scale: float) -> void:
-	_ensure_entry(item, facing)
-	_offsets[item][facing][key] =[value.x, value.y]
-	_offsets[item][facing][key + "_rotation"] = rot
-	
-	# ONLY ever save scale data for the waist! Hands do not support overridden scaling inside the engine logic.
-	if key == "waist":
-		_offsets[item][facing][key + "_scale"] = scale
-
-func _store_clothing_field(item: String, facing: String, offset: Vector2, scale: float) -> void:
-	if not _clothing_offsets.has(item):
-		_clothing_offsets[item] = {}
-	if not _clothing_offsets[item].has(facing):
-		_clothing_offsets[item][facing] = {}
-	_clothing_offsets[item][facing]["offset"] =[offset.x, offset.y]
-	_clothing_offsets[item][facing]["scale"] = scale
-
-func _default_offset(item: String, facing: String, hand_key: String) -> Vector2:
-	var table := DEFAULT_RIGHT if hand_key == "right" else DEFAULT_LEFT if hand_key == "left" else DEFAULT_WAIST
-	if table.has(item) and table[item].has(facing):
-		var arr = table[item][facing]
-		return Vector2(float(arr[0]), float(arr[1]))
-	return Vector2.ZERO
-
-# ── Save / Load ───────────────────────────────────────────────────────────────
-
-func _load_offsets() -> void:
-	if not FileAccess.file_exists(OFFSETS_PATH):
-		_set_status("No saved offsets — using defaults.")
-		return
-	var file := FileAccess.open(OFFSETS_PATH, FileAccess.READ)
-	if file == null:
-		_set_status("Could not read " + OFFSETS_PATH)
-		return
-	var parsed = JSON.parse_string(file.get_as_text())
-	file.close()
-	if not (parsed is Dictionary):
-		_set_status("JSON parse error — using defaults.")
-		return
-	_offsets = parsed
-	_set_status("Offsets loaded.")
-
-func _write_offsets() -> void:
-	var file := FileAccess.open(OFFSETS_PATH, FileAccess.WRITE)
-	if file == null:
-		_set_status("ERROR: cannot write " + OFFSETS_PATH)
-		return
-	file.store_string(JSON.stringify(_offsets, "\t"))
-	file.close()
-	_set_status("Saved.")
-
-func _load_clothing_offsets() -> void:
-	if not FileAccess.file_exists(CLOTHING_OFFSETS_PATH):
-		return
-	var file := FileAccess.open(CLOTHING_OFFSETS_PATH, FileAccess.READ)
-	if file == null:
-		return
-	var parsed = JSON.parse_string(file.get_as_text())
-	file.close()
-	if parsed is Dictionary:
-		_clothing_offsets = parsed
-
-func _write_clothing_offsets() -> void:
-	var dir := DirAccess.open("res://")
-	if not dir.dir_exists("clothing"):
-		dir.make_dir("clothing")
-	var file := FileAccess.open(CLOTHING_OFFSETS_PATH, FileAccess.WRITE)
-	if file == null:
-		_set_status("ERROR: cannot write " + CLOTHING_OFFSETS_PATH)
-		return
-	file.store_string(JSON.stringify(_clothing_offsets, "\t"))
-	file.close()
-	_set_status("Clothing offsets saved.")
-
-func _set_status(msg: String) -> void:
-	if _status_lbl != null:
-		_status_lbl.text = msg
