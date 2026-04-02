@@ -31,10 +31,15 @@ func _ready() -> void:
 	await get_tree().process_frame
 	Lighting.rebuild_roof_map()
 
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
-		# Flag the map as fully loaded for latejoin to handle safely
-		if has_node("/root/LateJoin"):
-			get_node("/root/LateJoin").map_loaded = true
+	if multiplayer.has_multiplayer_peer():
+		if multiplayer.is_server():
+			# Server is fully loaded — hide the startup loading screen.
+			LoadingScreen.hide_loading()
+		else:
+			# Flag the map as fully loaded; LateJoin will now start the version check.
+			if has_node("/root/LateJoin"):
+				get_node("/root/LateJoin").map_loaded = true
+			LoadingScreen.update_status("Checking version...")
 
 func shake_tile(tile_pos: Vector2i, z_level: int = 3) -> void:
 	var tile_origin := Vector2(tile_pos.x * World.TILE_SIZE, tile_pos.y * World.TILE_SIZE)

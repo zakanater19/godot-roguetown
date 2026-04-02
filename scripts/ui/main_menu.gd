@@ -12,12 +12,38 @@ var _known_servers: Array =[]
 func _ready() -> void:
 	Sidebar.set_visible(false)
 	ServerBrowser.server_found.connect(_on_server_found)
+	_check_pending_reconnect()
+
+
+func _check_pending_reconnect() -> void:
+	var path := "user://pending_reconnect.json"
+	if not FileAccess.file_exists(path):
+		return
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return
+	var text := file.get_as_text()
+	file.close()
+	DirAccess.remove_absolute(path)
+
+	var parsed = JSON.parse_string(text)
+	if not parsed is Dictionary:
+		return
+	var ip: String = str(parsed.get("ip", ""))
+	var port: int  = int(parsed.get("port", Host.PORT))
+	if ip == "":
+		return
+
+	LoadingScreen.show_loading("Reconnecting after update...")
+	Host.start_client_custom(ip, port)
+	_transition_to_game()
 
 func _on_host_pressed() -> void:
 	main_buttons.visible = false
 	host_options.visible = true
 
 func _on_start_hosting_pressed() -> void:
+	LoadingScreen.show_loading("Starting server...")
 	var max_p = int(max_players_spinbox.value)
 	Host.start_host(max_p)
 	Lobby.init_server_lobby()
@@ -55,7 +81,12 @@ func _on_server_found(ip: String, port: int, current_players: int = 1, max_playe
 
 func _join_game(ip: String, port: int) -> void:
 	ServerBrowser.stop_listening()
+	LoadingScreen.show_loading("Connecting to server...")
 	Host.start_client_custom(ip, port)
+	# Load the game scene immediately so Main/PlayerSpawner exists before the server
+	# tries to replicate existing entities to us.  Version check + any PCK patch run
+	# in the background and complete before request_sync is sent (_process gates on
+	# both map_loaded AND version_checked).
 	_transition_to_game()
 
 func _on_back_pressed() -> void:

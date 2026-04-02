@@ -3,10 +3,14 @@ extends Node
 
 const PORT: int = 9904
 
+var last_server_address: String = ""
+var last_server_port: int = PORT
+
 var max_clients: int = 200
 var peers: Dictionary = {}
 var _spawner: MultiplayerSpawner = null
 var _ip_sessions: Dictionary = {}
+var _peer_ips: Dictionary = {}   # peer_id → normalized IP, cached at connect time
 var session_ids: Dictionary = {}
 var _next_session_id: float = 2.0
 
@@ -39,8 +43,11 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 
 
 func start_client_custom(ip: String, port: int) -> void:
+	last_server_address = ip
+	last_server_port    = port
+
 	var enet := ENetMultiplayerPeer.new()
-	
+
 	# Explicitly enforce 3 channels to prevent Godot 4 default routing bugs
 	var err: int = enet.create_client(ip, port, 3)
 	if err == OK:
@@ -76,6 +83,10 @@ func _setup_spawner() -> void:
 
 func _on_peer_connected(id: int) -> void:
 	print("Host: peer connected — id ", id)
+	# Cache the IP now — ENet peer is valid at connect time but may not be at disconnect.
+	var ip := _query_peer_ip_from_enet(id)
+	if ip != "":
+		_peer_ips[id] = ip
 	_assign_session_id(id)
 
 
@@ -123,14 +134,19 @@ func _is_local_ip(ip: String) -> bool:
 
 
 func _get_peer_ip(peer_id: int) -> String:
+	# Prefer the cached value — ENet's peer object may be invalid at disconnect time.
+	if _peer_ips.has(peer_id):
+		return _peer_ips[peer_id]
+	return _query_peer_ip_from_enet(peer_id)
+
+
+func _query_peer_ip_from_enet(peer_id: int) -> String:
 	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
 	if enet == null:
 		return ""
-
 	var ep := enet.get_peer(peer_id)
 	if ep == null:
 		return ""
-
 	return _normalize_ip(ep.get_remote_address())
 
 
@@ -181,6 +197,7 @@ func _assign_session_id(peer_id: int) -> void:
 
 func clear_session_data() -> void:
 	_ip_sessions.clear()
+	_peer_ips.clear()
 	session_ids.clear()
 	_next_session_id = 2.0
 

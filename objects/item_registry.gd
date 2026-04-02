@@ -12,6 +12,9 @@ var _item_data_cache: Dictionary = {}
 var _icon_cache: Dictionary = {}
 
 func _ready() -> void:
+	_load_all_items()
+
+func _load_all_items() -> void:
 	var dir := DirAccess.open("res://items/")
 	if dir == null:
 		push_error("ItemRegistry: could not open res://items/")
@@ -26,6 +29,21 @@ func _ready() -> void:
 				if item.scene_path != "":
 					_scene_paths_cache[item.item_type] = item.scene_path
 		fname = dir.get_next()
+
+## Re-scan res://items/ after a PCK patch has been mounted.
+func reload() -> void:
+	_scene_paths_cache.clear()
+	_item_data_cache.clear()
+	_icon_cache.clear()
+	_load_all_items()
+
+## Overwrite (or insert) an item definition received from the server.
+## Called by GameVersion.apply_resource_diff on version-mismatched clients.
+func patch_item(item: ItemData) -> void:
+	_item_data_cache[item.item_type] = item
+	_icon_cache.erase(item.item_type)   # invalidate cached icon for this type
+	if item.scene_path != "":
+		_scene_paths_cache[item.item_type] = item.scene_path
 
 func get_by_type(item_type: String) -> ItemData:
 	return _item_data_cache.get(item_type, null)

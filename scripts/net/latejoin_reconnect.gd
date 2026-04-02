@@ -27,7 +27,8 @@ func handle_player_disconnection(peer_id: int, player_node: Node) -> void:
 	lj._disconnected_players[peer_id] = {
 		"node_path": node.get_path(),
 		"state":     player_state,
-		"timestamp": Time.get_ticks_msec()
+		"timestamp": Time.get_ticks_msec(),
+		"ip":        Host._get_peer_ip(peer_id)
 	}
 
 	lj.rpc_set_disconnect_indicator.rpc(node.get_path(), true)
@@ -49,7 +50,7 @@ func handle_player_disconnection(peer_id: int, player_node: Node) -> void:
 
 func handle_reconnection(peer_id: int) -> bool:
 	if lj._disconnected_players.is_empty(): return false
-	var best_peer_id = _find_best_reconnection_candidate()
+	var best_peer_id = _find_reconnection_candidate_for_peer(peer_id)
 	if best_peer_id == -1: return false
 
 	var player_node_path = lj._disconnected_players[best_peer_id]["node_path"]
@@ -68,13 +69,24 @@ func handle_reconnection(peer_id: int) -> bool:
 	else:        Host.peers.erase(peer_id)
 	return success
 
-func _find_best_reconnection_candidate() -> int:
-	var best_peer_id = -1
-	var latest_time  = 0
-	for peer_id in lj._disconnected_players.keys():
-		if lj._disconnected_players[peer_id]["timestamp"] > latest_time:
-			latest_time  = lj._disconnected_players[peer_id]["timestamp"]
-			best_peer_id = peer_id
+func _find_reconnection_candidate_for_peer(new_peer_id: int) -> int:
+	var new_ip: String = Host._get_peer_ip(new_peer_id)
+	var is_local: bool = new_ip == "" or Host._is_local_ip(new_ip)
+
+	if not is_local:
+		# Non-local: match exactly by stored IP — one client per IP, no ambiguity.
+		for dc_peer_id in lj._disconnected_players.keys():
+			if lj._disconnected_players[dc_peer_id].get("ip", "") == new_ip:
+				return dc_peer_id
+
+	# Localhost / fallback: use the most-recently disconnected player.
+	# Localhost testing typically has one client at a time, so this is unambiguous.
+	var best_peer_id := -1
+	var latest_time  := 0
+	for dc_peer_id in lj._disconnected_players.keys():
+		if lj._disconnected_players[dc_peer_id]["timestamp"] > latest_time:
+			latest_time  = lj._disconnected_players[dc_peer_id]["timestamp"]
+			best_peer_id = dc_peer_id
 	return best_peer_id
 
 func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node, _player_state: Dictionary) -> bool:

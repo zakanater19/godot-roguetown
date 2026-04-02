@@ -32,6 +32,15 @@ func _load_all_recipes() -> void:
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
+## Re-scan res://recipes/ after a PCK patch has been mounted.
+func reload() -> void:
+	_load_all_recipes()
+
+## Overwrite (or insert) a recipe definition received from the server.
+## Called by GameVersion.apply_resource_diff on version-mismatched clients.
+func patch_recipe(recipe: RecipeData) -> void:
+	_recipes[recipe.recipe_id] = recipe
+
 ## Returns the RecipeData for recipe_id, or null if not found.
 func get_recipe(recipe_id: String) -> RecipeData:
 	return _recipes.get(recipe_id, null)

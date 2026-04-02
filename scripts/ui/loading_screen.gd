@@ -1,0 +1,110 @@
+# res://scripts/ui/loading_screen.gd
+# Autoload: LoadingScreen
+#
+# Persistent full-screen overlay shown during:
+#   • Scene transition (connecting / starting server)
+#   • Version check & resource diff download
+#   • World-state sync from server
+#
+# Sits at CanvasLayer 100 so it covers every other UI layer.
+
+extends CanvasLayer
+
+var _status_label:   Label
+var _progress_bar:   ProgressBar
+var _detail_label:   Label
+
+func _ready() -> void:
+	layer = 100
+	_build_ui()
+	hide()
+
+
+func _build_ui() -> void:
+	# Dark translucent backdrop
+	var bg := ColorRect.new()
+	bg.color = Color(0.04, 0.04, 0.07, 0.96)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	# Centred panel
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2(440, 210)
+	panel.set_anchor(SIDE_LEFT,   0.5)
+	panel.set_anchor(SIDE_TOP,    0.5)
+	panel.set_anchor(SIDE_RIGHT,  0.5)
+	panel.set_anchor(SIDE_BOTTOM, 0.5)
+	panel.offset_left   = -220
+	panel.offset_top    = -105
+	panel.offset_right  =  220
+	panel.offset_bottom =  105
+	add_child(panel)
+
+	# Margin inside panel
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for edge in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(edge, 28)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Loading"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	vbox.add_child(title)
+
+	_status_label = Label.new()
+	_status_label.text = "Please wait..."
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status_label.autowrap_mode        = TextServer.AUTOWRAP_WORD
+	vbox.add_child(_status_label)
+
+	_progress_bar = ProgressBar.new()
+	_progress_bar.min_value            = 0.0
+	_progress_bar.max_value            = 1.0
+	_progress_bar.value                = 0.0
+	_progress_bar.custom_minimum_size.y = 18
+	_progress_bar.visible              = false
+	vbox.add_child(_progress_bar)
+
+	_detail_label = Label.new()
+	_detail_label.text = ""
+	_detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_detail_label.add_theme_color_override("font_color", Color(0.65, 0.65, 0.65))
+	_detail_label.visible = false
+	vbox.add_child(_detail_label)
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+## Show the overlay with an initial status message.
+func show_loading(status: String) -> void:
+	_status_label.text     = status
+	_progress_bar.visible  = false
+	_detail_label.visible  = false
+	show()
+
+
+## Update the status text and optionally display a progress bar.
+## Pass progress < 0 to hide the bar.  Pass detail = "" to hide the sub-label.
+func update_status(status: String, progress: float = -1.0, detail: String = "") -> void:
+	_status_label.text = status
+	if progress >= 0.0:
+		_progress_bar.value   = progress
+		_progress_bar.visible = true
+	else:
+		_progress_bar.visible = false
+	_detail_label.text    = detail
+	_detail_label.visible = detail != ""
+
+
+## Hide the overlay.  Safe to call even when already hidden.
+func hide_loading() -> void:
+	hide()
