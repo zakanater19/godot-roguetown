@@ -14,28 +14,36 @@ var _icon_cache: Dictionary = {}
 func _ready() -> void:
 	_load_all_items()
 
-func _load_all_items() -> void:
+func _load_all_items(force_replace: bool = false) -> void:
+	var cache_mode := ResourceLoader.CACHE_MODE_REPLACE if force_replace else ResourceLoader.CACHE_MODE_REUSE
 	var dir := DirAccess.open("res://items/")
 	if dir == null:
 		push_error("ItemRegistry: could not open res://items/")
 		return
 	dir.list_dir_begin()
-	var fname := dir.get_next()
+	var fname: String = dir.get_next()
 	while fname != "":
-		if fname.ends_with(".tres"):
-			var item := load("res://items/" + fname) as ItemData
+		# Strip .remap suffix if running in an exported build
+		var clean_name: String = fname.replace(".remap", "")
+		
+		if clean_name.ends_with(".tres"):
+			var path: String = "res://items/" + clean_name
+			var item := ResourceLoader.load(path, "", cache_mode) as ItemData
 			if item != null and item.item_type != "":
 				_item_data_cache[item.item_type] = item
 				if item.scene_path != "":
 					_scene_paths_cache[item.item_type] = item.scene_path
 		fname = dir.get_next()
+	dir.list_dir_end()
 
 ## Re-scan res://items/ after a PCK patch has been mounted.
+## Uses CACHE_MODE_REPLACE so the ResourceLoader discards pre-patch cached
+## objects and reads fresh data from the now-updated virtual filesystem.
 func reload() -> void:
 	_scene_paths_cache.clear()
 	_item_data_cache.clear()
 	_icon_cache.clear()
-	_load_all_items()
+	_load_all_items(true)
 
 ## Overwrite (or insert) an item definition received from the server.
 ## Called by GameVersion.apply_resource_diff on version-mismatched clients.

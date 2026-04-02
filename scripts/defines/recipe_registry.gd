@@ -10,18 +10,22 @@ var _recipes: Dictionary = {}
 func _ready() -> void:
 	_load_all_recipes()
 
-func _load_all_recipes() -> void:
+func _load_all_recipes(force_replace: bool = false) -> void:
+	var cache_mode := ResourceLoader.CACHE_MODE_REPLACE if force_replace else ResourceLoader.CACHE_MODE_REUSE
 	_recipes.clear()
 	var dir := DirAccess.open("res://recipes/")
 	if dir == null:
 		push_error("RecipeRegistry: res://recipes/ directory not found.")
 		return
 	dir.list_dir_begin()
-	var file_name := dir.get_next()
+	var file_name: String = dir.get_next()
 	while file_name != "":
-		if not dir.current_is_dir() and file_name.ends_with(".tres"):
-			var path := "res://recipes/" + file_name
-			var res := load(path)
+		# Strip .remap suffix if running in an exported build
+		var clean_name: String = file_name.replace(".remap", "")
+		
+		if not dir.current_is_dir() and clean_name.ends_with(".tres"):
+			var path: String = "res://recipes/" + clean_name
+			var res := ResourceLoader.load(path, "", cache_mode)
 			if res is RecipeData:
 				if res.recipe_id == "":
 					push_warning("RecipeRegistry: recipe at '%s' has no recipe_id, skipping." % path)
@@ -33,8 +37,10 @@ func _load_all_recipes() -> void:
 	dir.list_dir_end()
 
 ## Re-scan res://recipes/ after a PCK patch has been mounted.
+## Uses CACHE_MODE_REPLACE so the ResourceLoader discards pre-patch cached
+## objects and reads fresh data from the now-updated virtual filesystem.
 func reload() -> void:
-	_load_all_recipes()
+	_load_all_recipes(true)
 
 ## Overwrite (or insert) a recipe definition received from the server.
 ## Called by GameVersion.apply_resource_diff on version-mismatched clients.
@@ -52,7 +58,7 @@ func get_all_recipes() -> Array:
 ## Returns all recipes where the player meets the skill requirements.
 ## skills_dict: the player's { skill_name: level } dictionary.
 func get_available_recipes(skills_dict: Dictionary) -> Array:
-	var result: Array = []
+	var result: Array =[]
 	for recipe in _recipes.values():
 		var ok := true
 		for skill_name in recipe.skill_requirements:

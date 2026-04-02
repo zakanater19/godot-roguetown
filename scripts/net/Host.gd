@@ -35,6 +35,8 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 		session_ids[1] = 1.0
 		ServerBrowser.start_broadcasting()
 		_setup_spawner()
+		print("Host: generating server_patch.pck...")
+		GameVersion.generate_server_pck()
 
 		if has_node("/root/Sidebar"):
 			get_node("/root/Sidebar").refresh_debug_visibility()

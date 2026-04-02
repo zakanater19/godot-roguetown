@@ -58,7 +58,8 @@ func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:
 		player.misc.refresh_loot_panel()
 
 func unequip_clothing_from_slot(slot_name: String) -> void:
-	if player.equipped.get(slot_name, "") == "":
+	var _equipped_val = player.equipped.get(slot_name)
+	if not (_equipped_val is String) or _equipped_val == "":
 		return
 	if player.multiplayer.is_server():
 		World.rpc_request_unequip(slot_name, player.active_hand)
@@ -66,7 +67,8 @@ func unequip_clothing_from_slot(slot_name: String) -> void:
 		World.rpc_request_unequip.rpc_id(1, slot_name, player.active_hand)
 
 func perform_unequip(slot_name: String, new_node_name: String, hand_index: int) -> void:
-	var item_name: String = player.equipped.get(slot_name, "")
+	var _raw = player.equipped.get(slot_name)
+	var item_name: String = _raw if _raw is String else ""
 	if item_name == "":
 		return
 

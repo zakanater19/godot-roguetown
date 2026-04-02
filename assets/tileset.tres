@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" path="res://doors/stairs.png" id="2_7lii3"]
 [ext_resource type="Texture2D" path="res://animated/water_sheet.png" id="3_uyjym"]
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcvr3"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_80oah"]
 resource_name = "Floor Tiles"
 texture = ExtResource("1_fcvr3")
 texture_region_size = Vector2i(64, 64)
@@ -16,7 +16,7 @@ texture_region_size = Vector2i(64, 64)
 8:0/0 = 0
 9:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7lii3"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_beawo"]
 resource_name = "Solid Tiles"
 texture = ExtResource("1_fcvr3")
 texture_region_size = Vector2i(64, 64)
@@ -24,13 +24,13 @@ texture_region_size = Vector2i(64, 64)
 6:0/0 = 0
 7:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_uyjym"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fk0lh"]
 resource_name = "Stairs"
 texture = ExtResource("2_7lii3")
 texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_80oah"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_155r3"]
 resource_name = "Water"
 texture = ExtResource("3_uyjym")
 texture_region_size = Vector2i(64, 64)
@@ -43,7 +43,7 @@ texture_region_size = Vector2i(64, 64)
 
 [resource]
 tile_size = Vector2i(64, 64)
-sources/0 = SubResource("TileSetAtlasSource_fcvr3")
-sources/1 = SubResource("TileSetAtlasSource_7lii3")
-sources/2 = SubResource("TileSetAtlasSource_uyjym")
-sources/5 = SubResource("TileSetAtlasSource_80oah")
+sources/0 = SubResource("TileSetAtlasSource_80oah")
+sources/1 = SubResource("TileSetAtlasSource_beawo")
+sources/2 = SubResource("TileSetAtlasSource_fk0lh")
+sources/5 = SubResource("TileSetAtlasSource_155r3")

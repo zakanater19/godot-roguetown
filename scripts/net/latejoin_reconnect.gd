@@ -160,27 +160,19 @@ func capture_player_state(player_node: Node2D) -> Dictionary:
 	}
 
 func capture_equipped_state(player_node: Node2D) -> Dictionary:
-	var CLOTHING_SCENE_PATHS = {
-		"IronHelmet": "res://clothing/ironhelmet.tscn", "IronChestplate": "res://clothing/ironchestplate.tscn",
-		"LeatherBoots": "res://clothing/leatherboots.tscn", "LeatherTrousers": "res://clothing/leathertrousers.tscn",
-		"Apothshirt": "res://clothing/apothshirt.tscn", "Blackshirt": "res://clothing/blackshirt.tscn",
-		"Undershirt": "res://clothing/undershirt.tscn", "Pickaxe": "res://objects/pickaxe.tscn",
-		"Sword": "res://objects/sword.tscn", "Dirk": "res://objects/dirk.tscn",
-		"KingCloak": "res://clothing/king_cloak.tscn", "ChainGloves": "res://clothing/chaingloves.tscn",
-		"Hood": "res://clothing/hood.tscn",
-	}
 	var equipped_state = {}
 	var eq = player_node.get("equipped")
 	for slot in eq:
 		var item = eq[slot]
 		if item != null and not (item is String):
+			var itype: String = item.get("item_type") if item.get("item_type") != null else ""
 			equipped_state[slot] = {
-				"item_type":       item.get("item_type") if item.get("item_type") != null else "",
-				"scene_file_path": item.scene_file_path if item.scene_file_path != "" else "",
+				"item_type":       itype,
+				"scene_file_path": ItemRegistry.get_scene_path(itype) if itype != "" else item.scene_file_path,
 				"node_name":       item.name
 			}
 		elif item is String and item != "":
-			equipped_state[slot] = {"item_type": item, "scene_file_path": CLOTHING_SCENE_PATHS.get(item, ""), "node_name": ""}
+			equipped_state[slot] = {"item_type": item, "scene_file_path": ItemRegistry.get_scene_path(item), "node_name": ""}
 		else:
 			equipped_state[slot] = null
 	return equipped_state
