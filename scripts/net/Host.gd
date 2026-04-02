@@ -36,7 +36,13 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 		ServerBrowser.start_broadcasting()
 		_setup_spawner()
 		print("Host: generating server_patch.pck...")
-		GameVersion.generate_server_pck()
+		var pck_err: Error = GameVersion.generate_server_pck()
+		if pck_err != OK:
+			push_error("Host: server_patch.pck generation FAILED (error %d) — %s" % [
+				pck_err, GameVersion.pck_generation_error])
+			push_error("Host: clients with version mismatches will receive a partial patch (items/recipes only).")
+		else:
+			print("Host: server_patch.pck ready.")
 
 		if has_node("/root/Sidebar"):
 			get_node("/root/Sidebar").refresh_debug_visibility()

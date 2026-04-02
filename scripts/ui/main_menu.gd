@@ -19,19 +19,29 @@ func _check_pending_reconnect() -> void:
 	var path := "user://pending_reconnect.json"
 	if not FileAccess.file_exists(path):
 		return
+	# Only auto-reconnect if a patch was applied in this exact session.
+	# Without this guard a stale file left by a force-closed session (editor
+	# stop, crash, etc.) would silently skip the main menu every launch.
+	if not GameVersion.patch_applied:
+		DirAccess.remove_absolute(path)
+		return
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return
 	var text := file.get_as_text()
 	file.close()
-	DirAccess.remove_absolute(path)
+	# Do NOT delete here — LateJoin.receive_sync_complete() deletes it after a
+	# successful resume, and LateJoin._on_server_disconnected() deletes it if
+	# the connection fails, so we never loop on a dead server.
 
 	var parsed = JSON.parse_string(text)
 	if not parsed is Dictionary:
+		DirAccess.remove_absolute(path)  # malformed — discard immediately
 		return
 	var ip: String = str(parsed.get("ip", ""))
 	var port: int  = int(parsed.get("port", Host.PORT))
 	if ip == "":
+		DirAccess.remove_absolute(path)  # empty ip — discard
 		return
 
 	LoadingScreen.show_loading("Reconnecting after update...")

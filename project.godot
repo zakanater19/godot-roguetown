@@ -42,7 +42,7 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/pixel_hand_editor/plugin.cfg")
+enabled=PackedStringArray("res://addons/auto_version/plugin.cfg", "res://addons/pixel_hand_editor/plugin.cfg")
 
 [rendering]
 

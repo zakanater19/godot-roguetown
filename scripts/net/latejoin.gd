@@ -84,6 +84,9 @@ func _on_server_disconnected() -> void:
 	_pck_total_chunks = 0
 	_pck_chunks_received = 0
 	LoadingScreen.hide_loading()
+	# If we disconnected mid-reconnect (server down / refused), clean up the
+	# pending reconnect marker so the next launch doesn't loop forever.
+	DirAccess.remove_absolute("user://pending_reconnect.json")
 
 
 func _process(delta: float) -> void:
@@ -112,12 +115,12 @@ func _send_version_check_deferred() -> void:
 		return
 	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	
-	var is_reconnect: bool = is_manual_reconnect
+
 	request_version_check.rpc_id(1,
 		GameVersion.get_version(),
 		GameVersion.build_manifest(),
-		is_reconnect)
+		GameVersion.APP_VERSION,
+		is_manual_reconnect)
 
 
 func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
@@ -242,27 +245,80 @@ func client_reconnection_confirmed() -> void:
 		var main = get_node("/root/Main")
 		if main.has_method("_on_client_reconnected"): main.call("_on_client_reconnected")
 
+# ---------------------------------------------------------------------------
+# Version check — server-side handler
+# ---------------------------------------------------------------------------
+
 @rpc("any_peer", "call_remote", "reliable")
-func request_version_check(client_version: String, client_manifest: Dictionary, _is_reconnect: bool = false) -> void:
+func request_version_check(
+		client_version: String,
+		client_manifest: Dictionary,
+		_client_app_version: String = "",
+		_is_reconnect: bool = false) -> void:
 	if not multiplayer.is_server():
 		return
 	var peer_id: int = multiplayer.get_remote_sender_id()
 	if peer_id == 0: peer_id = multiplayer.get_unique_id()
 
+	# ── 1. Check whether the client needs an update ──────────────────────────
+	# Version is determined by content hash only (.tres / .tscn / assets).
+	# APP_VERSION (build timestamp) is intentionally excluded: GDScript bytecode
+	# has class_name registrations that crash the engine if re-loaded from a PCK
+	# on top of the already-running instance.  Content patches cover everything
+	# the PCK can safely deliver.  Two builds with identical content but
+	# different timestamps will correctly pass without triggering a re-download.
 	var server_version: String = GameVersion.get_version()
-	var server_manifest: Dictionary = GameVersion.build_manifest()
 
 	if client_version == server_version:
 		receive_version_response.rpc_id(peer_id, server_version, {}, false)
 		return
 
-	var pck_path: String = "user://server_patch.pck"
+	# ── 2. PCK patch path ─────────────────────────────────────────────────────
 	if GameVersion.server_pck_ready:
 		receive_version_response.rpc_id(peer_id, server_version, {}, true)
-		_send_pck_to_peer(peer_id, pck_path)
-	else:
-		var diffs: Dictionary = GameVersion.build_diff(server_manifest, client_manifest)
-		receive_version_response.rpc_id(peer_id, server_version, diffs, false)
+		_send_pck_to_peer(peer_id, "user://server_patch.pck")
+		return
+
+	# ── 3. PCK unavailable — try resource diffs (items / recipes only) ────────
+	if GameVersion.pck_generation_error != "":
+		# Warn client about partial patch so they know things may be off.
+		var warn: String = (
+			"[color=yellow]PCK generation failed on server:[/color] %s\n"
+			+ "Applying partial resource patch (items & recipes only).\n"
+			+ "Other content may be out of date until the server restarts."
+		) % GameVersion.pck_generation_error
+		# Send the warning as an informational error (non-fatal — version_checked
+		# is NOT set here; we fall through to send diffs below so the client can
+		# still play but sees the warning first).
+		receive_version_warning.rpc_id(peer_id, warn)
+
+	var server_manifest: Dictionary = GameVersion.build_manifest()
+	var diffs: Dictionary = GameVersion.build_diff(server_manifest, client_manifest)
+	receive_version_response.rpc_id(peer_id, server_version, diffs, false)
+
+
+# ---------------------------------------------------------------------------
+# Version check — client-side handlers
+# ---------------------------------------------------------------------------
+
+## Received when the server cannot serve a compatible client (exe mismatch or
+## unrecoverable PCK error).  Shows the message and keeps the loading screen
+## open — NO auto-close, NO crash.
+@rpc("authority", "call_remote", "reliable")
+func receive_version_error(error_msg: String) -> void:
+	push_error("LateJoin version error: " + error_msg)
+	LoadingScreen.show_loading("Version error — cannot connect")
+	LoadingScreen.update_status(error_msg, -1.0, "Close this window to return to the main menu")
+	# Do NOT set version_checked — the client stays on the loading screen.
+	# Do NOT call get_tree().quit() — no autoclose.
+
+
+## Non-fatal warning: server PCK failed but diffs will follow.
+@rpc("authority", "call_remote", "reliable")
+func receive_version_warning(warning_msg: String) -> void:
+	push_warning("LateJoin version warning: " + warning_msg)
+	LoadingScreen.update_status(warning_msg, 0.0, "Applying partial patch...")
+
 
 @rpc("authority", "call_remote", "reliable")
 func receive_version_response(_server_version: String, diffs: Dictionary, has_pck: bool) -> void:
@@ -279,14 +335,30 @@ func receive_version_response(_server_version: String, diffs: Dictionary, has_pc
 	LoadingScreen.update_status("Entering game...")
 	ready_to_enter_game.emit()
 
+
 @rpc("authority", "call_remote", "reliable")
 func receive_sync_complete() -> void:
 	LoadingScreen.hide_loading()
+	# Successful resume — clean up both pending patch markers.
+	DirAccess.remove_absolute("user://pending_reconnect.json")
+	# pending_patch.pck was already deleted in GameVersion._apply_pending_patch(),
+	# but remove it here too in case a future code path skips that step.
+	DirAccess.remove_absolute("user://pending_patch.pck")
+
+
+# ---------------------------------------------------------------------------
+# PCK transfer — server-side
+# ---------------------------------------------------------------------------
 
 func _send_pck_to_peer(peer_id: int, pck_path: String) -> void:
 	var file := FileAccess.open(pck_path, FileAccess.READ)
 	if file == null:
+		var err_msg: String = (
+			"[color=red]Server error:[/color] PCK patch file could not be opened (%s).\n"
+			+ "Please report this to the server administrator."
+		) % pck_path
 		push_error("LateJoin: cannot open PCK at %s" % pck_path)
+		receive_version_error.rpc_id(peer_id, err_msg)
 		return
 
 	var total_size:   int   = file.get_length()
@@ -303,6 +375,11 @@ func _send_pck_to_peer(peer_id: int, pck_path: String) -> void:
 		await get_tree().create_timer(delay_per_chunk).timeout
 
 	file.close()
+
+
+# ---------------------------------------------------------------------------
+# PCK transfer — client-side receivers
+# ---------------------------------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
 func receive_pck_header(total_size: int, total_chunks: int) -> void:
@@ -331,7 +408,7 @@ func _assemble_and_apply_pck() -> void:
 	if out != null:
 		out.store_buffer(assembled)
 		out.close()
-		out = null 
+		out = null
 
 	var reconnect_data: Dictionary = {"ip": Host.last_server_address, "port": Host.last_server_port}
 	var rf: FileAccess = FileAccess.open("user://pending_reconnect.json", FileAccess.WRITE)
@@ -339,7 +416,7 @@ func _assemble_and_apply_pck() -> void:
 		rf.store_string(JSON.stringify(reconnect_data))
 		rf.close()
 		rf = null
-		
+
 	LoadingScreen.update_status("Restarting...")
 	await get_tree().create_timer(1.0).timeout
 
@@ -347,5 +424,5 @@ func _assemble_and_apply_pck() -> void:
 	var pid: int = OS.create_instance(args)
 	if pid == -1:
 		OS.create_process(OS.get_executable_path(), args)
-	
+
 	get_tree().quit()

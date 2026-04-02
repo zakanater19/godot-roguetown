@@ -10,7 +10,7 @@
 
 extends CanvasLayer
 
-var _status_label:   Label
+var _status_label:   RichTextLabel
 var _progress_bar:   ProgressBar
 var _detail_label:   Label
 
@@ -58,10 +58,12 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 22)
 	vbox.add_child(title)
 
-	_status_label = Label.new()
+	_status_label = RichTextLabel.new()
+	_status_label.bbcode_enabled       = true
+	_status_label.fit_content          = true
+	_status_label.scroll_active        = false
+	_status_label.custom_minimum_size  = Vector2(380, 0)
 	_status_label.text = "Please wait..."
-	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label.autowrap_mode        = TextServer.AUTOWRAP_WORD
 	vbox.add_child(_status_label)
 
 	_progress_bar = ProgressBar.new()
