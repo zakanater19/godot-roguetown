@@ -155,7 +155,7 @@ func _process(_delta: float) -> void:
 	var local_player = World.get_local_player()
 	var current_z = 3
 	if local_player != null:
-		current_z = local_player.z_level
+		current_z = local_player.get("view_z_level") if "view_z_level" in local_player else local_player.z_level
 
 	# OPTIMIZATION: Only update map layers when the player's floor actively changes
 	if current_z != _last_z:

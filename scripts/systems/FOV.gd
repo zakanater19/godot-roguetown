@@ -13,6 +13,7 @@ const STEP_SIZE := 0.3
 var _visible_tiles: Dictionary = {}
 var _player_tile: Vector2i = Vector2i(-9999, -9999)
 var _player_z: int = 3
+var _view_z: int = 3
 var _draw_node: Node2D = null
 var _time_since_update: float = 0.0
 
@@ -35,10 +36,13 @@ func _process(delta: float) -> void:
 	
 	_time_since_update += delta
 	var tile = player.tile_pos
+	var p_z = player.z_level
+	var v_z = player.get("view_z_level") if "view_z_level" in player else p_z
 	
-	if tile != _player_tile or player.z_level != _player_z or _time_since_update >= 0.5:
+	if tile != _player_tile or p_z != _player_z or v_z != _view_z or _time_since_update >= 0.5:
 		_player_tile = tile
-		_player_z = player.z_level
+		_player_z = p_z
+		_view_z = v_z
 		_time_since_update = 0.0
 		_compute_fov()
 		_draw_node.queue_redraw()
@@ -46,9 +50,42 @@ func _process(delta: float) -> void:
 func _is_turf_opaque(tile: Vector2i) -> bool:
 	if _solid_cache.has(tile):
 		return _solid_cache[tile]
-	var opaque = World.is_opaque(tile, _player_z)
+	
+	# Primary check: opacity on the floor we are viewing.
+	var opaque = World.is_opaque(tile, _view_z)
+	
+	# Secondary check: If the tile is physically adjacent to the player's 
+	# current position, check their current floor for obstacles to prevent 
+	# seeing through/over adjacent walls.
+	if not opaque and _view_z != _player_z:
+		var diff = (tile - _player_tile).abs()
+		if diff.x <= 1 and diff.y <= 1:
+			if World.is_opaque(tile, _player_z):
+				opaque = true
+			
 	_solid_cache[tile] = opaque
 	return opaque
+
+# Check if a ray from the player to a tile is blocked by walls on the
+# player's own Z level. Uses a simple step-based raycast.
+func _is_blocked_by_player_z_wall(tile: Vector2i) -> bool:
+	var start = Vector2(_player_tile.x + 0.5, _player_tile.y + 0.5)
+	var end = Vector2(tile.x + 0.5, tile.y + 0.5)
+	var delta: Vector2 = end - start
+	var dist: float = delta.length()
+	if dist < 0.001:
+		return false
+	var norm: Vector2 = delta / dist
+	var t: float = STEP_SIZE
+	while t < dist - STEP_SIZE:
+		var p: Vector2 = start + norm * t
+		var check_tile := Vector2i(int(floor(p.x)), int(floor(p.y)))
+		# Skip the origin and destination tiles
+		if check_tile != _player_tile and check_tile != tile:
+			if World.is_opaque(check_tile, _player_z):
+				return true
+		t += STEP_SIZE
+	return false
 
 func _precompute_rays() -> void:
 	var r2: int = FOV_RADIUS * FOV_RADIUS
@@ -59,7 +96,7 @@ func _precompute_rays() -> void:
 			_precomputed_los[dest] = _generate_ray_paths(dest)
 
 func _generate_ray_paths(dest: Vector2i) -> Array:
-	var rays = []
+	var rays =[]
 	var base_targets =[Vector2(dest.x + 0.5, dest.y + 0.5)]
 	var extra_targets =[
 		Vector2(dest.x + 0.1, dest.y + 0.1),
@@ -140,6 +177,28 @@ func _compute_fov() -> void:
 			var tile := _player_tile + Vector2i(dx, dy)
 			if _has_los(_player_tile, tile): _visible_tiles[tile] = true
 	_visible_tiles[_player_tile] = true
+	
+	# Post-pass: When looking at a different Z level, hide tiles where the
+	# viewed Z has no floor AND the line of sight passes through a wall on
+	# the player's own Z level. This prevents seeing empty void/floor behind
+	# walls when looking up, without hiding the walls themselves or blocking
+	# vision into actual rooms on the viewed level.
+	if _view_z != _player_z:
+		var view_tm = World.get_tilemap(_view_z)
+		var to_remove: Array = []
+		for tile in _visible_tiles:
+			if tile == _player_tile:
+				continue
+			# Only affect tiles that have no floor on the viewed Z level
+			var has_view_floor = (view_tm != null and view_tm.get_cell_source_id(tile) != -1)
+			if has_view_floor:
+				continue
+			# Check if the ray to this tile passes through a wall on the player's Z
+			if _is_blocked_by_player_z_wall(tile):
+				to_remove.append(tile)
+		for tile in to_remove:
+			_visible_tiles.erase(tile)
+	
 	_apply_fov_hiding()
 
 func _apply_fov_hiding() -> void:
@@ -153,8 +212,8 @@ func _apply_fov_hiding() -> void:
 		if ez == null: continue
 		
 		var is_visible = false
-		if ez > _player_z:
-			# Entites on floors above the player are completely hidden
+		if ez > _view_z:
+			# Entites on floors above the player's view are completely hidden
 			is_visible = false
 		else:
 			# Entities on current or below floors use FOV logic

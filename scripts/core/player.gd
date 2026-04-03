@@ -31,6 +31,7 @@ var _sleeping_on_bed: bool = false
 @export var character_name: String = "noob"
 @export var character_class: String = "peasant"
 @export var z_level: int = 3
+var view_z_level: int = 3
 
 var tile_pos: Vector2i = Vector2i.ZERO :
 	set(val):
@@ -369,6 +370,7 @@ func _rpc_sync_lying_down(val: bool) -> void:
 @rpc("any_peer", "call_local", "reliable")
 func rpc_sync_z_level(new_z: int) -> void:
 	z_level = new_z
+	view_z_level = new_z
 	z_index = (z_level - 1) * 200 + 10
 	_update_water_submerge()
 	
@@ -408,6 +410,7 @@ func _enter_tree() -> void:
 			set_multiplayer_authority(parts[1].to_int())
 
 func _ready() -> void:
+	view_z_level = z_level
 	z_index = (z_level - 1) * 200 + 10
 	add_to_group("z_entity")
 	backend = preload("res://scripts/player/playerbackend.gd").new(self)
@@ -691,6 +694,9 @@ func _process(delta: float) -> void:
 				elif Input.is_key_pressed(KEY_A): buffered_dir.x -= 1
 				elif Input.is_key_pressed(KEY_D): buffered_dir.x += 1
 
+		if buffered_dir != Vector2i.ZERO and view_z_level != z_level:
+			view_z_level = z_level
+
 	if is_local and _stand_up_timer >= 0.0:
 		if sleep_: sleep_.update_stand_up(delta, buffered_dir)
 
@@ -780,6 +786,30 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _chat_input != null and not _chat_input.visible:
 			_chat_input.visible = true
 			_chat_input.grab_focus()
+			get_viewport().set_input_as_handled()
+			return
+
+	if event is InputEventKey and event.keycode == KEY_F and event.pressed and not event.echo:
+		if Input.is_key_pressed(KEY_SHIFT):
+			if view_z_level != z_level:
+				view_z_level = z_level
+			else:
+				if z_level >= 5:
+					Sidebar.add_message("[color=#ffaaaa]there is nothing above you[/color]")
+				else:
+					var tm = World.get_tilemap(z_level + 1)
+					var is_blocked = false
+					if tm != null:
+						var src = tm.get_cell_source_id(tile_pos)
+						if src != -1 and src != 2:
+							is_blocked = true
+					if World.is_opaque(tile_pos, z_level + 1):
+						is_blocked = true
+					
+					if is_blocked:
+						Sidebar.add_message("[color=#ffaaaa]there is something blocking your view above[/color]")
+					else:
+						view_z_level = z_level + 1
 			get_viewport().set_input_as_handled()
 			return
 

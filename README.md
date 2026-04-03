@@ -28,5 +28,7 @@ C - combat mode toggle - Right mouse shoves other players with empty hand in com
 
 hold SPACEBAR to run
 
+Shift+F to look up
+
 rest are UI buttons
 
