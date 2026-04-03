@@ -96,7 +96,8 @@ func _build_tileset() -> void:
 		solid_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
 		solid_atlas.create_tile(Vector2i(3, 0))  
 		solid_atlas.create_tile(Vector2i(6, 0))  
-		solid_atlas.create_tile(Vector2i(7, 0))  
+		solid_atlas.create_tile(Vector2i(7, 0))
+		solid_atlas.create_tile(Vector2i(10, 0))
 		
 		var ts := TileSet.new()
 		ts.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
@@ -129,7 +130,8 @@ func _build_tileset() -> void:
 			ts.add_source(water_atlas, 5)
 		else:
 			push_warning("res://animated/water_sheet.png not found — Water tile skipped.")
-		
+
+
 		tilemap.tile_set = ts
 		
 		for z in range(1, 6):

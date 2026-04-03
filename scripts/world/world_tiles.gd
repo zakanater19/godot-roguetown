@@ -24,7 +24,9 @@ func is_solid(pos: Vector2i, z_level: int) -> bool:
 
 func is_opaque(pos: Vector2i, z_level: int) -> bool:
 	var tm = world.get_tilemap(z_level)
-	if tm != null and tm.get_cell_source_id(pos) == 1: return true
+	if tm != null and tm.get_cell_source_id(pos) == 1:
+		# Wooden window (10,0) is solid but transparent — light/FOV passes through
+		if tm.get_cell_atlas_coords(pos) != Vector2i(10, 0): return true
 	if world.solid_grid[z_level].has(pos):
 		for obj in world.solid_grid[z_level][pos]:
 			if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
@@ -68,6 +70,7 @@ func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 				Vector2i(3, 0): return "a rock wall, solid and immovable"
 				Vector2i(6, 0): return "a stone wall, solid but workable"
 				Vector2i(7, 0): return "a wooden wall, solid and sturdy"
+				Vector2i(10, 0): return "a wooden window, solid but lets light through"
 				_: return "a wall"
 		2: return "a set of stairs"
 		5: return "water, murky and still"
@@ -233,13 +236,18 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 		if (i_type == "Sword") or ("Sword" in h.name) or (i_type == "Dirk"): holding_sword = true
 		elif (i_type == "Pickaxe") or ("Pickaxe" in h.name): holding_pickaxe = true
 	var hits_needed: int
-	if atlas_coords == Vector2i(3, 0): 
+	if atlas_coords == Vector2i(3, 0):
 		if holding_sword: return
 		hits_needed = world.WALL_HITS_TO_BREAK
-	elif atlas_coords == Vector2i(6, 0): 
+	elif atlas_coords == Vector2i(6, 0):
 		if holding_sword: return
 		hits_needed = world.STONE_WALL_HITS_TO_BREAK
-	elif atlas_coords == Vector2i(7, 0): 
+	elif atlas_coords == Vector2i(7, 0):
+		if holding_sword: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
+		elif holding_pickaxe and attacker.combat_mode: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
+		else: return
+	elif atlas_coords == Vector2i(10, 0):
+		# Wooden window — breakable with a sword or pickaxe in combat mode
 		if holding_sword: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
 		elif holding_pickaxe and attacker.combat_mode: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
 		else: return
@@ -250,7 +258,8 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 		world.tile_hit_counts[attacker.z_level].erase(pos)
 		if atlas_coords == Vector2i(3, 0):
 			world.rpc_confirm_break_wall.rpc(pos, attacker.z_level, "WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
-		elif atlas_coords == Vector2i(7, 0): world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, Vector2i(4, 0))
+		elif atlas_coords == Vector2i(7, 0) or atlas_coords == Vector2i(10, 0):
+			world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, Vector2i(4, 0))
 		else: world.rpc_confirm_break_stone_wall.rpc(pos, attacker.z_level)
 	else: world.rpc_confirm_hit_wall.rpc(pos, attacker.z_level)
 

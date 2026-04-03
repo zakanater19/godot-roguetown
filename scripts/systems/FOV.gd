@@ -147,9 +147,10 @@ func _has_los(from_tile: Vector2i, to_tile: Vector2i) -> bool:
 	var dest = to_tile - from_tile
 	if not _precomputed_los.has(dest): return false
 	var dest_opaque = _is_turf_opaque(to_tile)
-	
+	var dest_solid = dest_opaque or World.is_solid(to_tile, _view_z)
+
 	for ray in _precomputed_los[dest]:
-		if ray.is_extra and not dest_opaque:
+		if ray.is_extra and not dest_solid:
 			continue
 			
 		var ray_clear = true

@@ -140,7 +140,10 @@ func update_roof_map_at(pos: Vector2i) -> void:
 
 		var is_opaque = false
 		if source_id == 1:
-			is_opaque = true
+			# Wooden window (10,0) is solid but transparent — light passes through
+			var atlas_coords := Vector2i(-1, -1) if tm == null else tm.get_cell_atlas_coords(pos)
+			if atlas_coords != Vector2i(10, 0):
+				is_opaque = true
 		elif World.solid_grid.has(z) and World.solid_grid[z].has(pos):
 			for obj in World.solid_grid[z][pos]:
 				if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
