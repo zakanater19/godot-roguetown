@@ -27,11 +27,6 @@ var _chat_input: LineEdit
 
 var _sync_timer: float = 0.0
 
-var _round_ending: bool = false
-var _round_end_timer: float = 0.0
-var _announced_30: bool = false
-var _announced_10: bool = false
-
 func _ready() -> void:
 	_build_ui()
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -149,17 +144,6 @@ func _process(delta: float) -> void:
 
 	if game_started:
 		round_time += delta * Lighting.time_multiplier
-
-	if _round_ending and multiplayer.is_server():
-		_round_end_timer -= delta
-		if not _announced_30 and _round_end_timer <= 30.0:
-			_announced_30 = true
-			rpc_announce_round_end_countdown.rpc(30)
-		if not _announced_10 and _round_end_timer <= 10.0:
-			_announced_10 = true
-			rpc_announce_round_end_countdown.rpc(10)
-		if _round_end_timer <= 0.0:
-			_do_server_reboot()
 
 func _on_ready_pressed() -> void:
 	if not game_started:
@@ -422,51 +406,3 @@ func _on_peer_connected(id: int) -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
 		ready_players.erase(id)
-
-
-func admin_end_round() -> void:
-	if not multiplayer.is_server(): return
-	if _round_ending: return
-	_round_ending = true
-	_round_end_timer = 60.0
-	_announced_30 = false
-	_announced_10 = false
-	rpc_announce_round_end.rpc()
-
-@rpc("authority", "call_local", "reliable")
-func rpc_announce_round_end() -> void:
-	Sidebar.add_message("[color=#ff4444][b]!! Round end triggered by admin, 1 min remains! !![/b][/color]")
-
-@rpc("authority", "call_local", "reliable")
-func rpc_announce_round_end_countdown(seconds: int) -> void:
-	Sidebar.add_message("[color=#ff8844][b]!! Server restarting in %d seconds! !![/b][/color]" % seconds)
-
-@rpc("authority", "call_remote", "reliable")
-func rpc_prepare_for_reboot() -> void:
-	LoadingScreen.show_loading("Server restarting...")
-	LoadingScreen.update_status("Reconnecting after round restart...")
-	await get_tree().create_timer(0.5).timeout
-	# Pass reconnect info as args so the new process auto-connects without
-	# writing to user://, which is shared with the server on the same machine.
-	var args := PackedStringArray()
-	args.append_array(OS.get_cmdline_args())
-	args.append("--round-restart")
-	args.append("--connect-ip=%s" % Host.last_server_address)
-	args.append("--connect-port=%d" % Host.last_server_port)
-	var pid := OS.create_instance(args)
-	if pid == -1:
-		OS.create_process(OS.get_executable_path(), args)
-	get_tree().quit()
-
-func _do_server_reboot() -> void:
-	if not multiplayer.is_server(): return
-	_round_ending = false
-	rpc_prepare_for_reboot.rpc()
-	await get_tree().create_timer(2.0).timeout
-	var args := PackedStringArray()
-	args.append_array(OS.get_cmdline_args())
-	args.append("--server-restart")
-	args.append("--max-players=%d" % Host.max_clients)
-	args.append("--bind-ip=%s" % Host.last_bind_ip)
-	OS.create_process(OS.get_executable_path(), args)
-	get_tree().quit()

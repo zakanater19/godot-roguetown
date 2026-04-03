@@ -7,7 +7,6 @@ var last_server_address: String = ""
 var last_server_port: int = PORT
 
 var max_clients: int = 200
-var last_bind_ip: String = "*"
 var peers: Dictionary = {}
 var _spawner: MultiplayerSpawner = null
 var _ip_sessions: Dictionary = {}
@@ -23,7 +22,6 @@ func _ready() -> void:
 
 func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 	max_clients = custom_max_clients
-	last_bind_ip = bind_ip
 
 	var enet := ENetMultiplayerPeer.new()
 	if bind_ip != "" and bind_ip != "*":

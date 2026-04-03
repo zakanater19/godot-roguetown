@@ -140,7 +140,7 @@ func _build() -> void:
 	tabs_hbox.add_child(btn_laws)
 	
 	_btn_debug = Button.new()
-	_btn_debug.text = "ADMIN/DEBUG"
+	_btn_debug.text = "DEBUG"
 	_btn_debug.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn_debug.pressed.connect(_on_tab_debug_pressed)
 	_btn_debug.visible = multiplayer.is_server()
@@ -247,15 +247,6 @@ func _build() -> void:
 	mult_spin.value = Lighting.time_multiplier
 	mult_spin.value_changed.connect(_on_time_multiplier_changed)
 	mult_row.add_child(mult_spin)
-
-	var end_round_sep := HSeparator.new()
-	_debug_view.add_child(end_round_sep)
-
-	var btn_end_round := Button.new()
-	btn_end_round.text = "End Round"
-	btn_end_round.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
-	btn_end_round.pressed.connect(_on_end_round_pressed)
-	_debug_view.add_child(btn_end_round)
 
 	# === NEW: Thin separator line at the bottom of the top section ===
 	var separator := HSeparator.new()
@@ -406,9 +397,6 @@ func _on_save_laws_pressed() -> void:
 
 func _on_cancel_laws_pressed() -> void:
 	_on_tab_laws_pressed()
-
-func _on_end_round_pressed() -> void:
-	Lobby.admin_end_round()
 
 func add_message(text: String) -> void:
 	if _rtl == null:
