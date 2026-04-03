@@ -7,13 +7,29 @@ extends Control
 @onready var server_list = $ServerListPanel
 @onready var server_container = $ServerListPanel/VBoxContainer/ScrollContainer/ServerContainer
 
-var _known_servers: Array =[]
+var _known_servers: Array = []
 
 func _ready() -> void:
 	Sidebar.set_visible(false)
 	ServerBrowser.server_found.connect(_on_server_found)
-	_check_pending_reconnect()
+	_handle_auto_restart()
 
+func _handle_auto_restart() -> void:
+	if Host.auto_restart_server:
+		Host.auto_restart_server = false
+		LoadingScreen.show_loading("Restarting server...")
+		await get_tree().create_timer(0.5).timeout
+		Host.start_host(int(max_players_spinbox.value))
+		Lobby.init_server_lobby()
+		_transition_to_game()
+	elif Host.auto_reconnect_client:
+		Host.auto_reconnect_client = false
+		LoadingScreen.show_loading("Reconnecting...")
+		await get_tree().create_timer(1.5).timeout
+		Host.start_client_custom(Host.last_server_address, Host.last_server_port)
+		_transition_to_game()
+	else:
+		_check_pending_reconnect()
 
 func _check_pending_reconnect() -> void:
 	var path := "user://pending_reconnect.json"
@@ -113,4 +129,3 @@ func _transition_to_game() -> void:
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()
-	

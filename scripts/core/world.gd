@@ -78,7 +78,7 @@ func _world_to_tile(world_pos: Vector2) -> Vector2i:
 	return utils.world_to_tile(world_pos)
 
 func get_local_player() -> Node:
-	if not multiplayer.has_multiplayer_peer(): return null
+	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED: return null
 	var local_id = multiplayer.get_unique_id()
 	return _find_player_by_peer(local_id)
 
@@ -537,3 +537,20 @@ func rpc_request_table_place(table_path: NodePath, hand_idx: int, place_pos: Vec
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_table_place(peer_id: int, table_path: NodePath, hand_idx: int, place_pos: Vector2) -> void:
 	objects.handle_rpc_confirm_table_place(peer_id, table_path, hand_idx, place_pos)
+
+@rpc("any_peer", "call_local", "reliable")
+func rpc_request_round_end() -> void:
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id != 1 and sender_id != 0: return # Only host can restart
+	rpc("rpc_execute_round_end")
+
+@rpc("authority", "call_local", "reliable")
+func rpc_execute_round_end() -> void:
+	if has_node("/root/Sidebar"):
+		get_node("/root/Sidebar").add_message("\n[color=#ff4444][b][font_size=24]THE ROUND HAS ENDED! RESTARTING IN 5 SECONDS...[/font_size][/b][/color]\n")
+	get_tree().create_timer(5.0).timeout.connect(_on_round_restart_timeout)
+
+func _on_round_restart_timeout() -> void:
+	if get_tree().current_scene.name != "MainMenu":
+		Host.execute_round_restart()

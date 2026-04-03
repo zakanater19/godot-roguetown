@@ -37,11 +37,33 @@ func show_lobby() -> void:
 		_ui_layer.visible = true
 
 func init_server_lobby() -> void:
-	ready_players.clear()
+	reset_lobby_state()
 	ready_players[1] = {"ready": false, "name": "noob", "class": "peasant"}
+
+func reset_lobby_state() -> void:
+	ready_players.clear()
 	game_started = false
 	countdown = 300.0
 	round_time = 0.0
+	_pending_action = ""
+	if _ui_layer != null:
+		_ui_layer.visible = false
+	if _main_content != null:
+		_main_content.visible = true
+	if _latejoin_panel != null:
+		_latejoin_panel.visible = false
+	if _subclass_panel != null:
+		_subclass_panel.visible = false
+	
+	if _name_input != null:
+		_name_input.visible = true
+		_name_input.editable = true
+	if _class_option != null:
+		_class_option.visible = true
+		_class_option.disabled = false
+	if _ready_btn != null:
+		_ready_btn.text = "Unready"
+		_ready_btn.remove_theme_color_override("font_color")
 
 func _build_ui() -> void:
 	_ui_layer = CanvasLayer.new()
@@ -123,7 +145,7 @@ func rpc_receive_lobby_chat(formatted_message: String) -> void:
 func _process(delta: float) -> void:
 	# Guard: if there is no multiplayer peer (e.g. after a disconnect/before hosting),
 	# skip all multiplayer calls to prevent "No multiplayer peer is assigned" spam.
-	if multiplayer.multiplayer_peer == null:
+	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
 		return
 
 	if _force_btn != null:
@@ -387,7 +409,9 @@ func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dicti
 	
 	if game_started:
 		if _time_label != null: _time_label.text = "Game in progress"
-		if _ready_btn != null: _ready_btn.text = "Latejoin"
+		if _ready_btn != null: 
+			_ready_btn.text = "Latejoin"
+			_ready_btn.remove_theme_color_override("font_color")
 		if _name_input != null: _name_input.visible = false
 		if _class_option != null: _class_option.visible = false
 	else:
@@ -397,6 +421,14 @@ func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dicti
 			_ready_btn.text = "Ready" if my_ready else "Unready"
 			if my_ready:
 				_ready_btn.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))
+			else:
+				_ready_btn.remove_theme_color_override("font_color")
+		if _name_input != null:
+			_name_input.visible = true
+			_name_input.editable = not my_ready
+		if _class_option != null:
+			_class_option.visible = true
+			_class_option.disabled = my_ready
 
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():

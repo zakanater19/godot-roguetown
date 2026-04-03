@@ -21,8 +21,8 @@ var _edit_laws_btn: Button = null
 var _edit_laws_view: VBoxContainer = null
 var _edit_list_vbox: VBoxContainer = null
 
-var _debug_view: VBoxContainer = null
-var _btn_debug: Button = null
+var _admin_view: VBoxContainer = null
+var _btn_admin: Button = null
 
 
 func _ready() -> void:
@@ -139,12 +139,12 @@ func _build() -> void:
 	btn_laws.pressed.connect(_on_tab_laws_pressed)
 	tabs_hbox.add_child(btn_laws)
 	
-	_btn_debug = Button.new()
-	_btn_debug.text = "DEBUG"
-	_btn_debug.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_btn_debug.pressed.connect(_on_tab_debug_pressed)
-	_btn_debug.visible = multiplayer.is_server()
-	tabs_hbox.add_child(_btn_debug)
+	_btn_admin = Button.new()
+	_btn_admin.text = "ADMIN"
+	_btn_admin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_admin.pressed.connect(_on_tab_admin_pressed)
+	_btn_admin.visible = multiplayer.is_server()
+	tabs_hbox.add_child(_btn_admin)
 
 	# --- View Containers ---
 	
@@ -222,21 +222,21 @@ func _build() -> void:
 	cancel_laws_btn.pressed.connect(_on_cancel_laws_pressed)
 	edit_actions_hbox.add_child(cancel_laws_btn)
 	
-	# 4. Debug View
-	_debug_view = VBoxContainer.new()
-	_debug_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_debug_view.visible = false
-	stats_inner.add_child(_debug_view)
+	# 4. Admin View
+	_admin_view = VBoxContainer.new()
+	_admin_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_admin_view.visible = false
+	stats_inner.add_child(_admin_view)
 
 	# Lighting Toggle Button
 	var btn_time_toggle := Button.new()
 	btn_time_toggle.text = "Toggle Midnight/Midday"
 	btn_time_toggle.pressed.connect(_on_toggle_time_pressed)
-	_debug_view.add_child(btn_time_toggle)
+	_admin_view.add_child(btn_time_toggle)
 	
 	# Multiplier SpinBox
 	var mult_row := HBoxContainer.new()
-	_debug_view.add_child(mult_row)
+	_admin_view.add_child(mult_row)
 	mult_row.add_child(Label.new())
 	mult_row.get_child(0).text = "Time Speed:"
 	
@@ -247,6 +247,13 @@ func _build() -> void:
 	mult_spin.value = Lighting.time_multiplier
 	mult_spin.value_changed.connect(_on_time_multiplier_changed)
 	mult_row.add_child(mult_spin)
+
+	# Round End Button
+	var btn_round_end := Button.new()
+	btn_round_end.text = "End Round"
+	btn_round_end.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	btn_round_end.pressed.connect(_on_end_round_pressed)
+	_admin_view.add_child(btn_round_end)
 
 	# === NEW: Thin separator line at the bottom of the top section ===
 	var separator := HSeparator.new()
@@ -278,9 +285,9 @@ func _build() -> void:
 
 # --- Tab Logic ---
 
-func refresh_debug_visibility() -> void:
-	if _btn_debug:
-		_btn_debug.visible = multiplayer.is_server()
+func refresh_admin_visibility() -> void:
+	if _btn_admin:
+		_btn_admin.visible = multiplayer.is_server()
 
 func _on_toggle_time_pressed() -> void:
 	Lighting.toggle_time_of_day()
@@ -292,27 +299,31 @@ func _on_time_multiplier_changed(value: float) -> void:
 	elif player != null:
 		Lighting.sync_time_multiplier.rpc_id(1, value)
 
+func _on_end_round_pressed() -> void:
+	if multiplayer.is_server():
+		World.rpc_request_round_end.rpc()
+
 func _on_tab_stats_pressed() -> void:
 	if _stats_view == null: return
 	_stats_view.visible = true
 	_laws_view.visible = false
 	_edit_laws_view.visible = false
-	if _debug_view: _debug_view.visible = false
+	if _admin_view: _admin_view.visible = false
 
 func _on_tab_laws_pressed() -> void:
 	if _laws_view == null: return
 	_stats_view.visible = false
 	_laws_view.visible = true
 	_edit_laws_view.visible = false
-	if _debug_view: _debug_view.visible = false
+	if _admin_view: _admin_view.visible = false
 	refresh_laws_ui()
 
-func _on_tab_debug_pressed() -> void:
-	if _debug_view == null: return
+func _on_tab_admin_pressed() -> void:
+	if _admin_view == null: return
 	_stats_view.visible = false
 	_laws_view.visible = false
 	_edit_laws_view.visible = false
-	_debug_view.visible = true
+	_admin_view.visible = true
 
 func refresh_laws_ui() -> void:
 	if _laws_list_vbox == null: return
@@ -410,4 +421,3 @@ func add_message(text: String) -> void:
 
 	# Rebuild the full text
 	_rtl.text = "\n".join(_messages)
-	

@@ -14,6 +14,9 @@ var _peer_ips: Dictionary = {}   # peer_id → normalized IP, cached at connect 
 var session_ids: Dictionary = {}
 var _next_session_id: float = 2.0
 
+var auto_restart_server: bool = false
+var auto_reconnect_client: bool = false
+var is_host_mode: bool = false
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -22,6 +25,7 @@ func _ready() -> void:
 
 func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 	max_clients = custom_max_clients
+	is_host_mode = true
 
 	var enet := ENetMultiplayerPeer.new()
 	if bind_ip != "" and bind_ip != "*":
@@ -31,21 +35,21 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 	var err: int = enet.create_server(PORT, max_clients, 3)
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
-		print("Host: server listening on %s:%d with max players %d" % [bind_ip, PORT, max_clients])
+		print("Host: server listening on %s:%d with max players %d" %[bind_ip, PORT, max_clients])
 		session_ids[1] = 1.0
 		ServerBrowser.start_broadcasting()
 		_setup_spawner()
 		print("Host: generating server_patch.pck...")
 		var pck_err: Error = GameVersion.generate_server_pck()
 		if pck_err != OK:
-			push_error("Host: server_patch.pck generation FAILED (error %d) — %s" % [
+			push_error("Host: server_patch.pck generation FAILED (error %d) — %s" %[
 				pck_err, GameVersion.pck_generation_error])
 			push_error("Host: clients with version mismatches will receive a partial patch (items/recipes only).")
 		else:
 			print("Host: server_patch.pck ready.")
 
 		if has_node("/root/Sidebar"):
-			get_node("/root/Sidebar").refresh_debug_visibility()
+			get_node("/root/Sidebar").refresh_admin_visibility()
 	else:
 		push_error("Host: failed to start server (error %d)" % err)
 
@@ -53,6 +57,7 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
 func start_client_custom(ip: String, port: int) -> void:
 	last_server_address = ip
 	last_server_port    = port
+	is_host_mode = false
 
 	var enet := ENetMultiplayerPeer.new()
 
@@ -64,9 +69,49 @@ func start_client_custom(ip: String, port: int) -> void:
 		_setup_spawner()
 
 		if has_node("/root/Sidebar"):
-			get_node("/root/Sidebar").refresh_debug_visibility()
+			get_node("/root/Sidebar").refresh_admin_visibility()
 	else:
 		push_error("Host: failed to start client (error %d)" % err)
+
+
+func execute_round_restart() -> void:
+	if is_host_mode:
+		auto_restart_server = true
+	else:
+		auto_reconnect_client = true
+
+	# Cleanup everything (matching esc_menu.gd)
+	multiplayer.multiplayer_peer = null
+	peers.clear()
+	_spawner = null
+
+	if has_node("/root/Lobby"):
+		get_node("/root/Lobby").reset_lobby_state()
+
+	if has_node("/root/LateJoin"):
+		var lj = get_node("/root/LateJoin")
+		lj._world_state = {"tiles": {}, "objects": {}, "players": {}}
+		lj._pending_joins.clear()
+		lj._disconnected_players.clear()
+		lj._state_dirty = false
+		lj.client_connected = false
+		lj.map_loaded = false
+		lj.sync_requested = false
+		lj.is_manual_reconnect = false
+
+	if has_node("/root/Sidebar"):
+		var sidebar = get_node("/root/Sidebar")
+		sidebar._messages.clear()
+		if sidebar._rtl != null:
+			sidebar._rtl.text = ""
+		sidebar.set_visible(false)
+
+	if has_node("/root/ServerBrowser"):
+		var sb = get_node("/root/ServerBrowser")
+		sb.stop_listening()
+		sb.stop_broadcasting()
+
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 func _setup_spawner() -> void:
@@ -182,7 +227,7 @@ func _assign_session_id(peer_id: int) -> void:
 		var session: Dictionary = _ip_sessions[ip]
 
 		if int(session.get("active_peer_id", -1)) != -1:
-			print("Host: rejecting duplicate active peer %d from IP %s" % [peer_id, ip])
+			print("Host: rejecting duplicate active peer %d from IP %s" %[peer_id, ip])
 			_disconnect_peer(peer_id)
 			return
 
@@ -236,16 +281,16 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 
 	if is_latejoin:
 		if p_class in["swordsman", "miner", "adventurer"]:
-			preferred_spawns = [p_class, "adventurer", "latejoin"]
+			preferred_spawns =[p_class, "adventurer", "latejoin"]
 		elif p_class == "bandit":
 			preferred_spawns =["antag latejoin", "bandit", "latejoin"]
 		else:
 			preferred_spawns = ["latejoin", p_class]
 	else:
-		if p_class in ["swordsman", "miner", "adventurer"]:
-			preferred_spawns = [p_class, "adventurer", "latejoin"]
+		if p_class in["swordsman", "miner", "adventurer"]:
+			preferred_spawns =[p_class, "adventurer", "latejoin"]
 		else:
-			preferred_spawns = [p_class, "latejoin"]
+			preferred_spawns =[p_class, "latejoin"]
 
 	var spawners = get_tree().get_nodes_in_group("spawners")
 	var valid_spawners =[]

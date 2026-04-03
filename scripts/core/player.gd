@@ -232,7 +232,7 @@ func _rpc_sync_sneak_alpha(alpha: float) -> void:
 	_apply_sneak_alpha(alpha)
 
 func _apply_sneak_alpha(alpha: float) -> void:
-	var all_sprites: Array[String] = [
+	var all_sprites: Array[String] =[
 		"Sprite2D", "TrousersSprite", "ClothingSprite", "ChestSprite",
 		"GlovesSprite", "BackpackSprite", "WaistSprite", "BootsSprite",
 		"HelmetSprite", "FaceSprite", "CloakSprite"
@@ -448,7 +448,7 @@ func _is_local_authority() -> bool:
 
 func _start_move_lerp() -> void:
 	_awaiting_move_confirm = false
-	var new_pixel := World.tile_to_pixel(tile_pos)
+	var new_pixel: Vector2 = World.tile_to_pixel(tile_pos)
 	if new_pixel == pixel_pos: return
 
 	if dead:
