@@ -172,8 +172,8 @@ func _build_tileset() -> void:
 		if tm != null:
 			tm.tile_set = ts
 
-	if OS.has_feature("editor"):
-		ResourceSaver.save(ts, "res://assets/tileset.tres")
+	# REMOVED: ResourceSaver.save() was causing editor bloat.
+	# The tileset is generated in memory at runtime and no longer saved to disk.
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
