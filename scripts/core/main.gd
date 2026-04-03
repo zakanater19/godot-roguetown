@@ -8,6 +8,21 @@ const OUTLINE_WIDTH: float = 1.0
 
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
+## Column order 0..10 must match TileSet atlas coords (floor + solid share one row).
+const TURF_TILE_PATHS: PackedStringArray = [
+	"res://assets/tiles/tile_00_grass.png",
+	"res://assets/tiles/tile_01_cobble_rough.png",
+	"res://assets/tiles/tile_02_dirt.png",
+	"res://assets/tiles/tile_03_wall_rock.png",
+	"res://assets/tiles/tile_04_wood_planks.png",
+	"res://assets/tiles/tile_05_cobble_floor.png",
+	"res://assets/tiles/tile_06_wall_stone.png",
+	"res://assets/tiles/tile_07_wall_wood.png",
+	"res://assets/tiles/tile_08_greenblocks.png",
+	"res://assets/tiles/tile_09_loose_rock.png",
+	"res://assets/tiles/tile_10_wooden_window.png",
+]
+
 var target_fps: int = 60
 var _last_z: int = -1
 
@@ -74,81 +89,91 @@ func _build_background() -> void:
 	add_child(rect)
 	move_child(rect, 0)
 
+func _compose_turf_atlas_texture() -> ImageTexture:
+	var w := TURF_TILE_PATHS.size() * World.TILE_SIZE
+	var h := World.TILE_SIZE
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for i in TURF_TILE_PATHS.size():
+		var tex_path: String = TURF_TILE_PATHS[i]
+		var tex: Texture2D = load(tex_path) as Texture2D
+		if tex == null:
+			push_error("_compose_turf_atlas_texture: missing or invalid texture: %s" % tex_path)
+			continue
+		var sub: Image = tex.get_image()
+		if sub == null:
+			push_error("_compose_turf_atlas_texture: could not read image data: %s" % tex_path)
+			continue
+		if sub.get_width() != World.TILE_SIZE or sub.get_height() != World.TILE_SIZE:
+			sub.resize(World.TILE_SIZE, World.TILE_SIZE, Image.INTERPOLATE_NEAREST)
+		sub.convert(Image.FORMAT_RGBA8)
+		img.blit_rect(sub, Rect2i(0, 0, World.TILE_SIZE, World.TILE_SIZE), Vector2i(i * World.TILE_SIZE, 0))
+	return ImageTexture.create_from_image(img)
+
+
 func _build_tileset() -> void:
 	var tilemap: TileMapLayer = $TileMapLayer_Z3
-	
-	if OS.has_feature("editor"):
-		var floor_atlas := TileSetAtlasSource.new()
-		floor_atlas.resource_name = "Floor Tiles"
-		floor_atlas.texture = load("res://assets/tiles.png")
-		floor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-		floor_atlas.create_tile(Vector2i(0, 0)) 
-		floor_atlas.create_tile(Vector2i(1, 0))  
-		floor_atlas.create_tile(Vector2i(2, 0))  
-		floor_atlas.create_tile(Vector2i(4, 0))  
-		floor_atlas.create_tile(Vector2i(5, 0))  
-		floor_atlas.create_tile(Vector2i(8, 0))  
-		floor_atlas.create_tile(Vector2i(9, 0)) 
-		
-		var solid_atlas := TileSetAtlasSource.new()
-		solid_atlas.resource_name = "Solid Tiles"
-		solid_atlas.texture = load("res://assets/tiles.png")
-		solid_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-		solid_atlas.create_tile(Vector2i(3, 0))  
-		solid_atlas.create_tile(Vector2i(6, 0))  
-		solid_atlas.create_tile(Vector2i(7, 0))
-		solid_atlas.create_tile(Vector2i(10, 0))
-		
-		var ts := TileSet.new()
-		ts.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-		ts.add_source(floor_atlas, 0)
-		ts.add_source(solid_atlas, 1)
-		
-		# --- STAIRS IMPLEMENTATION ---
-		var stairs_tex = load("res://doors/stairs.png")
-		if stairs_tex != null:
-			var stairs_atlas := TileSetAtlasSource.new()
-			stairs_atlas.resource_name = "Stairs"
-			stairs_atlas.texture = stairs_tex
-			# Now 64x64 to match the resized stair tile
-			stairs_atlas.texture_region_size = Vector2i(64, 64)
-			stairs_atlas.create_tile(Vector2i(0, 0))
-			ts.add_source(stairs_atlas, 2)
-		else:
-			push_warning("res://doors/stairs.png not found — Stairs tile skipped.")
-		
-		var water_tex = load("res://animated/water_sheet.png")
-		if water_tex != null:
-			var water_atlas := TileSetAtlasSource.new()
-			water_atlas.resource_name = "Water"
-			water_atlas.texture = water_tex
-			water_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-			water_atlas.create_tile(Vector2i(0, 0))
-			water_atlas.set_tile_animation_columns(Vector2i(0, 0), 3)
-			water_atlas.set_tile_animation_frames_count(Vector2i(0, 0), 3)
-			water_atlas.set_tile_animation_speed(Vector2i(0, 0), 4.0)
-			ts.add_source(water_atlas, 5)
-		else:
-			push_warning("res://animated/water_sheet.png not found — Water tile skipped.")
+	var turf_tex := _compose_turf_atlas_texture()
 
+	var floor_atlas := TileSetAtlasSource.new()
+	floor_atlas.resource_name = "Floor Tiles"
+	floor_atlas.texture = turf_tex
+	floor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+	floor_atlas.create_tile(Vector2i(0, 0))
+	floor_atlas.create_tile(Vector2i(1, 0))
+	floor_atlas.create_tile(Vector2i(2, 0))
+	floor_atlas.create_tile(Vector2i(4, 0))
+	floor_atlas.create_tile(Vector2i(5, 0))
+	floor_atlas.create_tile(Vector2i(8, 0))
+	floor_atlas.create_tile(Vector2i(9, 0))
 
-		tilemap.tile_set = ts
-		
-		for z in range(1, 6):
-			var tm = get_node_or_null("TileMapLayer_Z" + str(z))
-			if tm != null:
-				tm.tile_set = ts
+	var solid_atlas := TileSetAtlasSource.new()
+	solid_atlas.resource_name = "Solid Tiles"
+	solid_atlas.texture = turf_tex
+	solid_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+	solid_atlas.create_tile(Vector2i(3, 0))
+	solid_atlas.create_tile(Vector2i(6, 0))
+	solid_atlas.create_tile(Vector2i(7, 0))
+	solid_atlas.create_tile(Vector2i(10, 0))
 
-		ResourceSaver.save(ts, "res://assets/tileset.tres")
+	var ts := TileSet.new()
+	ts.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+	ts.add_source(floor_atlas, 0)
+	ts.add_source(solid_atlas, 1)
+
+	var stairs_tex = load("res://doors/stairs.png")
+	if stairs_tex != null:
+		var stairs_atlas := TileSetAtlasSource.new()
+		stairs_atlas.resource_name = "Stairs"
+		stairs_atlas.texture = stairs_tex
+		stairs_atlas.texture_region_size = Vector2i(64, 64)
+		stairs_atlas.create_tile(Vector2i(0, 0))
+		ts.add_source(stairs_atlas, 2)
 	else:
-		var cached_ts = load("res://assets/tileset.tres") as TileSet
-		if cached_ts != null:
-			for z in range(1, 6):
-				var tm = get_node_or_null("TileMapLayer_Z" + str(z))
-				if tm != null:
-					tm.tile_set = cached_ts
-		else:
-			push_error("Failed to load cached tileset.tres!")
+		push_warning("res://doors/stairs.png not found — Stairs tile skipped.")
+
+	var water_tex = load("res://animated/water_sheet.png")
+	if water_tex != null:
+		var water_atlas := TileSetAtlasSource.new()
+		water_atlas.resource_name = "Water"
+		water_atlas.texture = water_tex
+		water_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+		water_atlas.create_tile(Vector2i(0, 0))
+		water_atlas.set_tile_animation_columns(Vector2i(0, 0), 3)
+		water_atlas.set_tile_animation_frames_count(Vector2i(0, 0), 3)
+		water_atlas.set_tile_animation_speed(Vector2i(0, 0), 4.0)
+		ts.add_source(water_atlas, 5)
+	else:
+		push_warning("res://animated/water_sheet.png not found — Water tile skipped.")
+
+	tilemap.tile_set = ts
+	for z in range(1, 6):
+		var tm = get_node_or_null("TileMapLayer_Z" + str(z))
+		if tm != null:
+			tm.tile_set = ts
+
+	if OS.has_feature("editor"):
+		ResourceSaver.save(ts, "res://assets/tileset.tres")
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():

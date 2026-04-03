@@ -278,9 +278,13 @@ func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int
 	if tm == null: return
 	tm.set_cell(pos, source_id, atlas_coords)
 	Lighting.update_roof_map_at(pos)
+	if world.has_node("/root/LateJoin"):
+		world.get_node("/root/LateJoin").register_tile_change(pos, z_level, source_id, atlas_coords)
 
 func handle_rpc_confirm_break_stone_wall(pos: Vector2i, z_level: int) -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, 0, Vector2i(5, 0))
 	Lighting.update_roof_map_at(pos)
+	if world.has_node("/root/LateJoin"):
+		world.get_node("/root/LateJoin").register_tile_change(pos, z_level, 0, Vector2i(5, 0))

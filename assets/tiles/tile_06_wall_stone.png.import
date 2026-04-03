@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dqt7lslgkqn5w"
-path="res://.godot/imported/woodenwindow.png-0c2c665f2cf8cad9c3cd4a333dc89a0f.ctex"
+uid="uid://cou6bmxf2f0kw"
+path="res://.godot/imported/tile_06_wall_stone.png-ff828f18cdecaa493ece0b4c9d708455.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/woodenwindow.png"
-dest_files=["res://.godot/imported/woodenwindow.png-0c2c665f2cf8cad9c3cd4a333dc89a0f.ctex"]
+source_file="res://assets/tiles/tile_06_wall_stone.png"
+dest_files=["res://.godot/imported/tile_06_wall_stone.png-ff828f18cdecaa493ece0b4c9d708455.ctex"]
 
 [params]
 
