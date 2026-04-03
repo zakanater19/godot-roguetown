@@ -313,6 +313,28 @@ func rpc_confirm_remove_door(door_path: NodePath) -> void:
 	objects.handle_rpc_confirm_remove_door(door_path)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_hit_gate(gate_path: NodePath) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_hit_gate(sender_id, gate_path)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_toggle_gate(_gate_path: NodePath) -> void:
+	objects.handle_rpc_confirm_toggle_gate(_gate_path)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_hit_gate(gate_path: NodePath) -> void:
+	objects.handle_rpc_confirm_hit_gate(gate_path)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_destroy_gate(gate_path: NodePath) -> void:
+	objects.handle_rpc_confirm_destroy_gate(gate_path)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_remove_gate(gate_path: NodePath) -> void:
+	objects.handle_rpc_confirm_remove_gate(gate_path)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_interact_hand_item(hand_idx: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()

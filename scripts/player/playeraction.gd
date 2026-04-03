@@ -170,6 +170,24 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 					is_exerting = true
 				break
 
+	if not target_found:
+		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_GATE):
+			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
+			# Gate spans 3 tiles, check if target is any of the 3 tiles
+			var obj_tile_x = int(obj.global_position.x / World.TILE_SIZE)
+			var obj_tile_y = int(obj.global_position.y / World.TILE_SIZE)
+			# Gate tiles are: obj_tile_x-1, obj_tile_x, obj_tile_x+1 (3 tiles wide, centered)
+			if (target_tile == Vector2i(obj_tile_x, obj_tile_y) or 
+				target_tile == Vector2i(obj_tile_x - 1, obj_tile_y) or
+				target_tile == Vector2i(obj_tile_x + 1, obj_tile_y)):
+				if held_item == null:
+					target_found = true
+					is_exerting = false
+				elif is_sword or (is_pickaxe and player.intent == Defs.INTENT_HARM):
+					target_found = true
+					is_exerting = true
+				break
+
 	if not target_found and can_chop:
 		for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_CHOPPABLE):
 			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
@@ -239,6 +257,20 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 				World.rpc_request_hit_door(obj.get_path())
 			else:
 				World.rpc_request_hit_door.rpc_id(1, obj.get_path())
+			return
+
+	for obj in player.get_tree().get_nodes_in_group(Defs.GROUP_GATE):
+		if obj.get("z_level") != null and obj.z_level != player.z_level: continue
+		# Gate spans 3 tiles, check if target is any of the 3 tiles
+		var obj_tile_x = int(obj.global_position.x / World.TILE_SIZE)
+		var obj_tile_y = int(obj.global_position.y / World.TILE_SIZE)
+		if (target_tile == Vector2i(obj_tile_x, obj_tile_y) or 
+			target_tile == Vector2i(obj_tile_x - 1, obj_tile_y) or
+			target_tile == Vector2i(obj_tile_x + 1, obj_tile_y)):
+			if player.multiplayer.is_server():
+				World.rpc_request_hit_gate(obj.get_path())
+			else:
+				World.rpc_request_hit_gate.rpc_id(1, obj.get_path())
 			return
 
 	if can_chop:

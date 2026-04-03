@@ -6,6 +6,7 @@ var world: Node
 
 var harvesting = null
 var doors      = null
+var gates      = null
 var items      = null
 var coins      = null
 var loot       = null
@@ -16,6 +17,7 @@ func _init(p_world: Node) -> void:
 	world      = p_world
 	harvesting = preload("res://scripts/world/objects/world_harvesting.gd").new(world)
 	doors      = preload("res://scripts/world/objects/world_doors.gd").new(world)
+	gates      = preload("res://scripts/world/objects/world_gates.gd").new(world)
 	items      = preload("res://scripts/world/objects/world_items.gd").new(world)
 	coins      = preload("res://scripts/world/objects/world_coins.gd").new(world)
 	loot       = preload("res://scripts/world/objects/world_loot.gd").new(world)
@@ -47,6 +49,13 @@ func handle_rpc_confirm_toggle_door(door_path: NodePath) -> void:               
 func handle_rpc_confirm_hit_door(door_path: NodePath) -> void:                       doors.handle_rpc_confirm_hit_door(door_path)
 func handle_rpc_confirm_destroy_door(door_path: NodePath) -> void:                   doors.handle_rpc_confirm_destroy_door(door_path)
 func handle_rpc_confirm_remove_door(door_path: NodePath) -> void:                    doors.handle_rpc_confirm_remove_door(door_path)
+
+# ── Gates ─────────────────────────────────────────────────────────────────────
+func handle_rpc_request_hit_gate(sender_id: int, gate_path: NodePath) -> void:      gates.handle_rpc_request_hit_gate(sender_id, gate_path)
+func handle_rpc_confirm_toggle_gate(gate_path: NodePath) -> void:                    gates.handle_rpc_confirm_toggle_gate(gate_path)
+func handle_rpc_confirm_hit_gate(gate_path: NodePath) -> void:                       gates.handle_rpc_confirm_hit_gate(gate_path)
+func handle_rpc_confirm_destroy_gate(gate_path: NodePath) -> void:                   gates.handle_rpc_confirm_destroy_gate(gate_path)
+func handle_rpc_confirm_remove_gate(gate_path: NodePath) -> void:                    gates.handle_rpc_confirm_remove_gate(gate_path)
 
 # ── Items / Equipment / Furnace / Pickup / Drop / Throw ───────────────────────
 func handle_rpc_request_interact_hand_item(sender_id: int, hand_idx: int) -> void:                                                        items.handle_rpc_request_interact_hand_item(sender_id, hand_idx)

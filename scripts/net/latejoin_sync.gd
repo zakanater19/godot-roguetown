@@ -60,7 +60,7 @@ func sync_objects_for_late_joiner(peer_id: int) -> void:
 
 	var objects_to_sync   = []
 	var valid_object_names = []
-	var sync_groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "breakable_object"]
+	var sync_groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 
 	for group in sync_groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
@@ -190,7 +190,7 @@ func _retry_receive_player_states(player_states: Dictionary, retries: int) -> vo
 func handle_purge_missing_objects(valid_names: Array) -> void:
 	var main_node = lj.get_tree().root.get_node_or_null("Main")
 	if main_node == null: return
-	var groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "breakable_object"]
+	var groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 	for group in groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
 			if obj is Node2D and obj.get_parent() == main_node and not obj.name in valid_names:

@@ -8,6 +8,7 @@ class_name Defs
 # ---------------------------------------------------------------------------
 const GROUP_PICKABLE    = "pickable"
 const GROUP_DOOR        = "door"
+const GROUP_GATE        = "gate"
 const GROUP_CHOPPABLE   = "choppable_object"
 const GROUP_MINABLE     = "minable_object"
 const GROUP_BREAKABLE   = "breakable_object"
