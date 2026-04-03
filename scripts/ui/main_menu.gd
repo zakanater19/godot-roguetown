@@ -12,7 +12,48 @@ var _known_servers: Array =[]
 func _ready() -> void:
 	Sidebar.set_visible(false)
 	ServerBrowser.server_found.connect(_on_server_found)
+	if _check_server_restart():
+		return
+	if _check_round_restart_reconnect():
+		return
 	_check_pending_reconnect()
+
+
+func _check_server_restart() -> bool:
+	var args := OS.get_cmdline_args()
+	if not "--server-restart" in args:
+		return false
+	var max_p := 200
+	var bind_ip := "*"
+	for arg in args:
+		if arg.begins_with("--max-players="):
+			max_p = int(arg.substr(14))
+		elif arg.begins_with("--bind-ip="):
+			bind_ip = arg.substr(10)
+	LoadingScreen.show_loading("Restarting server...")
+	Host.start_host(max_p, bind_ip)
+	Lobby.init_server_lobby()
+	_transition_to_game()
+	return true
+
+
+func _check_round_restart_reconnect() -> bool:
+	var args := OS.get_cmdline_args()
+	if not "--round-restart" in args:
+		return false
+	var ip := ""
+	var port := Host.PORT
+	for arg in args:
+		if arg.begins_with("--connect-ip="):
+			ip = arg.substr(13)
+		elif arg.begins_with("--connect-port="):
+			port = int(arg.substr(15))
+	if ip == "":
+		return false
+	LoadingScreen.show_loading("Reconnecting after round restart...")
+	Host.start_client_custom(ip, port)
+	_transition_to_game()
+	return true
 
 
 func _check_pending_reconnect() -> void:
