@@ -165,10 +165,22 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Back"
 
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -33.0
+offset_right = 200.0
+offset_bottom = -10.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+text = "Version: "
+
 [connection signal="pressed" from="MainButtons/HostButton" to="." method="_on_host_pressed"]
 [connection signal="pressed" from="MainButtons/JoinButton" to="." method="_on_join_pressed"]
 [connection signal="pressed" from="MainButtons/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="HostOptionsPanel/VBoxContainer/StartHostingButton" to="." method="_on_start_hosting_pressed"]
 [connection signal="pressed" from="HostOptionsPanel/VBoxContainer/CancelHostButton" to="." method="_on_cancel_host_pressed"]
 [connection signal="pressed" from="ServerListPanel/VBoxContainer/BackButton" to="." method="_on_back_pressed"]
-

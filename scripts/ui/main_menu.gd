@@ -6,10 +6,12 @@ extends Control
 @onready var max_players_spinbox = $HostOptionsPanel/VBoxContainer/HBoxContainer/MaxPlayersSpinBox
 @onready var server_list = $ServerListPanel
 @onready var server_container = $ServerListPanel/VBoxContainer/ScrollContainer/ServerContainer
+@onready var version_label = $VersionLabel
 
 var _known_servers: Array = []
 
 func _ready() -> void:
+	version_label.text = "Version: " + GameVersion.APP_VERSION
 	Sidebar.set_visible(false)
 	ServerBrowser.server_found.connect(_on_server_found)
 	_handle_auto_restart()
@@ -35,9 +37,6 @@ func _check_pending_reconnect() -> void:
 	var path := "user://pending_reconnect.json"
 	if not FileAccess.file_exists(path):
 		return
-	# Only auto-reconnect if a patch was applied in this exact session.
-	# Without this guard a stale file left by a force-closed session (editor
-	# stop, crash, etc.) would silently skip the main menu every launch.
 	if not GameVersion.patch_applied:
 		DirAccess.remove_absolute(path)
 		return
@@ -46,18 +45,15 @@ func _check_pending_reconnect() -> void:
 		return
 	var text := file.get_as_text()
 	file.close()
-	# Do NOT delete here — LateJoin.receive_sync_complete() deletes it after a
-	# successful resume, and LateJoin._on_server_disconnected() deletes it if
-	# the connection fails, so we never loop on a dead server.
 
 	var parsed = JSON.parse_string(text)
 	if not parsed is Dictionary:
-		DirAccess.remove_absolute(path)  # malformed — discard immediately
+		DirAccess.remove_absolute(path)
 		return
 	var ip: String = str(parsed.get("ip", ""))
 	var port: int  = int(parsed.get("port", Host.PORT))
 	if ip == "":
-		DirAccess.remove_absolute(path)  # empty ip — discard
+		DirAccess.remove_absolute(path)
 		return
 
 	LoadingScreen.show_loading("Reconnecting after update...")
@@ -80,7 +76,6 @@ func _on_cancel_host_pressed() -> void:
 	main_buttons.visible = true
 
 func _on_join_pressed() -> void:
-	# Clear previous list on new join attempt
 	_known_servers.clear()
 	for child in server_container.get_children():
 		child.queue_free()
@@ -92,7 +87,6 @@ func _on_join_pressed() -> void:
 func _on_server_found(ip: String, port: int, current_players: int = 1, max_players: int = 200) -> void:
 	var server_id = ip + ":" + str(port)
 	
-	# Check our tracking list instead of the UI tree
 	if server_id in _known_servers:
 		return
 	
@@ -109,15 +103,11 @@ func _join_game(ip: String, port: int) -> void:
 	ServerBrowser.stop_listening()
 	LoadingScreen.show_loading("Connecting to server...")
 	Host.start_client_custom(ip, port)
-	# Load the game scene immediately so Main/PlayerSpawner exists before the server
-	# tries to replicate existing entities to us.  Version check + any PCK patch run
-	# in the background and complete before request_sync is sent (_process gates on
-	# both map_loaded AND version_checked).
 	_transition_to_game()
 
 func _on_back_pressed() -> void:
 	ServerBrowser.stop_listening()
-	_known_servers.clear() # Reset list
+	_known_servers.clear()
 	host_options.visible = false
 	main_buttons.visible = true
 	server_list.visible = false
