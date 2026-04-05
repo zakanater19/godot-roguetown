@@ -37,8 +37,6 @@ func _load_all_items(force_replace: bool = false) -> void:
 	dir.list_dir_end()
 
 ## Re-scan res://items/ after a PCK patch has been mounted.
-## Uses CACHE_MODE_REPLACE so the ResourceLoader discards pre-patch cached
-## objects and reads fresh data from the now-updated virtual filesystem.
 func reload() -> void:
 	_scene_paths_cache.clear()
 	_item_data_cache.clear()
@@ -46,7 +44,6 @@ func reload() -> void:
 	_load_all_items(true)
 
 ## Overwrite (or insert) an item definition received from the server.
-## Called by GameVersion.apply_resource_diff on version-mismatched clients.
 func patch_item(item: ItemData) -> void:
 	_item_data_cache[item.item_type] = item
 	_icon_cache.erase(item.item_type)   # invalidate cached icon for this type
@@ -72,18 +69,26 @@ func get_item_icon(item_type: String) -> Texture2D:
 		return null
 
 	var region_rect := Rect2(0, 0, tex.get_width(), tex.get_height())
-	var scene_path := get_scene_path(item_type)
-	if scene_path != "":
-		var scene := load(scene_path) as PackedScene
-		if scene != null:
-			var state := scene.get_state()
-			for i in range(state.get_node_count()):
-				if state.get_node_name(i) == "Sprite2D":
-					for j in range(state.get_node_property_count(i)):
-						if state.get_node_property_name(i, j) == "region_rect":
-							region_rect = state.get_node_property_value(i, j)
-							break
-					break
+	
+	# 1. Check if item uses a specific column index on a spritesheet (e.g. Pickaxe, Coal).
+	#    These are 64px wide columns.
+	if item_data.sprite_col >= 0:
+		region_rect = Rect2(item_data.sprite_col * 64, 0, 64, 64)
+	else:
+		# 2. For items with custom cropping in their scene (e.g. LeatherBoots).
+		#    We load the scene to fetch the exact region_rect defined in the Sprite2D.
+		var scene_path := get_scene_path(item_type)
+		if scene_path != "":
+			var scene := load(scene_path) as PackedScene
+			if scene != null:
+				var state := scene.get_state()
+				for i in range(state.get_node_count()):
+					if state.get_node_name(i) == "Sprite2D":
+						for j in range(state.get_node_property_count(i)):
+							if state.get_node_property_name(i, j) == "region_rect":
+								region_rect = state.get_node_property_value(i, j)
+								break
+						break
 
 	var atlas := AtlasTexture.new()
 	atlas.atlas = tex

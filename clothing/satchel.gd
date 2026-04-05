@@ -76,7 +76,7 @@ func _input(event: InputEvent) -> void:
 	var drag_dist: float = event.position.distance_to(_drag_press_screen)
 	if drag_dist <= DRAG_THRESHOLD: return
 
-	var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y  / TILE_SIZE))
+	var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	var diff: Vector2i = (my_tile - player.tile_pos).abs()
 	if diff.x > 1 or diff.y > 1: return
 
@@ -104,7 +104,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			var player: Node = World.get_local_player()
 			if player == null or player.z_level != z_level: return
 
-			var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y  / TILE_SIZE))
+			var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 			var diff: Vector2i = (my_tile - player.tile_pos).abs()
 			if diff.x > 1 or diff.y > 1: return
 
@@ -198,7 +198,22 @@ func _refresh_ui() -> void:
 			var amt = slot_entry.get("state", {}).get("amount", 1)
 			
 			var icon_tex = null
-			if item_registry != null and item_registry.has_method("get_item_icon"):
+			
+			# Check if item is a coin to load the correct stack sprite
+			if itype.ends_with("Coin") and slot_entry.has("state"):
+				var state = slot_entry.get("state", {})
+				var metal_type = state.get("metal_type", 0)
+				var amount = state.get("amount", 1)
+				
+				var suffix = ["copper", "silver", "gold"][metal_type]
+				var thresholds = [20, 15, 10, 5, 4, 3, 2, 1]
+				for ta in thresholds:
+					if amount >= ta:
+						var path = "res://objects/coins/" + str(ta) + suffix + ".png"
+						if ResourceLoader.exists(path):
+							icon_tex = load(path)
+							break
+			elif item_registry != null and item_registry.has_method("get_item_icon"):
 				icon_tex = item_registry.get_item_icon(itype)
 				
 			if icon_tex != null:
@@ -224,7 +239,7 @@ func _on_slot_pressed(slot_index: int) -> void:
 	var player: Node = World.get_local_player()
 	if player == null: return
 
-	var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y  / TILE_SIZE))
+	var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	var diff: Vector2i = (my_tile - player.tile_pos).abs()
 	if diff.x > 1 or diff.y > 1 or player.z_level != z_level:
 		_close_ui()

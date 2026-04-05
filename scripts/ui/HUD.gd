@@ -160,6 +160,7 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 		var _idata = ItemRegistry.get_by_type(item_name) if item_name != null else null
 
 		if _idata != null and _idata.hud_texture_path != "":
+			# ── Special Case: HOOD ───────────────────────────────────
 			if item_name == "Hood" and slot_name == "face":
 				var face_data = equipped_data.get("face", null)
 				var hood_up: bool = false
@@ -179,6 +180,44 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 				amt_lbl.visible = false
 				continue
 
+			# ── Special Case: COINS (Dynamic Stack Sprites) ──────────
+			elif item_name.ends_with("Coin"):
+				var edata = equipped_data.get(slot_name)
+				var amt = 1
+				var mtype = 0
+				if typeof(edata) == TYPE_DICTIONARY:
+					# Satchels wrap item data inside a "state" dictionary
+					if edata.has("state"):
+						var state = edata["state"]
+						amt = state.get("amount", 1)
+						mtype = state.get("metal_type", 0)
+					else:
+						# Pockets and hands save data flatly
+						amt = edata.get("amount", 1)
+						mtype = edata.get("metal_type", 0)
+				
+				var suffix = ["copper", "silver", "gold"][mtype]
+				var thresholds = [20, 15, 10, 5, 4, 3, 2, 1]
+				var icon_path = ""
+				for ta in thresholds:
+					if amt >= ta:
+						var p = "res://objects/coins/" + str(ta) + suffix + ".png"
+						if ResourceLoader.exists(p):
+							icon_path = p
+							break
+							
+				if icon_path != "":
+					var tex = load(icon_path)
+					if tex != null:
+						icon.texture        = tex
+						icon.region_enabled = false
+						var max_dim = max(tex.get_width(), tex.get_height())
+						icon.scale   = Vector2(32.0 / max_dim, 32.0 / max_dim) if max_dim > 0 else Vector2.ONE
+						icon.visible = true
+						amt_lbl.visible = false
+						continue
+
+			# ── General Case: Standard Item ──────────────────────────
 			var atlas: AtlasTexture = ItemRegistry.get_item_icon(item_name) as AtlasTexture
 			if atlas != null:
 				icon.texture        = atlas

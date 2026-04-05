@@ -194,7 +194,27 @@ func refresh_loot_panel() -> void:
 		var item = loot_target.equipped.get(es, null)
 		if item != null and item is String and item != "":
 			var icon_tex = null
-			if item_registry != null and item_registry.has_method("get_item_icon"):
+
+			# ── Special Case: COINS (Dynamic Stack Sprites) ──────────
+			if item.ends_with("Coin"):
+				var edata = loot_target.equipped_data.get(es)
+				var amt = 1
+				var mtype = 0
+				if typeof(edata) == TYPE_DICTIONARY:
+					# Pockets and hands usually store flat data
+					amt = edata.get("amount", 1)
+					mtype = edata.get("metal_type", 0)
+				
+				var suffix = ["copper", "silver", "gold"][mtype]
+				var thresholds = [20, 15, 10, 5, 4, 3, 2, 1]
+				for ta in thresholds:
+					if amt >= ta:
+						var p = "res://objects/coins/" + str(ta) + suffix + ".png"
+						if ResourceLoader.exists(p):
+							icon_tex = load(p)
+							break
+			# ── General Case: Standard Items ──────────────────────────
+			elif item_registry != null and item_registry.has_method("get_item_icon"):
 				icon_tex = item_registry.get_item_icon(item)
 
 			if icon_tex != null:
