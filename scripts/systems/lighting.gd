@@ -283,7 +283,7 @@ func _process(delta: float) -> void:
 	var roof_data := roof_map_image.get_data()
 
 	if player_tile != Vector2i(-9999, -9999):
-		var ambient = 0.1
+		var ambient = 0.0
 
 		var view_radius_x = 16
 		var view_radius_y = 11
