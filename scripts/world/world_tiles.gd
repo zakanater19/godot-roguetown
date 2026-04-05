@@ -25,8 +25,7 @@ func is_solid(pos: Vector2i, z_level: int) -> bool:
 func is_opaque(pos: Vector2i, z_level: int) -> bool:
 	var tm = world.get_tilemap(z_level)
 	if tm != null and tm.get_cell_source_id(pos) == 1:
-		# Wooden window (10,0) is solid but transparent — light/FOV passes through
-		if tm.get_cell_atlas_coords(pos) != Vector2i(10, 0): return true
+		if TileDefs.is_opaque(1, tm.get_cell_atlas_coords(pos)): return true
 	if world.solid_grid[z_level].has(pos):
 		for obj in world.solid_grid[z_level][pos]:
 			if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
@@ -40,10 +39,10 @@ func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	if is_solid(next, z_level): return from
 	return next
 
-func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "") -> void:
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0)) -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
-	tm.set_cell(pos, 0, Vector2i(9, 0)) 
+	tm.set_cell(pos, 0, break_floor)
 	Lighting.update_roof_map_at(pos)
 	var scene = load("res://objects/rock.tscn") as PackedScene
 	if scene:
@@ -54,27 +53,7 @@ func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "
 		parent.add_child(rock)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
-	match source_id:
-		0:
-			match atlas_coords:
-				Vector2i(0, 0): return "short tangled grass, wild and unkempt"
-				Vector2i(1, 0): return "rough cobble, jagged worn stones"
-				Vector2i(2, 0): return "rough dirt, uneven and loose"
-				Vector2i(4, 0): return "worn wooden planks, creaking underfoot"
-				Vector2i(5, 0): return "cobblestone floor, rough and uneven"
-				Vector2i(8, 0): return "greenblocks, a green patterned floor"
-				Vector2i(9, 0): return "loose rock, scattered debris on the floor"
-				_: return "floor, some kind of stone"
-		1:
-			match atlas_coords:
-				Vector2i(3, 0): return "a rock wall, solid and immovable"
-				Vector2i(6, 0): return "a stone wall, solid but workable"
-				Vector2i(7, 0): return "a wooden wall, solid and sturdy"
-				Vector2i(10, 0): return "a wooden window, solid but lets light through"
-				_: return "a wall"
-		2: return "a set of stairs"
-		5: return "water, murky and still"
-		_: return "empty space, nothing here"
+	return TileDefs.get_description(source_id, atlas_coords)
 
 func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
@@ -218,6 +197,12 @@ func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool
 	if player.has_method("_start_move_lerp"): player._start_move_lerp()
 	if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").update_player_state(peer_id, {"position": player.position})
 
+func _get_held_tool_type(item: Node) -> String:
+	var i_type = item.get("item_type")
+	if (i_type == "Sword") or ("Sword" in item.name) or (i_type == "Dirk"): return Defs.TOOL_SLASHING
+	if (i_type == "Pickaxe") or ("Pickaxe" in item.name): return Defs.TOOL_PICKAXE
+	return ""
+
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if not world.multiplayer.is_server(): return
 	var attacker: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
@@ -228,50 +213,32 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand): return
 	if (pos - attacker.tile_pos).abs().x > 1 or (pos - attacker.tile_pos).abs().y > 1: return
 	if not world.utils.server_check_action_cooldown(attacker): return
-	var holding_sword: bool = false
-	var holding_pickaxe: bool = false
+	var def: Dictionary = TileDefs.get_def(1, atlas_coords)
+	if def.is_empty(): return
+	var tool_type: String = ""
 	if attacker.hands[attacker.active_hand] != null:
-		var h = attacker.hands[attacker.active_hand]
-		var i_type = h.get("item_type")
-		if (i_type == "Sword") or ("Sword" in h.name) or (i_type == "Dirk"): holding_sword = true
-		elif (i_type == "Pickaxe") or ("Pickaxe" in h.name): holding_pickaxe = true
-	var hits_needed: int
-	if atlas_coords == Vector2i(3, 0):
-		if holding_sword: return
-		hits_needed = world.WALL_HITS_TO_BREAK
-	elif atlas_coords == Vector2i(6, 0):
-		if holding_sword: return
-		hits_needed = world.STONE_WALL_HITS_TO_BREAK
-	elif atlas_coords == Vector2i(7, 0):
-		if holding_sword: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
-		elif holding_pickaxe and attacker.combat_mode: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
-		else: return
-	elif atlas_coords == Vector2i(10, 0):
-		# Wooden window — breakable with a sword or pickaxe in combat mode
-		if holding_sword: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
-		elif holding_pickaxe and attacker.combat_mode: hits_needed = world.WOODEN_WALL_HITS_TO_BREAK
-		else: return
-	else: return
+		tool_type = _get_held_tool_type(attacker.hands[attacker.active_hand])
+	if not TileDefs.is_tool_allowed(def, tool_type, attacker.combat_mode): return
+	var hits_needed: int = def["break_hits"]
 	if not world.tile_hit_counts[attacker.z_level].has(pos): world.tile_hit_counts[attacker.z_level][pos] = 0
 	world.tile_hit_counts[attacker.z_level][pos] += 1
 	if world.tile_hit_counts[attacker.z_level][pos] >= hits_needed:
 		world.tile_hit_counts[attacker.z_level].erase(pos)
-		if atlas_coords == Vector2i(3, 0):
-			world.rpc_confirm_break_wall.rpc(pos, attacker.z_level, "WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
-		elif atlas_coords == Vector2i(7, 0) or atlas_coords == Vector2i(10, 0):
-			world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, Vector2i(4, 0))
-		else: world.rpc_confirm_break_stone_wall.rpc(pos, attacker.z_level)
+		if def.get("break_type") == TileDefs.BREAK_DEBRIS:
+			world.rpc_confirm_break_wall.rpc(pos, attacker.z_level, "WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000), def["break_floor"])
+		else:
+			world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, def["break_floor"])
 	else: world.rpc_confirm_hit_wall.rpc(pos, attacker.z_level)
 
 func handle_rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main != null and main.has_method("shake_tile"): main.shake_tile(pos, z_level)
 
-func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String) -> void:
+func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i) -> void:
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main != null:
-		break_wall(pos, z_level, main, rock_name)
-		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, z_level, 0, Vector2i(9, 0))
+		break_wall(pos, z_level, main, rock_name, break_floor)
+		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, z_level, 0, break_floor)
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	var tm = world.get_tilemap(z_level)
@@ -281,10 +248,3 @@ func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int
 	if world.has_node("/root/LateJoin"):
 		world.get_node("/root/LateJoin").register_tile_change(pos, z_level, source_id, atlas_coords)
 
-func handle_rpc_confirm_break_stone_wall(pos: Vector2i, z_level: int) -> void:
-	var tm = world.get_tilemap(z_level)
-	if tm == null: return
-	tm.set_cell(pos, 0, Vector2i(5, 0))
-	Lighting.update_roof_map_at(pos)
-	if world.has_node("/root/LateJoin"):
-		world.get_node("/root/LateJoin").register_tile_change(pos, z_level, 0, Vector2i(5, 0))

@@ -10,9 +10,6 @@ var tilemap: TileMapLayer = null
 var solid_grid: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
 var tile_hit_counts: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
 
-const WALL_HITS_TO_BREAK: int = 3
-const STONE_WALL_HITS_TO_BREAK: int = 10
-const WOODEN_WALL_HITS_TO_BREAK: int = 5
 
 var server_action_cooldowns: Dictionary = {}
 
@@ -106,8 +103,8 @@ func is_opaque(pos: Vector2i, z_level: int) -> bool:
 func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	return tiles.try_move(from, z_level, dir)
 
-func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "") -> void:
-	tiles.break_wall(pos, z_level, parent, rock_name)
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0)) -> void:
+	tiles.break_wall(pos, z_level, parent, rock_name, break_floor)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return tiles.get_tile_description(source_id, atlas_coords)
@@ -237,16 +234,13 @@ func rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
 	tiles.handle_rpc_confirm_hit_wall(pos, z_level)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String) -> void:
-	tiles.handle_rpc_confirm_break_wall(pos, z_level, rock_name)
+func rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i) -> void:
+	tiles.handle_rpc_confirm_break_wall(pos, z_level, rock_name, break_floor)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	tiles.handle_rpc_confirm_replace_tile(pos, z_level, source_id, atlas_coords)
 
-@rpc("authority", "call_local", "reliable")
-func rpc_confirm_break_stone_wall(pos: Vector2i, z_level: int) -> void:
-	tiles.handle_rpc_confirm_break_stone_wall(pos, z_level)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_rock(rock_path: NodePath) -> void:

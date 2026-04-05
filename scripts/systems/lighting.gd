@@ -99,7 +99,7 @@ func rebuild_roof_map() -> void:
 							continue
 
 						var idx = (pos.y * 1000 + pos.x) * 2
-						if source_id == 1:
+						if TileDefs.is_opaque(source_id, tm.get_cell_atlas_coords(pos)):
 							if z > roof_data[idx]: roof_data[idx] = z
 						# All non-stair tiles count as a roof for levels below them
 						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
@@ -140,9 +140,8 @@ func update_roof_map_at(pos: Vector2i) -> void:
 
 		var is_opaque = false
 		if source_id == 1:
-			# Wooden window (10,0) is solid but transparent — light passes through
 			var atlas_coords := Vector2i(-1, -1) if tm == null else tm.get_cell_atlas_coords(pos)
-			if atlas_coords != Vector2i(10, 0):
+			if TileDefs.is_opaque(source_id, atlas_coords):
 				is_opaque = true
 		elif World.solid_grid.has(z) and World.solid_grid[z].has(pos):
 			for obj in World.solid_grid[z][pos]:
