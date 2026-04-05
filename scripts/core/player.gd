@@ -810,6 +810,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						Sidebar.add_message("[color=#ffaaaa]there is something blocking your view above[/color]")
 					else:
 						view_z_level = z_level + 1
+						Sidebar.add_message("[color=#aaccff]You look up.[/color]")
 			get_viewport().set_input_as_handled()
 			return
 
@@ -913,12 +914,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_face_toward(mouse_world)
 
 		if hands[active_hand] != null and throwing_mode:
-			if exhausted: Sidebar.add_message("[color=#ffaaaa]You are too exhausted to throw![/color]")
-			else:
-				if stamina < 5.0:
-					exhausted = true; Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
-				_spend_stamina(5.0)
-				_throw_held_object(mouse_world)
+			_throw_held_object(mouse_world)
 		else: _use_held_object(mouse_world)
 
 @rpc("any_peer", "call_remote", "reliable")

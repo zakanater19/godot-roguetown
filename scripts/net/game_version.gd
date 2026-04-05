@@ -5,7 +5,7 @@ extends Node
 ## that a PCK patch alone cannot fix (i.e. any .gd change, new node types, etc.).
 ## Clients with a different APP_VERSION are told to download the new executable
 ## rather than being patched — preventing crashes from script/binary mismatches.
-const APP_VERSION: String = "1775370518"
+const APP_VERSION: String = "1775406479"
 
 ## Directories whose .tres files are included in both the version hash AND the
 ## server PCK.  Keep this list in sync with _stage_res_dir_recursive's allowed[].

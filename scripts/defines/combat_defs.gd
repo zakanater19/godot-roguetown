@@ -64,7 +64,7 @@ const EXHAUSTED_DELAY_MULT:    float = 3.0    # action delay multiplier when exh
 # ---------------------------------------------------------------------------
 const STAMINA_MAX:                  float = 100.0  # starting and maximum stamina
 const STAMINA_REGEN_DELAY:          float = 5.0    # seconds after exertion before regen starts
-const STAMINA_REGEN_RATE:           float = 1.0    # stamina per second during regen
+const STAMINA_REGEN_RATE:           float = 4.0    # stamina per second during regen
 const STAMINA_EXHAUSTION_THRESHOLD: float = 10.0   # stamina must reach this to clear exhausted
 const STAMINA_EXERTION_COST:        float = 5.0    # stamina spent per physical action
 

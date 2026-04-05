@@ -83,7 +83,7 @@ func get_detailed_description() -> String:
 			desc += "\n[color=gray]" + slot + ":[/color] " + item
 
 	if is_me and player.body != null:
-		var limb_display: Array = [["head", "head"], ["chest", "chest"], ["r_arm", "right arm"], ["l_arm", "left arm"], ["r_leg", "right leg"], ["l_leg", "left leg"]]
+		var limb_display: Array = [["head", "head"], ["chest", "chest"], ["r_arm", "right arm"],["l_arm", "left arm"], ["r_leg", "right leg"],["l_leg", "left leg"]]
 		for entry in limb_display:
 			var limb_key: String   = entry[0]
 			var limb_label: String = entry[1]
@@ -171,7 +171,7 @@ func inspect_at(world_pos: Vector2) -> void:
 			show_inspect_text(short_desc, detailed_desc)
 		return
 
-	for group in ["pickable", "minable_object", "inspectable", "choppable_object", "door", "breakable_object"]:
+	for group in["pickable", "minable_object", "inspectable", "choppable_object", "door", "breakable_object"]:
 		var best: Node = null
 		best_dist = INF
 		for obj in player.get_tree().get_nodes_in_group(group):
@@ -252,13 +252,20 @@ func spend_stamina(amount: float) -> void:
 func check_stamina_regen(delta: float) -> void:
 	if not player._is_local_authority():
 		return
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if current_time - player.last_exertion_time >= CombatDefs.STAMINA_REGEN_DELAY:
-		if player.stamina < player.max_stamina:
-			player.stamina = clamp(player.stamina + (delta * CombatDefs.STAMINA_REGEN_RATE), 0.0, player.max_stamina)
-			if player.exhausted and player.stamina >= CombatDefs.STAMINA_EXHAUSTION_THRESHOLD:
-				player.exhausted = false
-				Sidebar.add_message("[color=#aaffaa]You have caught your breath.[/color]")
+
+	if player.combat_mode:
+		player.stamina = clamp(player.stamina - (delta * 0.25), 0.0, player.max_stamina)
+		if player.stamina <= 0.0 and not player.exhausted:
+			player.exhausted = true
+			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
+	else:
+		var current_time = Time.get_ticks_msec() / 1000.0
+		if current_time - player.last_exertion_time >= CombatDefs.STAMINA_REGEN_DELAY:
+			if player.stamina < player.max_stamina:
+				player.stamina = clamp(player.stamina + (delta * CombatDefs.STAMINA_REGEN_RATE), 0.0, player.max_stamina)
+				if player.exhausted and player.stamina >= CombatDefs.STAMINA_EXHAUSTION_THRESHOLD:
+					player.exhausted = false
+					Sidebar.add_message("[color=#aaffaa]You have caught your breath.[/color]")
 
 # ===========================================================================
 # Offsets Loading
@@ -329,7 +336,7 @@ func get_clothing_transform(item_name: String, facing_name: String) -> Dictionar
 	if clothing_offsets.has(item_name) and clothing_offsets[item_name].has(facing_name):
 		var entry = clothing_offsets[item_name][facing_name]
 		return {
-			"offset": Vector2(float(entry.get("offset", [0, 0])[0]), float(entry.get("offset", [0, 0])[1])),
+			"offset": Vector2(float(entry.get("offset", [0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
 			"scale":  float(entry.get("scale", 1.0))
 		}
 	return {"offset": Vector2.ZERO, "scale": 1.0}
