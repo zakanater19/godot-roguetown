@@ -11,15 +11,15 @@ func _init(p_player: Node2D) -> void:
 # ===========================================================================
 
 func apply_action_cooldown(item: Node, is_attack: bool = false) -> void:
-	var delay = 0.5
+	var delay = CombatDefs.DEFAULT_ACTION_DELAY
 	if item != null and item.has_method("get_use_delay"):
 		delay = item.get_use_delay()
 
-	if is_attack and delay < 1.0:
-		delay = 1.0
+	if is_attack and delay < CombatDefs.MIN_ATTACK_DELAY:
+		delay = CombatDefs.MIN_ATTACK_DELAY
 
 	if player.exhausted:
-		delay *= 3.0
+		delay *= CombatDefs.EXHAUSTED_DELAY_MULT
 
 	player.action_cooldown = delay
 

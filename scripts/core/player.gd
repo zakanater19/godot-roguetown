@@ -4,7 +4,7 @@ extends Node2D
 const MOVE_TIME:   float = 0.22
 const THROW_TILES:    int   = 4
 const THROW_DURATION: float = 0.18
-const DROP_SPREAD:    float = 14.0
+const DROP_SPREAD:    float = Defs.DROP_SPREAD
 
 const FACING_NAMES: Array =["south", "north", "east", "west"]
 
@@ -91,8 +91,8 @@ var _sneak_was_hidden: bool = false
 var prices_shown: bool = false
 var stats: Dictionary = {"strength": 10, "agility": 10}
 var health: int = 100
-var stamina: float = 100.0
-var max_stamina: float = 100.0
+var stamina: float = CombatDefs.STAMINA_MAX
+var max_stamina: float = CombatDefs.STAMINA_MAX
 var last_exertion_time: float = 0.0
 var _blood_drip_timer: float = 0.0
 

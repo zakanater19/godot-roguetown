@@ -77,8 +77,7 @@ func get_detailed_description() -> String:
 			lhand_name = player.hands[1].name.get_slice("@", 0)
 		desc += "\n[color=gray]left hand:[/color] " + lhand_name
 
-	var slots_order: Array[String] = ["head", "face", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
-	for slot in slots_order:
+	for slot in Defs.SLOTS_ALL:
 		var item = player.equipped.get(slot, null)
 		if item != null and item is String and item != "":
 			desc += "\n[color=gray]" + slot + ":[/color] " + item
@@ -88,20 +87,20 @@ func get_detailed_description() -> String:
 		for entry in limb_display:
 			var limb_key: String   = entry[0]
 			var limb_label: String = entry[1]
-			var damage_taken: int  = 70 - player.body.limb_hp[limb_key]
+			var damage_taken: int  = CombatDefs.LIMB_HP_MAX - player.body.limb_hp[limb_key]
 			if damage_taken > 0:
 				desc += "\n[color=gray]" + limb_label + ":[/color] " + _get_limb_status(damage_taken)
 
 	return desc
 
 func _get_limb_status(damage_taken: int) -> String:
-	if damage_taken >= 70:
+	if damage_taken >= CombatDefs.LIMB_BROKEN:
 		return "[color=#cc0000]broken[/color]"
-	elif damage_taken >= 60:
+	elif damage_taken >= CombatDefs.LIMB_MANGLED:
 		return "[color=#ff2200]mangled[/color]"
-	elif damage_taken >= 40:
+	elif damage_taken >= CombatDefs.LIMB_SEVERE:
 		return "[color=#ff6600]severely injured[/color]"
-	elif damage_taken >= 20:
+	elif damage_taken >= CombatDefs.LIMB_INJURED:
 		return "[color=#ffaa00]injured[/color]"
 	else:
 		return "[color=#ffdd44]a little injured[/color]"
@@ -158,7 +157,7 @@ func inspect_at(world_pos: Vector2) -> void:
 					is_npc_disguised = best_npc.backend.is_disguised()
 
 				if not is_npc_disguised:
-					var outsiders = ["adventurer", "bandit"]
+					var outsiders = Defs.OUTSIDER_CLASSES
 					if best_npc.character_class == "king":
 						detailed_desc += "\n[color=#88ccaa]I know them as the king.[/color]"
 					elif not (player.character_class in outsiders):
@@ -229,17 +228,11 @@ func apply_class_defaults() -> void:
 		var variation = randi_range(-1, 1)
 		player.stats[stat_name] = clamp(base_val + variation, 0, 20)
 
-	player.equipped = {
-		"head": null, "face": null, "cloak": null, "armor": null,
-		"backpack": null, "gloves": null, "waist": null, "clothing": null,
-		"trousers": null, "feet": null, "pocket_l": null, "pocket_r": null
-	}
-
-	player.equipped_data = {
-		"head": null, "face": null, "cloak": null, "armor": null,
-		"backpack": null, "gloves": null, "waist": null, "clothing": null,
-		"trousers": null, "feet": null, "pocket_l": null, "pocket_r": null
-	}
+	player.equipped      = {}
+	player.equipped_data = {}
+	for s in Defs.SLOTS_ALL:
+		player.equipped[s]      = null
+		player.equipped_data[s] = null
 
 	for slot in class_data["equipment"]:
 		player.equipped[slot] = class_data["equipment"][slot]
@@ -260,10 +253,10 @@ func check_stamina_regen(delta: float) -> void:
 	if not player._is_local_authority():
 		return
 	var current_time = Time.get_ticks_msec() / 1000.0
-	if current_time - player.last_exertion_time >= 5.0:
+	if current_time - player.last_exertion_time >= CombatDefs.STAMINA_REGEN_DELAY:
 		if player.stamina < player.max_stamina:
-			player.stamina = clamp(player.stamina + (delta * 1.0), 0.0, player.max_stamina)
-			if player.exhausted and player.stamina >= 10.0:
+			player.stamina = clamp(player.stamina + (delta * CombatDefs.STAMINA_REGEN_RATE), 0.0, player.max_stamina)
+			if player.exhausted and player.stamina >= CombatDefs.STAMINA_EXHAUSTION_THRESHOLD:
 				player.exhausted = false
 				Sidebar.add_message("[color=#aaffaa]You have caught your breath.[/color]")
 
@@ -308,7 +301,8 @@ func get_hand_transform(item_name: String, facing_name: String, hand: String) ->
 		res.scale    = float(entry.get(hand + "_scale", 1.0))
 		return res
 
-	var base_y: float = -10.0 if item_name == "Sword" else 0.0
+	var _fallback_data = ItemRegistry.get_by_type(item_name)
+	var base_y: float = _fallback_data.hand_offset_y if _fallback_data != null else 0.0
 	if hand == "right":
 		match facing_name:
 			"south": res.offset = Vector2( 20.0,   8.0 + base_y)
@@ -327,8 +321,8 @@ func get_hand_transform(item_name: String, facing_name: String, hand: String) ->
 			"north": res.offset = Vector2(-12.0, 4.0)
 			"east":  res.offset = Vector2(  0.0, 4.0)
 			"west":  res.offset = Vector2(  0.0, 4.0)
-		if item_name == "Sword":
-			res.rotation = 45.0
+		var _wd = ItemRegistry.get_by_type(item_name)
+		if _wd != null: res.rotation = _wd.waist_rotation
 	return res
 
 func get_clothing_transform(item_name: String, facing_name: String) -> Dictionary:

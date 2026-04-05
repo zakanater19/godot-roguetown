@@ -14,9 +14,11 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 		for h in defender.get("hands"):
 			if h != null:
 				var i_type = h.get("item_type")
-				if (i_type != null and (i_type == "Sword" or i_type == "Dirk")) or ("Sword" in h.name) or ("Dirk" in h.name):
-					d_has_sword = true
-					break
+				if i_type != null:
+					var _idata = ItemRegistry.get_by_type(i_type)
+					if _idata != null and _idata.can_parry:
+						d_has_sword = true
+						break
 	var a_skill = 0
 	if attacker != null and attacker.is_in_group("player") and is_sword_attack:
 		if "skills" in attacker: a_skill = attacker.get("skills").get("sword_fighting", 0)
@@ -224,7 +226,9 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 	if not world.utils.server_check_action_cooldown(attacker, true): return
 	var held_item = attacker.hands[attacker.get("active_hand")]
 	var amount: int = attacker._get_weapon_damage(held_item)
-	var is_sword = held_item != null and (held_item.get("item_type") in["Sword", "Dirk"] or "Sword" in held_item.name or "Dirk" in held_item.name)
+	var _held_itype = held_item.get("item_type") if held_item != null else null
+	var _held_idata = ItemRegistry.get_by_type(_held_itype) if _held_itype != null else null
+	var is_sword = _held_idata != null and _held_idata.can_parry
 	var entities = world.utils.get_entities_at_tile(tile, attacker.get("z_level"), sender_id)
 	for entity in entities:
 		var roll = calculate_combat_roll(attacker, entity, amount, is_sword)

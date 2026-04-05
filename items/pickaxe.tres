@@ -17,3 +17,4 @@ too_large_for_satchel = true
 pickable = true
 hud_texture_path = "res://objects/objects.png"
 mob_texture_path = "res://objects/objects.png"
+waist_sprite_scale = 0.75

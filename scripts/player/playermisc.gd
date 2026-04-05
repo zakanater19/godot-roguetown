@@ -3,14 +3,11 @@ extends RefCounted
 
 var player: Node2D
 
-const TILE_SIZE: int = 64
-
 # --- LOOTING STATE ---
 var loot_panel: Control = null
 var loot_target: Node = null
 var loot_slot_controls: Dictionary = {}
-var active_loot_attempts: Array =[]
-const LOOT_DURATION: float = 4.0
+var active_loot_attempts: Array = []
 
 func _init(p_player: Node2D) -> void:
 	player = p_player
@@ -120,20 +117,9 @@ func open_target_inventory(target: Node) -> void:
 	equip_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(equip_lbl)
 
-	var equip_slots := [
-		["head", "Head"],
-		["face", "Face"],
-		["cloak", "Cloak"],["armor", "Chest"],
-		["backpack", "Backpack"],
-		["gloves", "Gloves"],["waist", "Waist"],["clothing", "Clothing"],
-		["trousers", "Trousers"],
-		["feet", "Feet"],
-		["pocket_l", "L. Pocket"],
-		["pocket_r", "R. Pocket"]
-	]
-	for es in equip_slots:
-		var slot_key: String = "equip_" + es[0]
-		var row := _build_slot_row(vbox, es[1], slot_key)
+	for es in Defs.SLOTS_ALL:
+		var slot_key: String = "equip_" + es
+		var row := _build_slot_row(vbox, Defs.SLOT_DISPLAY[es], slot_key)
 		loot_slot_controls[slot_key] = row
 
 	refresh_loot_panel()
@@ -199,8 +185,7 @@ func refresh_loot_panel() -> void:
 			btn.icon     = null
 			btn.disabled = true
 
-	var equip_slots := ["head", "face", "cloak", "armor", "backpack", "gloves", "waist", "clothing", "trousers", "feet", "pocket_l", "pocket_r"]
-	for es in equip_slots:
+	for es in Defs.SLOTS_ALL:
 		var sk: String = "equip_" + es
 		if not loot_slot_controls.has(sk):
 			continue
@@ -325,20 +310,20 @@ func _update_loot_attempts(delta: float) -> void:
 		attempt["elapsed"]       += delta
 		attempt["blink_elapsed"] += delta
 
-		var progress: float = clamp(attempt["elapsed"] / LOOT_DURATION, 0.0, 1.0)
+		var progress: float = clamp(attempt["elapsed"] / Defs.LOOT_DURATION, 0.0, 1.0)
 		var dot_count: int = clamp(int(progress * 5.0) + 1, 1, 5)
 		var dot_str: String = ""
 		for _d in range(dot_count):
 			dot_str += "."
 
-		if attempt["blink_elapsed"] >= 0.25:
+		if attempt["blink_elapsed"] >= Defs.LOOT_BLINK_INTERVAL:
 			attempt["blink_elapsed"] = 0.0
 			prog_lbl.visible = not prog_lbl.visible
 
 		if prog_lbl.visible:
 			prog_lbl.text = dot_str
 
-		if attempt["elapsed"] >= LOOT_DURATION:
+		if attempt["elapsed"] >= Defs.LOOT_DURATION:
 			completed_keys.append(slot_key)
 
 	for sk in completed_keys:

@@ -32,7 +32,7 @@ func handle_rpc_request_loot_item(sender_id: int, target_path: NodePath, looter_
 	if diff.x > 1 or diff.y > 1 or target.z_level != looter.z_level: return
 
 	var drop_tile: Vector2i = target.tile_pos
-	const SPREAD: float = 14.0
+	const SPREAD: float = Defs.DROP_SPREAD
 
 	if slot_type == "hand":
 		var idx: int  = int(slot_index)

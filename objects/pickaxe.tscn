@@ -1,14 +1,16 @@
-[gd_scene load_steps=4 format=4 uid="uid://cpickaxe01sc"]
+[gd_scene load_steps=5 format=4 uid="uid://cpickaxe01sc"]
 
-[ext_resource type="Script" uid="uid://cpickaxe01gd" path="res://objects/pickaxe.gd" id="1_pkgd"]
+[ext_resource type="Script" path="res://objects/object_item.gd" id="1_oigd"]
 [ext_resource type="Texture2D" path="res://objects/objects.png" id="2_objtex"]
+[ext_resource type="Resource" path="res://items/pickaxe.tres" id="3_itemdata"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(50, 46)
 
 [node name="Pickaxe" type="Area2D"]
 z_index = 5
-script = ExtResource("1_pkgd")
+script = ExtResource("1_oigd")
+item_data = ExtResource("3_itemdata")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 scale = Vector2(0.75, 0.75)

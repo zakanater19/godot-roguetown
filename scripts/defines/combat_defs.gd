@@ -58,3 +58,21 @@ const RESIST_COOLDOWN_MS:      int   = 1000
 const DEFAULT_ACTION_DELAY:    float = 0.5    # seconds between generic actions
 const MIN_ATTACK_DELAY:        float = 1.0    # minimum seconds between attacks
 const EXHAUSTED_DELAY_MULT:    float = 3.0    # action delay multiplier when exhausted
+
+# ---------------------------------------------------------------------------
+# Stamina — player stamina pool and regeneration
+# ---------------------------------------------------------------------------
+const STAMINA_MAX:                  float = 100.0  # starting and maximum stamina
+const STAMINA_REGEN_DELAY:          float = 5.0    # seconds after exertion before regen starts
+const STAMINA_REGEN_RATE:           float = 1.0    # stamina per second during regen
+const STAMINA_EXHAUSTION_THRESHOLD: float = 10.0   # stamina must reach this to clear exhausted
+const STAMINA_EXERTION_COST:        float = 5.0    # stamina spent per physical action
+
+# ---------------------------------------------------------------------------
+# Limb HP — each limb starts at LIMB_HP_MAX; damage taken = LIMB_HP_MAX - current
+# ---------------------------------------------------------------------------
+const LIMB_HP_MAX:     int = 70
+const LIMB_BROKEN:     int = 70   # damage_taken >= this → "broken"
+const LIMB_MANGLED:    int = 60   # damage_taken >= this → "mangled"
+const LIMB_SEVERE:     int = 40   # damage_taken >= this → "severely injured"
+const LIMB_INJURED:    int = 20   # damage_taken >= this → "injured"

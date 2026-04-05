@@ -72,7 +72,7 @@ func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_pa
 	var main = world.get_tree().root.get_node_or_null("Main")
 	if main:
 		main.add_child(item)
-		world.objects.drop_item_at(item, drop_tile, 14.0)
+		world.objects.drop_item_at(item, drop_tile, Defs.DROP_SPREAD)
 		for child in item.get_children():
 			if child is CollisionShape2D: child.disabled = false
 

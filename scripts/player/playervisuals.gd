@@ -60,10 +60,9 @@ func update_clothing_sprites() -> void:
 				if player.facing == 3: flip_h = not flip_h
 				var region = Rect2(0, 0, 64, 64)
 				var final_scale = w_transform.scale
-				if item_name == "Pickaxe":
-					region = Rect2(0, 0, 64, 64)
-					final_scale *= 0.75
-				elif item_name == "Sword": region = Rect2(192, 0, 64, 64)
+				if _idata != null and _idata.sprite_col >= 0:
+					region = Rect2(_idata.sprite_col * 64, 0, 64, 64)
+					final_scale *= _idata.waist_sprite_scale
 				elif _mob_tex != "" and _mob_tex != "res://objects/objects.png":
 					if sprite.texture != null: region = Rect2(0, 0, sprite.texture.get_width(), sprite.texture.get_height())
 				sprite.region_rect = region
