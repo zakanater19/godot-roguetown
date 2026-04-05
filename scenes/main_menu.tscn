@@ -67,10 +67,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -150.0
-offset_top = -100.0
-offset_right = 150.0
-offset_bottom = 100.0
+offset_left = -180.0
+offset_top = -140.0
+offset_right = 180.0
+offset_bottom = 140.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -97,11 +97,24 @@ horizontal_alignment = 1
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="MaxPlayersLabel" type="Label" parent="HostOptionsPanel/VBoxContainer/HBoxContainer"]
+[node name="ServerNameLabel" type="Label" parent="HostOptionsPanel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Server Name:"
+
+[node name="ServerNameInput" type="LineEdit" parent="HostOptionsPanel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "My Roguetown Server"
+
+[node name="MaxPlayersHBox" type="HBoxContainer" parent="HostOptionsPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MaxPlayersLabel" type="Label" parent="HostOptionsPanel/VBoxContainer/MaxPlayersHBox"]
 layout_mode = 2
 text = "Max Players:"
 
-[node name="MaxPlayersSpinBox" type="SpinBox" parent="HostOptionsPanel/VBoxContainer/HBoxContainer"]
+[node name="MaxPlayersSpinBox" type="SpinBox" parent="HostOptionsPanel/VBoxContainer/MaxPlayersHBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 2.0
@@ -126,10 +139,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -150.0
-offset_right = 200.0
-offset_bottom = 150.0
+offset_left = -350.0
+offset_top = -300.0
+offset_right = 350.0
+offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -152,9 +165,39 @@ theme_override_font_sizes/font_size = 24
 text = "Available Servers"
 horizontal_alignment = 1
 
+[node name="DirectConnectHBox" type="HBoxContainer" parent="ServerListPanel/VBoxContainer"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="DCIPLabel" type="Label" parent="ServerListPanel/VBoxContainer/DirectConnectHBox"]
+layout_mode = 2
+text = "IP:"
+
+[node name="DCIPInput" type="LineEdit" parent="ServerListPanel/VBoxContainer/DirectConnectHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "127.0.0.1"
+text = "127.0.0.1"
+
+[node name="DCPortLabel" type="Label" parent="ServerListPanel/VBoxContainer/DirectConnectHBox"]
+layout_mode = 2
+text = "Port:"
+
+[node name="DCPortInput" type="SpinBox" parent="ServerListPanel/VBoxContainer/DirectConnectHBox"]
+layout_mode = 2
+min_value = 1.0
+max_value = 65535.0
+value = 9904.0
+
+[node name="DCConnectBtn" type="Button" parent="ServerListPanel/VBoxContainer/DirectConnectHBox"]
+layout_mode = 2
+text = "Connect"
+
 [node name="ScrollContainer" type="ScrollContainer" parent="ServerListPanel/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 300)
 
 [node name="ServerContainer" type="VBoxContainer" parent="ServerListPanel/VBoxContainer/ScrollContainer"]
 layout_mode = 2
@@ -183,4 +226,5 @@ text = "Version: "
 [connection signal="pressed" from="MainButtons/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="HostOptionsPanel/VBoxContainer/StartHostingButton" to="." method="_on_start_hosting_pressed"]
 [connection signal="pressed" from="HostOptionsPanel/VBoxContainer/CancelHostButton" to="." method="_on_cancel_host_pressed"]
+[connection signal="pressed" from="ServerListPanel/VBoxContainer/DirectConnectHBox/DCConnectBtn" to="." method="_on_direct_connect_pressed"]
 [connection signal="pressed" from="ServerListPanel/VBoxContainer/BackButton" to="." method="_on_back_pressed"]

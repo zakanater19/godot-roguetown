@@ -1,7 +1,7 @@
 # res://scripts/net/serverbrowser.gd
 extends Node
 
-signal server_found(ip: String, port: int, current_players: int, max_players: int)
+signal server_found(ip: String, port: int, current_players: int, max_players: int, name: String)
 
 const GAME_ID: String = "godotroguetown"
 
@@ -11,27 +11,6 @@ const DISCOVERY_PORT: int = 9905
 const BROADCAST_INTERVAL: float = 1.0
 const PUBLIC_HEARTBEAT_INTERVAL: float = 10.0
 const PUBLIC_POLL_INTERVAL: float = 5.0
-
-# Optional ProjectSettings keys:
-#   roguetown/network/public_registry_base_url
-#   roguetown/network/public_server_host
-#   roguetown/network/public_server_port
-#   roguetown/network/public_server_name
-#
-# Optional environment variables:
-#   ROGUETOWN_PUBLIC_REGISTRY_URL
-#   ROGUETOWN_PUBLIC_HOST
-#   ROGUETOWN_PUBLIC_PORT
-#   ROGUETOWN_SERVER_NAME
-#
-# Public discovery needs a tiny HTTP registry service.
-# This script assumes:
-#   POST {base_url}/servers   -> upsert/heartbeat this server
-#   GET  {base_url}/servers   -> list live servers
-#
-# If "address" is blank in the POST body, your registry should infer it from the
-# request source IP. If you port-forward to a different external port than 9904,
-# set ROGUETOWN_PUBLIC_PORT (or the ProjectSetting) to that external port.
 
 const SETTING_REGISTRY_BASE_URL: String = "roguetown/network/public_registry_base_url"
 const SETTING_PUBLIC_HOST: String = "roguetown/network/public_server_host"
@@ -71,8 +50,11 @@ func _ready() -> void:
 	_load_config()
 
 
-func start_broadcasting() -> void:
+func start_broadcasting(srv_name: String = "") -> void:
 	_load_config()
+	_public_server_name = srv_name.strip_edges()
+	if _public_server_name == "":
+		_public_server_name = _default_server_name()
 
 	_is_broadcasting_server = true
 	_broadcast_timer = 0.0
@@ -269,7 +251,9 @@ func _broadcast_lan_server() -> void:
 	if _broadcaster == null:
 		return
 
-	var packet_str := "ROGUETOWN_SERVER:%d:%d:%d" % [
+	var safe_name = _public_server_name.replace(":", "").replace(",", "")
+	var packet_str := "ROGUETOWN_SERVER:%s:%d:%d:%d" % [
+		safe_name,
 		GAME_PORT,
 		_get_current_player_count(),
 		int(Host.max_clients)
@@ -294,20 +278,31 @@ func _drain_listener() -> void:
 		if parts.size() < 2:
 			continue
 
-		var port := int(parts[1])
+		var srv_name = ""
+		var port_idx = 1
+		var players_idx = 2
+		var max_idx = 3
+		
+		if parts.size() >= 5:
+			srv_name = parts[1]
+			port_idx = 2
+			players_idx = 3
+			max_idx = 4
+			
+		var port := int(parts[port_idx])
 		if port <= 0:
 			continue
 
 		var current_players := 1
 		var max_players := 200
 
-		if parts.size() >= 3:
-			current_players = max(1, int(parts[2]))
-		if parts.size() >= 4:
-			max_players = max(1, int(parts[3]))
+		if parts.size() > players_idx:
+			current_players = max(1, int(parts[players_idx]))
+		if parts.size() > max_idx:
+			max_players = max(1, int(parts[max_idx]))
 
 		if sender_ip != "":
-			server_found.emit(sender_ip, port, current_players, max_players)
+			server_found.emit(sender_ip, port, current_players, max_players, srv_name)
 
 
 func _send_public_heartbeat() -> void:
@@ -409,8 +404,9 @@ func _on_list_request_completed(result: int, response_code: int, _headers: Packe
 		var max_players := int(
 			entry.get("max_players", entry.get("maxPlayers", 200))
 		)
+		var srv_name := str(entry.get("name", "")).strip_edges()
 
 		if address == "" or port <= 0:
 			continue
 
-		server_found.emit(address, port, max(1, current_players), max(1, max_players))
+		server_found.emit(address, port, max(1, current_players), max(1, max_players), srv_name)

@@ -7,6 +7,7 @@ var last_server_address: String = ""
 var last_server_port: int = PORT
 
 var max_clients: int = 200
+var server_name: String = "Roguetown Server"
 var peers: Dictionary = {}
 var _spawner: MultiplayerSpawner = null
 var _ip_sessions: Dictionary = {}
@@ -23,21 +24,25 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 
-func start_host(custom_max_clients: int = 200, bind_ip: String = "*") -> void:
+func start_host(custom_max_clients: int = 200, bind_ip: String = "*", custom_name: String = "") -> void:
 	max_clients = custom_max_clients
+	if custom_name != "":
+		server_name = custom_name
+	else:
+		server_name = "Roguetown Server"
+		
 	is_host_mode = true
 
 	var enet := ENetMultiplayerPeer.new()
 	if bind_ip != "" and bind_ip != "*":
 		enet.set_bind_ip(bind_ip)
 
-	# Explicitly enforce 3 channels to prevent Godot 4 default routing bugs
 	var err: int = enet.create_server(PORT, max_clients, 3)
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
 		print("Host: server listening on %s:%d with max players %d" %[bind_ip, PORT, max_clients])
 		session_ids[1] = 1.0
-		ServerBrowser.start_broadcasting()
+		ServerBrowser.start_broadcasting(server_name)
 		_setup_spawner()
 		print("Host: generating server_patch.pck...")
 		var pck_err: Error = GameVersion.generate_server_pck()
@@ -61,7 +66,6 @@ func start_client_custom(ip: String, port: int) -> void:
 
 	var enet := ENetMultiplayerPeer.new()
 
-	# Explicitly enforce 3 channels to prevent Godot 4 default routing bugs
 	var err: int = enet.create_client(ip, port, 3)
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
@@ -80,7 +84,6 @@ func execute_round_restart() -> void:
 	else:
 		auto_reconnect_client = true
 
-	# Cleanup everything (matching esc_menu.gd)
 	multiplayer.multiplayer_peer = null
 	peers.clear()
 	_spawner = null
@@ -136,7 +139,13 @@ func _setup_spawner() -> void:
 
 func _on_peer_connected(id: int) -> void:
 	print("Host: peer connected — id ", id)
-	# Cache the IP now — ENet peer is valid at connect time but may not be at disconnect.
+	
+	# Enforce max players strictly
+	if multiplayer.get_peers().size() > max_clients:
+		print("Host: Server is full. Rejecting peer ", id)
+		_disconnect_peer(id)
+		return
+
 	var ip := _query_peer_ip_from_enet(id)
 	if ip != "":
 		_peer_ips[id] = ip
@@ -187,7 +196,6 @@ func _is_local_ip(ip: String) -> bool:
 
 
 func _get_peer_ip(peer_id: int) -> String:
-	# Prefer the cached value — ENet's peer object may be invalid at disconnect time.
 	if _peer_ips.has(peer_id):
 		return _peer_ips[peer_id]
 	return _query_peer_ip_from_enet(peer_id)
@@ -222,7 +230,6 @@ func _assign_session_id(peer_id: int) -> void:
 
 	var is_local := _is_local_ip(ip)
 
-	# Non-local peers are limited to one active client per public IP.
 	if not is_local and _ip_sessions.has(ip):
 		var session: Dictionary = _ip_sessions[ip]
 
