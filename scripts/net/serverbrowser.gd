@@ -410,3 +410,25 @@ func _on_list_request_completed(result: int, response_code: int, _headers: Packe
 			continue
 
 		server_found.emit(address, port, max(1, current_players), max(1, max_players), srv_name)
+		
+		
+# Optional ProjectSettings keys:
+#   roguetown/network/public_registry_base_url
+#   roguetown/network/public_server_host
+#   roguetown/network/public_server_port
+#   roguetown/network/public_server_name
+#
+# Optional environment variables:
+#   ROGUETOWN_PUBLIC_REGISTRY_URL
+#   ROGUETOWN_PUBLIC_HOST
+#   ROGUETOWN_PUBLIC_PORT
+#   ROGUETOWN_SERVER_NAME
+#
+# Public discovery needs a tiny HTTP registry service.
+# This script assumes:
+#   POST {base_url}/servers   -> upsert/heartbeat this server
+#   GET  {base_url}/servers   -> list live servers
+#
+# If "address" is blank in the POST body, your registry should infer it from the
+# request source IP. If you port-forward to a different external port than 9904,
+# set ROGUETOWN_PUBLIC_PORT (or the ProjectSetting) to that external port.
