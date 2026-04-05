@@ -112,6 +112,15 @@ func _compose_turf_atlas_texture() -> ImageTexture:
 
 
 func _build_tileset() -> void:
+	if Engine.is_editor_hint():
+		var editor_ts := load("res://assets/tileset.tres") as TileSet
+		if editor_ts:
+			for z in range(1, 6):
+				var tm = get_node_or_null("TileMapLayer_Z" + str(z))
+				if tm != null:
+					tm.tile_set = editor_ts
+		return
+
 	var tilemap: TileMapLayer = $TileMapLayer_Z3
 	var turf_tex := _compose_turf_atlas_texture()
 
@@ -171,9 +180,6 @@ func _build_tileset() -> void:
 		var tm = get_node_or_null("TileMapLayer_Z" + str(z))
 		if tm != null:
 			tm.tile_set = ts
-
-	# REMOVED: ResourceSaver.save() was causing editor bloat.
-	# The tileset is generated in memory at runtime and no longer saved to disk.
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():

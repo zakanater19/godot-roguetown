@@ -1,14 +1,12 @@
-[gd_resource type="TileSet" load_steps=6 format=3]
+[gd_resource type="TileSet" load_steps=8 format=3 uid="uid://dvay042606hsy"]
 
-[ext_resource type="Texture2D" path="res://doors/stairs.png" id="1_ylah7"]
-[ext_resource type="Texture2D" path="res://animated/water_sheet.png" id="2_fcvr3"]
+[ext_resource type="Texture2D" uid="uid://bdj1mqusy4yhs" path="res://assets/tiles/tiles_sheet.png" id="1_sheet"]
+[ext_resource type="Texture2D" uid="uid://bxyh8myxk32b4" path="res://doors/stairs.png" id="2_stairs"]
+[ext_resource type="Texture2D" uid="uid://dxo1qyl685x72" path="res://animated/water_sheet.png" id="3_water"]
 
-[sub_resource type="PlaceholderTexture2D" id="PlaceholderTurf"]
-size = Vector2i(704, 64)
-
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_80oah"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_floor"]
 resource_name = "Floor Tiles"
-texture = SubResource("PlaceholderTurf")
+texture = ExtResource("1_sheet")
 texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 1:0/0 = 0
@@ -18,24 +16,24 @@ texture_region_size = Vector2i(64, 64)
 8:0/0 = 0
 9:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_beawo"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_solid"]
 resource_name = "Solid Tiles"
-texture = SubResource("PlaceholderTurf")
+texture = ExtResource("1_sheet")
 texture_region_size = Vector2i(64, 64)
 3:0/0 = 0
 6:0/0 = 0
 7:0/0 = 0
 10:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fk0lh"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_stairs"]
 resource_name = "Stairs"
-texture = ExtResource("1_ylah7")
+texture = ExtResource("2_stairs")
 texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_155r3"]
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_water"]
 resource_name = "Water"
-texture = ExtResource("2_fcvr3")
+texture = ExtResource("3_water")
 texture_region_size = Vector2i(64, 64)
 0:0/animation_columns = 3
 0:0/animation_speed = 4.0
@@ -46,7 +44,7 @@ texture_region_size = Vector2i(64, 64)
 
 [resource]
 tile_size = Vector2i(64, 64)
-sources/0 = SubResource("TileSetAtlasSource_80oah")
-sources/1 = SubResource("TileSetAtlasSource_beawo")
-sources/2 = SubResource("TileSetAtlasSource_fk0lh")
-sources/5 = SubResource("TileSetAtlasSource_155r3")
+sources/0 = SubResource("TileSetAtlasSource_floor")
+sources/1 = SubResource("TileSetAtlasSource_solid")
+sources/2 = SubResource("TileSetAtlasSource_stairs")
+sources/5 = SubResource("TileSetAtlasSource_water")
