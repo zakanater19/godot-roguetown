@@ -52,11 +52,11 @@ func _ready() -> void:
 	roof_map_image = Image.create(1000, 1000, false, Image.FORMAT_RG8)
 	roof_map_image.fill(Color(0, 0, 0, 1))
 
-	# 2. Precalculate the 11x11 (5 tile radius) blur kernel for sun bleed on the surface
-	for sy in range(-5, 6):
-		for sx in range(-5, 6):
+	# 2. Precalculate the tight 7x7 (3 tile radius) blur kernel for soft local shadows (e.g., trees)
+	for sy in range(-3, 4):
+		for sx in range(-3, 4):
 			var dist = Vector2(sx, sy).length()
-			if dist <= 5.5:
+			if dist <= 3.5:
 				_blur_weights[Vector2i(sx, sy)] = 1.0 / (1.0 + dist * dist)
 
 	# 3. Setup the drawing node for our CPU shadows
@@ -99,8 +99,12 @@ func rebuild_roof_map() -> void:
 							continue
 
 						var idx = (pos.y * 1000 + pos.x) * 2
-						if TileDefs.is_opaque(source_id, tm.get_cell_atlas_coords(pos)):
+						var is_op = TileDefs.is_opaque(source_id, tm.get_cell_atlas_coords(pos))
+						
+						# Mark opacity if opaque
+						if is_op:
 							if z > roof_data[idx]: roof_data[idx] = z
+							
 						# All non-stair tiles count as a roof for levels below them
 						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
 
@@ -134,13 +138,9 @@ func update_roof_map_at(pos: Vector2i) -> void:
 		if source_id == 2:
 			continue
 
-		# Any non-stair tile acts as a floor/roof
-		if source_id != -1 and highest_floor_z == 0:
-			highest_floor_z = z
-
+		var atlas_coords := Vector2i(-1, -1) if tm == null else tm.get_cell_atlas_coords(pos)
 		var is_opaque = false
 		if source_id == 1:
-			var atlas_coords := Vector2i(-1, -1) if tm == null else tm.get_cell_atlas_coords(pos)
 			if TileDefs.is_opaque(source_id, atlas_coords):
 				is_opaque = true
 		elif World.solid_grid.has(z) and World.solid_grid[z].has(pos):
@@ -149,11 +149,13 @@ func update_roof_map_at(pos: Vector2i) -> void:
 					is_opaque = true
 					break
 
+		# Any non-stair tile acts as a floor, but only opaque tiles act as roofs
+		if source_id != -1 and highest_floor_z == 0:
+			highest_floor_z = z
+
 		if is_opaque and highest_wall_z == 0:
 			highest_wall_z = z
-			# An opaque tile also implicitly acts as a roof/floor if we didn't find one yet
-			if highest_floor_z == 0:
-				highest_floor_z = z
+			if highest_floor_z == 0: highest_floor_z = z
 
 		if highest_wall_z > 0 and highest_floor_z > 0:
 			break
@@ -182,7 +184,7 @@ func _can_light_pass_z(pos: Vector2i, z1: int, z2: int) -> bool:
 			
 	return true
 
-# Robust grid traversal (Bresenham) to prevent corner snagging clipping the light
+# Robust grid traversal (Bresenham) to prevent corner snagging clipping point lights
 func _is_line_blocked(start_px: Vector2, end_px: Vector2, check_z: int) -> bool:
 	var x0 = int(floor(start_px.x / 64.0))
 	var y0 = int(floor(start_px.y / 64.0))
@@ -260,7 +262,7 @@ func _process(delta: float) -> void:
 
 	# Gather active lamps and categorize them by Z-level
 	var valid_lamps: Array[Node] =[]
-	var same_z_lamps: Array[Dictionary] = []
+	var same_z_lamps: Array[Dictionary] =[]
 	var other_z_lamps: Array[Dictionary] =[]
 
 	for lamp in active_lamps:
@@ -281,29 +283,102 @@ func _process(delta: float) -> void:
 	var roof_data := roof_map_image.get_data()
 
 	if player_tile != Vector2i(-9999, -9999):
-		var ambient = 0.04
+		var ambient = 0.1
 
 		var view_radius_x = 16
 		var view_radius_y = 11
 
 		var is_underground = current_z < 3
-		var sun_open_positions: Array[Vector2i] =[]
 		var valid_holes_for_lamps: Array =[]
+		var sunlight_dist: Dictionary = {}
 
-		# Scan view radius for sunlight holes (roof_data)
-		if is_underground and sun_weight > 0.001:
-			for dy in range(-view_radius_y, view_radius_y + 1):
-				for dx in range(-view_radius_x, view_radius_x + 1):
-					var check = player_tile + Vector2i(dx, dy)
-					if check.x < 0 or check.x >= 1000 or check.y < 0 or check.y >= 1000:
+		# Flood Fill (BFS) to softly scatter daylight around corners and through windows
+		if sun_weight > 0.001:
+			var ext_rx = 20
+			var ext_ry = 15
+			var queue =[]
+			
+			# 1. Identify light sources (Unroofed tiles, windows, doors)
+			for dy in range(-ext_ry, ext_ry + 1):
+				for dx in range(-ext_rx, ext_rx + 1):
+					var t = player_tile + Vector2i(dx, dy)
+					if t.x < 0 or t.x >= 1000 or t.y < 0 or t.y >= 1000:
 						continue
-					var idx = (check.y * 1000 + check.x) * 2
+						
+					var idx = (t.y * 1000 + t.x) * 2
 					var wz = roof_data[idx]
 					var fz = roof_data[idx + 1]
-					# An open position has no ceiling above current_z and no wall blocking.
-					# Stair tiles have fz == 0 and wz == 0, so they always pass this check.
-					if fz <= current_z and wz < current_z:
-						sun_open_positions.append(check)
+					
+					var is_roofed = false
+					# Solid walls don't emit scattered light. Only air/windows/doors.
+					if is_underground:
+						is_roofed = (fz > current_z or wz >= current_z)
+					else:
+						is_roofed = (wz >= current_z or fz > current_z)
+					
+					var tm = World.get_tilemap(current_z)
+					var is_window = (tm != null and tm.get_cell_source_id(t) == 1 and tm.get_cell_atlas_coords(t) == Vector2i(10, 0))
+					if is_window: is_roofed = false
+					
+					if not is_roofed:
+						sunlight_dist[t] = 0.0
+						queue.append(t)
+						
+			# 2. Propagate the light outward like a fluid
+			var dirs =[
+				Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+				Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)
+			]
+			var dists =[1.0, 1.0, 1.0, 1.0, 1.414, 1.414, 1.414, 1.414]
+			
+			var head = 0
+			while head < queue.size():
+				var curr = queue[head]
+				head += 1
+				var d = sunlight_dist[curr]
+				
+				# Max light propagation distance (optimization)
+				if d > 12.0: continue
+				
+				for i in range(8):
+					var n = curr + dirs[i]
+					if n.x < 0 or n.x >= 1000 or n.y < 0 or n.y >= 1000: continue
+					if abs(n.x - player_tile.x) > ext_rx or abs(n.y - player_tile.y) > ext_ry: continue
+					
+					# Avoid light leaking diagonally through tight solid corners
+					if i >= 4:
+						var w1 = curr + Vector2i(dirs[i].x, 0)
+						var w2 = curr + Vector2i(0, dirs[i].y)
+						var tm = World.get_tilemap(current_z)
+						var w1_op = false
+						var w2_op = false
+						if tm != null:
+							if tm.get_cell_source_id(w1) == 1 and TileDefs.is_opaque(1, tm.get_cell_atlas_coords(w1)): w1_op = true
+							if tm.get_cell_source_id(w2) == 1 and TileDefs.is_opaque(1, tm.get_cell_atlas_coords(w2)): w2_op = true
+						if w1_op and w2_op:
+							continue
+					
+					var nd = d + dists[i]
+					if not sunlight_dist.has(n) or nd < sunlight_dist[n]:
+						sunlight_dist[n] = nd
+						
+						# Check opacity to see if light can keep traveling through this tile
+						var tm = World.get_tilemap(current_z)
+						var src = -1 if tm == null else tm.get_cell_source_id(n)
+						var coords = Vector2i(-1, -1) if tm == null else tm.get_cell_atlas_coords(n)
+						
+						var n_is_window = (src == 1 and coords == Vector2i(10, 0))
+						var n_is_opaque = false
+						if src == 1:
+							if TileDefs.is_opaque(src, coords): n_is_opaque = true
+						elif World.solid_grid.has(current_z) and World.solid_grid[current_z].has(n):
+							for obj in World.solid_grid[current_z][n]:
+								if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
+									n_is_opaque = true
+									break
+									
+						if not n_is_opaque or n_is_window:
+							queue.append(n)
 						
 		# Scan view radius for lamp transit holes
 		if not other_z_lamps.is_empty():
@@ -326,6 +401,7 @@ func _process(delta: float) -> void:
 										"intensity": l_info.intensity
 									})
 
+		# Main rendering loop
 		for dy in range(-view_radius_y, view_radius_y + 1):
 			for dx in range(-view_radius_x, view_radius_x + 1):
 				var tile = player_tile + Vector2i(dx, dy)
@@ -340,36 +416,26 @@ func _process(delta: float) -> void:
 				var floor_z = roof_data[idx + 1]
 
 				var is_roofed = (wall_z > current_z) or (floor_z > current_z)
+				
+				# Check for window transparency directly
+				var tm = World.get_tilemap(current_z)
+				var is_window = (tm != null and tm.get_cell_source_id(tile) == 1 and tm.get_cell_atlas_coords(tile) == Vector2i(10, 0))
+				if is_window: is_roofed = false
+
 				var sunlight: float = 0.0
 				var global_px = Vector2(tile.x * 64 + 32, tile.y * 64 + 32)
 
 				if is_underground:
-					# Underground: no kernel. Sunlight bleeds from holes.
-					if not sun_open_positions.is_empty() and sun_weight > 0.001:
-						var min_dist_sq = 999999.0
-						var closest_op = Vector2i(-9999, -9999)
-						for op in sun_open_positions:
-							var ddx = tile.x - op.x
-							var ddy = tile.y - op.y
-							var dsq = float(ddx * ddx + ddy * ddy)
-							if dsq < min_dist_sq:
-								min_dist_sq = dsq
-								closest_op = op
-						var min_dist = sqrt(min_dist_sq)
-						if min_dist < STAIR_BLEED_TILES:
-							var op_px = Vector2(closest_op.x * 64 + 32, closest_op.y * 64 + 32)
-							if not _is_line_blocked(global_px, op_px, current_z):
-								sunlight = sun_weight * (1.0 - smoothstep(0.0, STAIR_BLEED_TILES, min_dist))
+					var dist = sunlight_dist.get(tile, 9999.0)
+					sunlight = sun_weight * (1.0 - smoothstep(0.0, STAIR_BLEED_TILES, dist))
 				else:
 					# Surface lighting
 					if not is_roofed:
-						# Direct sunlight, skip blur
 						sunlight = sun_weight
 					elif sun_weight < 0.001:
-						# Night — nothing to bleed
 						sunlight = 0.0
 					else:
-						# Roofed surface tile — run blur kernel for soft shadow edges
+						# 1. Soft local shadows (e.g. for trees)
 						var shadow: float = 0.0
 						var total_weight: float = 0.0
 
@@ -384,16 +450,30 @@ func _process(delta: float) -> void:
 							var c_wall_z = roof_data[c_idx]
 							var c_floor_z = roof_data[c_idx + 1]
 
-							# Blocks horizontal light bleed if it's an opaque wall at/above current Z,
-							# OR if it's a floor strictly above current Z (i.e. an indoor tile).
-							# Stair positions have floor_z == 0 and will not block.
-							var block = 1.0 if (c_wall_z >= current_z or c_floor_z > current_z) else 0.0
+							# Blocks light bleed if it's an opaque wall/roof
+							var is_c_roofed = (c_wall_z >= current_z or c_floor_z > current_z)
+							
+							# Override for transparent windows
+							var c_tm = World.get_tilemap(current_z)
+							var is_c_window = (c_tm != null and c_tm.get_cell_source_id(Vector2i(cx, cy)) == 1 and c_tm.get_cell_atlas_coords(Vector2i(cx, cy)) == Vector2i(10, 0))
+							if is_c_window: is_c_roofed = false
+							
+							var block = 1.0 if is_c_roofed else 0.0
 							var w = _blur_weights[offset]
 
 							shadow += block * w
 							total_weight += w
 
 						shadow /= total_weight
+						
+						# 2. Add BFS scattered sunlight. 
+						# Full light out to 3.5 tiles, beautifully fading out to shadow at 8.5 tiles.
+						var dist = sunlight_dist.get(tile, 9999.0)
+						var bleed = 1.0 - smoothstep(3.5, 8.5, dist)
+						
+						# Softly blend the shadow away based on how much light bleeds in
+						shadow = lerp(shadow, 0.0, bleed)
+						
 						sunlight = (1.0 - shadow) * sun_weight
 
 				# Lamp light distance calculation (Same Z)
