@@ -12,10 +12,10 @@ func _init(p_player: Node2D) -> void:
 
 func get_strength_damage_modifier() -> float:
 	var str_val = player.stats.get("strength", 10)
-	return (str_val - 10) * 0.05
+	return (str_val - 10) * CombatDefs.STRENGTH_DAMAGE_SCALE
 
 func get_weapon_damage(item: Node) -> int:
-	var base_damage: int = 5
+	var base_damage: int = CombatDefs.UNARMED_BASE_DAMAGE
 	if item != null:
 		var force = item.get("force")
 		if force != null:

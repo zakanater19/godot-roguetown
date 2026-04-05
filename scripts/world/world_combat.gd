@@ -24,7 +24,7 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 	var avoidance_chance = 0.0
 	var valid_dodge_tiles =[]
 	var can_defend = true
-	if "stamina" in defender and defender.get("stamina") < 3.0: can_defend = false
+	if "stamina" in defender and defender.get("stamina") < CombatDefs.STAMINA_MIN_TO_DEFEND: can_defend = false
 	if "exhausted" in defender and defender.get("exhausted"): can_defend = false
 	if "grabbed_by" in defender and defender.get("grabbed_by") != null and is_instance_valid(defender.get("grabbed_by")): can_defend = false
 	
@@ -35,7 +35,7 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 		if d_stance == "parry" and d_has_sword:
 			var d_skill = 0
 			if "skills" in defender: d_skill = defender.get("skills").get("sword_fighting", 0)
-			avoidance_chance = clamp(float(d_skill - a_skill) * 17.0, 0.0, 98.0)
+			avoidance_chance = clamp(float(d_skill - a_skill) * CombatDefs.PARRY_AVOIDANCE_SCALE, 0.0, CombatDefs.PARRY_AVOIDANCE_MAX)
 			result.block_type = "parried"
 		else:
 			for dir in[Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
@@ -56,7 +56,7 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 			else:
 				var d_agility = 10
 				if "stats" in defender: d_agility = defender.get("stats").get("agility", 10)
-				avoidance_chance = clamp((d_agility - 10) * 5.0 + 20.0, 0.0, 85.0)
+				avoidance_chance = clamp((d_agility - 10) * CombatDefs.DODGE_AGILITY_SCALE + CombatDefs.DODGE_BASE_CHANCE, 0.0, CombatDefs.DODGE_AVOIDANCE_MAX)
 				result.block_type = "dodged"
 				
 	if attacker != null and (attacker.is_in_group("player") or attacker.is_in_group("npc")):
@@ -75,8 +75,8 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 				elif d_facing == 3 and attack_dir == 2: is_back = true
 				if is_back:
 					if not defender.get("combat_mode"): avoidance_chance = 0.0
-					else: avoidance_chance *= 0.1
-				else: avoidance_chance *= 0.5
+					else: avoidance_chance *= CombatDefs.BACK_ATTACK_AVOIDANCE_MULT
+				else: avoidance_chance *= CombatDefs.SIDE_ATTACK_AVOIDANCE_MULT
 				
 	if randf() * 100.0 < avoidance_chance:
 		result.damage = 0
@@ -104,7 +104,7 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 			if entity.is_in_group("player") and entity.get("is_possessed") == true:
 				if entity.has_method("rpc_consume_stamina"):
 					var tgt_peer: int = entity.get_multiplayer_authority()
-					if tgt_peer == 1 or tgt_peer in world.multiplayer.get_peers(): entity.rpc_consume_stamina.rpc_id(tgt_peer, 3.0)
+					if tgt_peer == 1 or tgt_peer in world.multiplayer.get_peers(): entity.rpc_consume_stamina.rpc_id(tgt_peer, CombatDefs.STAMINA_BLOCK_COST)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):
 					entity.set("tile_pos", roll.dodge_tile)
 					world.rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
@@ -156,7 +156,7 @@ func drag_grabbed_entity(grabber_peer_id: int, old_tile: Vector2i) -> void:
 func server_try_resist(peer_id: int) -> void:
 	var now_ms := Time.get_ticks_msec()
 	if world.resist_cooldown_map.has(peer_id) and now_ms < world.resist_cooldown_map[peer_id]: return
-	world.resist_cooldown_map[peer_id] = now_ms + world.RESIST_COOLDOWN_MS
+	world.resist_cooldown_map[peer_id] = now_ms + CombatDefs.RESIST_COOLDOWN_MS
 	var grabbed: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 	if grabbed == null or grabbed.get("dead") or grabbed.get("is_possessed") == false: return
 	
@@ -170,10 +170,10 @@ func server_try_resist(peer_id: int) -> void:
 			break
 	if grabber == null or grabber_peer_id == -1 or grabbed.get("exhausted"): return
 	var total_str = max(float(grabbed.get("stats").get("strength", 10)) + float(grabber.get("stats").get("strength", 10)), 1.0)
-	var resist_cost = 20.0 * (float(grabber.get("stats").get("strength", 10)) / total_str)
-	var grabber_cost = 20.0 * (float(grabbed.get("stats").get("strength", 10)) / total_str)
+	var resist_cost = CombatDefs.STAMINA_RESIST_BASE * (float(grabber.get("stats").get("strength", 10)) / total_str)
+	var grabber_cost = CombatDefs.STAMINA_RESIST_BASE * (float(grabbed.get("stats").get("strength", 10)) / total_str)
 	var break_chance = (float(grabbed.get("stats").get("strength", 10)) / total_str) * 100.0
-	if grabbed.get("is_lying_down"): break_chance *= 0.2
+	if grabbed.get("is_lying_down"): break_chance *= CombatDefs.LYING_DOWN_RESIST_MULT
 	
 	var tgt_peer: int = grabbed.get_multiplayer_authority()
 	if tgt_peer == 1 or tgt_peer in world.multiplayer.get_peers(): grabbed.rpc_consume_stamina.rpc_id(tgt_peer, resist_cost)
@@ -233,7 +233,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 			t_name = (entity as Node2D).get("character_name")
 			if roll.damage > 0: entity.receive_damage.rpc(roll.damage, targeted_limb)
 			elif roll.blocked:
-				if entity.has_method("rpc_consume_stamina"): entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), 3.0)
+				if entity.has_method("rpc_consume_stamina"): entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), CombatDefs.STAMINA_BLOCK_COST)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):
 					entity.set("tile_pos", roll.dodge_tile)
 					if entity.get("is_possessed") == true:
@@ -252,7 +252,7 @@ func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String
 	if grabber.get("body") != null and grabber.body.is_arm_broken(grabber.get("active_hand")): return
 	var now_ms := Time.get_ticks_msec()
 	if world.grab_cooldown_map.has(sender_id) and now_ms < world.grab_cooldown_map[sender_id]: return
-	world.grab_cooldown_map[sender_id] = now_ms + world.GRAB_COOLDOWN_MS
+	world.grab_cooldown_map[sender_id] = now_ms + CombatDefs.GRAB_COOLDOWN_MS
 	var target := world.get_node_or_null(target_path)
 	if target == null or not is_instance_valid(target) or target.get("z_level") != grabber.get("z_level"): return
 	if world.grab_map.has(sender_id): release_grab_for_peer(sender_id)

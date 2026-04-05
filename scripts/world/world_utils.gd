@@ -16,11 +16,11 @@ func server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool
 	var peer_id = player.get_multiplayer_authority()
 	var next_allowed = world.server_action_cooldowns.get(peer_id, 0)
 	if current_time < next_allowed - 100: return false
-	var delay = 0.5
+	var delay = CombatDefs.DEFAULT_ACTION_DELAY
 	var held_item = player.hands[player.active_hand]
 	if held_item != null and held_item.has_method("get_use_delay"): delay = held_item.get_use_delay()
-	if is_attack and delay < 1.0: delay = 1.0
-	if player.exhausted: delay *= 3.0
+	if is_attack and delay < CombatDefs.MIN_ATTACK_DELAY: delay = CombatDefs.MIN_ATTACK_DELAY
+	if player.exhausted: delay *= CombatDefs.EXHAUSTED_DELAY_MULT
 	world.server_action_cooldowns[peer_id] = current_time + int(delay * 1000)
 	return true
 

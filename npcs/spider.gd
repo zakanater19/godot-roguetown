@@ -1,9 +1,6 @@
 # res://npcs/spider.gd
 extends Node2D
 
-const TILE_SIZE:       int   = 64
-const GRID_WIDTH:      int   = 1000
-const GRID_HEIGHT:     int   = 1000
 const MOVE_TIME:       float = 0.5
 const DETECTION_RANGE: int   = 8
 const ATTACK_RANGE:    int   = 1
@@ -70,7 +67,7 @@ func _ready() -> void:
 		add_to_group("npc")
 
 	var p: Vector2 = position
-	tile_pos  = Vector2i(int(p.x / TILE_SIZE), int(p.y / TILE_SIZE))
+	tile_pos  = Vector2i(int(p.x / World.TILE_SIZE), int(p.y / World.TILE_SIZE))
 	pixel_pos = World.tile_to_pixel(tile_pos)
 	position  = pixel_pos
 	_update_sprite()
@@ -210,7 +207,7 @@ func _try_move(dir: Vector2i) -> void:
 	var next: Vector2i = tile_pos + dir
 
 	# Bounds check
-	if next.x < 0 or next.x >= GRID_WIDTH or next.y < 0 or next.y >= GRID_HEIGHT:
+	if next.x < 0 or next.x >= World.GRID_WIDTH or next.y < 0 or next.y >= World.GRID_HEIGHT:
 		return
 
 	# Solid check
@@ -234,7 +231,7 @@ func _try_move(dir: Vector2i) -> void:
 		z_index = (z_level - 1) * 200 + (z_index % 200)
 		rpc_sync_spider_z_level.rpc(land_z)
 		
-		var dmg = randi_range(20, 30) * drop
+		var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
 		receive_damage(dmg)
 		
 	World.register_solid(tile_pos, z_level, self)

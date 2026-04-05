@@ -19,8 +19,6 @@ var current_laws: Array =[
 ]
 
 var grab_map: Dictionary = {}
-const GRAB_COOLDOWN_MS:   int = 1000
-const RESIST_COOLDOWN_MS: int = 1000
 var grab_cooldown_map:   Dictionary = {}
 var resist_cooldown_map: Dictionary = {}
 
@@ -140,7 +138,7 @@ func apply_gravity_to_player(player: Node2D) -> void:
 		player.rpc_sync_z_level(land_z)
 		player.rpc_sync_z_level.rpc(land_z)
 		
-		var dmg = randi_range(20, 30) * drop
+		var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
 		var target_limb = "chest"
 		if drop >= 2:
 			target_limb =["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"].pick_random()
