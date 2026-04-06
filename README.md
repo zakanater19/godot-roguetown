@@ -32,4 +32,7 @@ Shift+F to look up
 
 rest are UI buttons
 
-https://github.com/user-attachments/assets/b951778c-7c12-476e-99e4-150317dcaf30
+
+
+https://github.com/user-attachments/assets/d6851a3a-b7ba-45de-92e8-2eecb7c273d8
+
