@@ -138,13 +138,30 @@ func apply_gravity_to_player(player: Node2D) -> void:
 		player.rpc_sync_z_level(land_z)
 		player.rpc_sync_z_level.rpc(land_z)
 		
-		var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
-		var target_limb = "chest"
-		if drop >= 2:
-			target_limb = Defs.LIMBS.pick_random()
+		var agility = 10
+		if "stats" in player and player.stats.has("agility"):
+			agility = player.stats.get("agility", 10)
+			
+		var avoid_chance = clamp(50.0 + (agility - 10) * 5.0 - ((drop - 1) * 20.0), 0.0, 100.0)
+		var avoided = randf() * 100.0 < avoid_chance
 		
-		player.receive_damage.rpc(dmg, target_limb)
-		rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")
+		if avoided:
+			var peer_id = player.get_multiplayer_authority()
+			rpc_send_direct_message.rpc_id(peer_id, "[color=#aaffaa]You land safely.[/color]")
+		else:
+			var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
+			var target_limb = "chest"
+			if drop >= 2:
+				target_limb = Defs.LIMBS.pick_random()
+			
+			player.receive_damage.rpc(dmg, target_limb)
+			rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")
+			
+			if not player.get("is_lying_down"):
+				player.set("is_lying_down", true)
+				if player.has_method("_update_sprite"): player.call("_update_sprite")
+				if player.has_method("_update_water_submerge"): player.call("_update_water_submerge")
+				player.rpc("_rpc_sync_lying_down", true)
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_request_respawn(request_peer_id: int) -> void:
@@ -568,3 +585,8 @@ func rpc_execute_round_end() -> void:
 func _on_round_restart_timeout() -> void:
 	if get_tree().current_scene.name != "MainMenu":
 		Host.execute_round_restart()
+
+@rpc("authority", "call_local", "reliable")
+func rpc_send_direct_message(message: String) -> void:
+	if has_node("/root/Sidebar"):
+		get_node("/root/Sidebar").add_message(message)
