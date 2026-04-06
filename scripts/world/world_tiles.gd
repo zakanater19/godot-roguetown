@@ -198,9 +198,9 @@ func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool
 	if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").update_player_state(peer_id, {"position": player.position})
 
 func _get_held_tool_type(item: Node) -> String:
-	var i_type = item.get("item_type")
-	if (i_type == "Sword") or ("Sword" in item.name) or (i_type == "Dirk"): return Defs.TOOL_SLASHING
-	if (i_type == "Pickaxe") or ("Pickaxe" in item.name): return Defs.TOOL_PICKAXE
+	if item == null: return ""
+	var t = item.get("tool_type")
+	if t != null and t is String: return t
 	return ""
 
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
@@ -247,4 +247,3 @@ func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int
 	Lighting.update_roof_map_at(pos)
 	if world.has_node("/root/LateJoin"):
 		world.get_node("/root/LateJoin").register_tile_change(pos, z_level, source_id, atlas_coords)
-

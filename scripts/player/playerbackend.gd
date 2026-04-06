@@ -83,10 +83,8 @@ func get_detailed_description() -> String:
 			desc += "\n[color=gray]" + slot + ":[/color] " + item
 
 	if is_me and player.body != null:
-		var limb_display: Array = [["head", "head"], ["chest", "chest"], ["r_arm", "right arm"],["l_arm", "left arm"], ["r_leg", "right leg"],["l_leg", "left leg"]]
-		for entry in limb_display:
-			var limb_key: String   = entry[0]
-			var limb_label: String = entry[1]
+		for limb_key in Defs.LIMBS:
+			var limb_label: String = Defs.LIMB_DISPLAY.get(limb_key, limb_key)
 			var damage_taken: int  = CombatDefs.LIMB_HP_MAX - player.body.limb_hp[limb_key]
 			if damage_taken > 0:
 				desc += "\n[color=gray]" + limb_label + ":[/color] " + _get_limb_status(damage_taken)
@@ -336,7 +334,7 @@ func get_clothing_transform(item_name: String, facing_name: String) -> Dictionar
 	if clothing_offsets.has(item_name) and clothing_offsets[item_name].has(facing_name):
 		var entry = clothing_offsets[item_name][facing_name]
 		return {
-			"offset": Vector2(float(entry.get("offset", [0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
+			"offset": Vector2(float(entry.get("offset",[0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
 			"scale":  float(entry.get("scale", 1.0))
 		}
 	return {"offset": Vector2.ZERO, "scale": 1.0}

@@ -112,16 +112,6 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 					world.rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
 	return results
 
-func limb_display_name(limb: String) -> String:
-	match limb:
-		"head": return "head"
-		"chest": return "chest"
-		"r_arm": return "right arm"
-		"l_arm": return "left arm"
-		"r_leg": return "right leg"
-		"l_leg": return "left leg"
-	return limb
-
 func release_grab_for_peer(grabber_peer_id: int, silent: bool = false) -> void:
 	if not world.grab_map.has(grabber_peer_id): return
 	var entry = world.grab_map[grabber_peer_id]
@@ -263,7 +253,7 @@ func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String
 	if not world.utils.is_within_interaction_range(grabber, target.global_position): return
 	var is_player = target.is_in_group("player")
 	var target_peer = target.get_multiplayer_authority() if (is_player and target.get("is_possessed") == true) else -1
-	var safe_limb = limb if limb in["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"] else "chest"
+	var safe_limb = limb if limb in Defs.LIMBS else "chest"
 	world.grab_map[sender_id] = {"target": target, "is_player": is_player, "target_peer_id": target_peer, "limb": safe_limb}
 	var t_name = (target as Node2D).get("character_name") if is_player else (target.get("item_type") if target.get("item_type") else target.name.get_slice("@", 0))
 	world.rpc_confirm_grab_start.rpc(sender_id, is_player, target_peer, target_path, grabber.get("character_name"), t_name, safe_limb, grabber.get("active_hand"))
@@ -299,8 +289,8 @@ func handle_rpc_confirm_grab_start(grabber_peer_id: int, is_player: bool, target
 			var lp: Node2D = world.utils.get_local_player() as Node2D
 			if lp:
 				var sidebar = world.get_node("/root/Sidebar")
-				if lp.get_multiplayer_authority() == grabber_peer_id: sidebar.add_message("[color=#ffcc44]You grab " + target_name + " by the " + limb_display_name(limb) + "![/color]")
-				elif lp.get_multiplayer_authority() == target_peer_id: sidebar.add_message("[color=#ff4444]" + grabber_name + " grabs you by the " + limb_display_name(limb) + "![/color]")
+				if lp.get_multiplayer_authority() == grabber_peer_id: sidebar.add_message("[color=#ffcc44]You grab " + target_name + " by the " + Defs.LIMB_DISPLAY.get(limb, limb) + "![/color]")
+				elif lp.get_multiplayer_authority() == target_peer_id: sidebar.add_message("[color=#ff4444]" + grabber_name + " grabs you by the " + Defs.LIMB_DISPLAY.get(limb, limb) + "![/color]")
 
 func handle_rpc_confirm_grab_released(grabber_peer_id: int, is_player: bool, target_peer_id: int, grabber_name: String, target_name: String, silent: bool) -> void:
 	var grabber: Node2D = world.utils.find_player_by_peer(grabber_peer_id) as Node2D

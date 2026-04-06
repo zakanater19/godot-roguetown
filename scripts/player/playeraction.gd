@@ -118,8 +118,8 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	if held_item != null:
 		var t_type = held_item.get("tool_type")
 		is_slashing = (t_type == Defs.TOOL_SLASHING)
-		is_sword    = (is_slashing or t_type == Defs.TOOL_STABBING)
-		is_pickaxe  = (t_type == Defs.TOOL_PICKAXE)
+		is_sword    = Defs.is_tool_sword(held_item)
+		is_pickaxe  = Defs.is_tool_pickaxe(held_item)
 		is_clothing = held_item.get("slot") != null and held_item.get("slot") != ""
 
 	var can_attack: bool = false

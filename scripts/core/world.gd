@@ -141,7 +141,7 @@ func apply_gravity_to_player(player: Node2D) -> void:
 		var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
 		var target_limb = "chest"
 		if drop >= 2:
-			target_limb =["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"].pick_random()
+			target_limb = Defs.LIMBS.pick_random()
 		
 		player.receive_damage.rpc(dmg, target_limb)
 		rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")

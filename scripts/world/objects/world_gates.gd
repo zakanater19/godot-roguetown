@@ -21,9 +21,8 @@ func handle_rpc_request_hit_gate(sender_id: int, gate_path: NodePath) -> void:
 		if gate.state != gate.GateState.DESTROYED:
 			world.rpc_confirm_toggle_gate.rpc(gate_path)
 	else:
-		var i_type = held_item.get("item_type")
-		var is_sword = (i_type == "Sword") or ("Sword" in held_item.name) or ("sword" in held_item.name.to_lower()) or (i_type == "Dirk") or ("Dirk" in held_item.name) or ("dirk" in held_item.name.to_lower())
-		var is_pickaxe = (i_type == "Pickaxe") or ("Pickaxe" in held_item.name) or ("pickaxe" in held_item.name.to_lower())
+		var is_sword = Defs.is_tool_sword(held_item)
+		var is_pickaxe = Defs.is_tool_pickaxe(held_item)
 
 		if is_sword or (is_pickaxe and player.combat_mode):
 			if not world.utils.server_check_action_cooldown(player): return

@@ -36,6 +36,10 @@ const GROUP_BREAKABLE   = "breakable_object"
 const GROUP_BED         = "bed"
 const GROUP_INSPECTABLE = "inspectable"
 const GROUP_COIN        = "coin"
+const GROUP_PLAYER      = "player"
+const GROUP_NPC         = "npc"
+const GROUP_Z_ENTITY    = "z_entity"
+const GROUP_SPAWNERS    = "spawners"
 
 # ---------------------------------------------------------------------------
 # Equipment slots — matches ItemData.slot values
@@ -73,9 +77,23 @@ const INTENT_GRAB   = "grab"
 const INTENT_DISARM = "disarm"
 
 # ---------------------------------------------------------------------------
+# Limbs
+# ---------------------------------------------------------------------------
+const LIMBS: Array =["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"]
+
+const LIMB_DISPLAY: Dictionary = {
+	"head": "head",
+	"chest": "chest",
+	"r_arm": "right arm",
+	"l_arm": "left arm",
+	"r_leg": "right leg",
+	"l_leg": "left leg"
+}
+
+# ---------------------------------------------------------------------------
 # Equipment slots — canonical ordered list; drives UI, init, and loot panels
 # ---------------------------------------------------------------------------
-const SLOTS_ALL: Array = [
+const SLOTS_ALL: Array =[
 	"head", "face", "cloak", "armor", "backpack",
 	"gloves", "waist", "clothing", "trousers", "feet",
 	"pocket_l", "pocket_r"
@@ -102,3 +120,25 @@ const SLOT_DISPLAY: Dictionary = {
 # Social / class knowledge — classes that are considered "outsiders" to townsfolk
 # ---------------------------------------------------------------------------
 const OUTSIDER_CLASSES: Array = ["adventurer", "bandit"]
+
+# ---------------------------------------------------------------------------
+# Static Helpers
+# ---------------------------------------------------------------------------
+
+static func is_tool_sword(item: Node) -> bool:
+	if item == null: return false
+	var t_type = item.get("tool_type")
+	return t_type == TOOL_SLASHING or t_type == TOOL_STABBING
+
+static func is_tool_pickaxe(item: Node) -> bool:
+	if item == null: return false
+	return item.get("tool_type") == TOOL_PICKAXE
+
+static func get_z_index(z_level: int, offset: int = 0) -> int:
+	return (z_level - 1) * Z_LAYER_SIZE + offset
+
+static func world_to_tile(world_pos: Vector2) -> Vector2i:
+	return Vector2i(int(world_pos.x / TILE_SIZE), int(world_pos.y / TILE_SIZE))
+
+static func tile_to_pixel(tile_pos: Vector2i) -> Vector2:
+	return Vector2((tile_pos.x + 0.5) * TILE_SIZE, (tile_pos.y + 0.5) * TILE_SIZE)
