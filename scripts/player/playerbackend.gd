@@ -58,7 +58,7 @@ func get_detailed_description() -> String:
 	var desc: String = "[color=#" + title_col + "][b]" + name_str + "[/b][/color]"
 
 	if player.dead:
-		desc += " (dead)"
+		desc += " (dead)\nthey are stiff and dead."
 	elif player.sleep_state != player.SleepState.AWAKE:
 		desc += " (sleeping)"
 
@@ -133,7 +133,7 @@ func inspect_at(world_pos: Vector2) -> void:
 			show_inspect_text(desc + hand_label, "")
 			return
 
-	for obj in World.get_entities_at_tile(target_tile, player.z_level):
+	for obj in World.get_entities_at_tile(target_tile, player.z_level, 0, true):
 		var d: float = (world_pos - player.global_position).length()
 		if d < best_dist:
 			best_dist = d

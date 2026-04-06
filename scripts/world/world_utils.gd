@@ -24,7 +24,7 @@ func server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool
 	world.server_action_cooldowns[peer_id] = current_time + int(delay * 1000)
 	return true
 
-func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -> Array:
+func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0, include_dead: bool = false) -> Array:
 	var result :=[]
 	for npc in world.get_tree().get_nodes_in_group("npc"):
 		if npc.z_level != z_level: continue
@@ -37,7 +37,7 @@ func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -
 	for p in world.get_tree().get_nodes_in_group("player"):
 		if p.z_level != z_level: continue
 		if p.get_multiplayer_authority() == exclude_peer: continue
-		if p.get("dead"): continue
+		if p.get("dead") and not include_dead: continue
 		if p.tile_pos == tile:
 			result.append(p)
 			continue

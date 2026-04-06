@@ -99,18 +99,27 @@ func die() -> void:
 		player.crafting.close_menus()
 
 	player.dead = true
+	
+	# Show death message to local player if nearby
+	var local_player = World.get_local_player()
+	if local_player != null and local_player.z_level == player.z_level:
+		var diff = local_player.tile_pos - player.tile_pos
+		if diff.x * diff.x + diff.y * diff.y <= 144:
+			if player.get_tree().root.has_node("Sidebar"):
+				player.get_tree().root.get_node("Sidebar").add_message("[color=purple]" + player.character_name + " Seizes up and goes limp.[/color]")
 
 func die_visuals() -> void:
 	var sprite: Sprite2D = player.get_node_or_null("Sprite2D")
 	if sprite != null:
 		sprite.rotation_degrees = 90.0
 
-	for slot in ["HelmetSprite", "FaceSprite", "ChestSprite", "TrousersSprite", "BootsSprite", "ClothingSprite", "WaistSprite", "GlovesSprite"]:
+	for slot in["HelmetSprite", "FaceSprite", "ChestSprite", "TrousersSprite", "BootsSprite", "ClothingSprite", "WaistSprite", "GlovesSprite"]:
 		var s: Sprite2D = player.get_node_or_null(slot)
 		if s != null:
 			s.rotation_degrees = 90.0
 			if slot == "HelmetSprite" or slot == "FaceSprite":
-				s.position = Vector2(0, -10)
+				# Offset (0, -10) rotated 90 degrees becomes (-(-10), 0) = (10, 0)
+				s.position = Vector2(10, 0)
 
 	if player._dead_container != null:
 		player._dead_container.visible = true

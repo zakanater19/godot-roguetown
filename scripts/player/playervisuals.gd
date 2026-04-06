@@ -53,7 +53,12 @@ func update_clothing_sprites() -> void:
 				var _mob_tex = _idata.mob_texture_path if (_idata and _idata.mob_texture_path != "") else ""
 				sprite.texture = load(_mob_tex) if _mob_tex != "" else load("res://objects/objects.png")
 				var w_transform = player.backend.get_hand_transform(item_name, facing_name, "waist")
-				sprite.position = w_transform.offset
+				
+				var w_pos = w_transform.offset
+				if target_rot == 90.0:
+					w_pos = Vector2(-w_pos.y, w_pos.x) # Rotate offset 90 deg
+					
+				sprite.position = w_pos
 				if player.facing == 1: sprite.z_index = -1
 				else: sprite.z_index = 4
 				var flip_h = w_transform.flip_h
@@ -76,12 +81,16 @@ func update_clothing_sprites() -> void:
 		if _idata2 != null and _idata2.mob_texture_path != "":
 			sprite.texture = load(_idata2.mob_texture_path)
 			var cd = player.backend.get_clothing_transform(item_name, facing_name)
-			if slot[1] == "head" and target_rot == 90.0: sprite.position = Vector2(0, -10)
-			else: sprite.position = cd.offset
-			sprite.scale            = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
-			sprite.region_rect      = Rect2(player.facing * 32, 0, 32, 32)
-			sprite.rotation_degrees = target_rot
-			sprite.visible          = true
+			
+			var pos = cd.offset
+			if target_rot == 90.0:
+				pos = Vector2(-pos.y, pos.x) # Rotate offset 90 deg
+				
+			sprite.position           = pos
+			sprite.scale              = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
+			sprite.region_rect        = Rect2(player.facing * 32, 0, 32, 32)
+			sprite.rotation_degrees   = target_rot
+			sprite.visible            = true
 		else: sprite.visible = false
 
 	# ── Face slot / Hood sprite ───────────────────────────────────────────────
@@ -97,12 +106,16 @@ func update_clothing_sprites() -> void:
 			if hood_up and hood_data and hood_data.mob_texture_path != "":
 				face_sprite.texture = load(hood_data.mob_texture_path)
 				var cd = player.backend.get_clothing_transform("Hood", facing_name)
-				if target_rot == 90.0: face_sprite.position = Vector2(0, -10)
-				else: face_sprite.position = cd.offset
-				face_sprite.scale            = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
-				face_sprite.region_rect      = Rect2(player.facing * 32, 0, 32, 32)
-				face_sprite.rotation_degrees = target_rot
-				face_sprite.visible          = true
+				
+				var pos = cd.offset
+				if target_rot == 90.0:
+					pos = Vector2(-pos.y, pos.x) # Rotate offset 90 deg
+					
+				face_sprite.position           = pos
+				face_sprite.scale              = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
+				face_sprite.region_rect        = Rect2(player.facing * 32, 0, 32, 32)
+				face_sprite.rotation_degrees   = target_rot
+				face_sprite.visible            = true
 			else:
 				face_sprite.visible = false
 		else:

@@ -60,8 +60,8 @@ func _is_within_interaction_range(player: Node, target_pos: Vector2, target_z: i
 func _server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool:
 	return utils.server_check_action_cooldown(player, is_attack)
 
-func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0) -> Array:
-	return utils.get_entities_at_tile(tile, z_level, exclude_peer)
+func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0, include_dead: bool = false) -> Array:
+	return utils.get_entities_at_tile(tile, z_level, exclude_peer, include_dead)
 
 func _find_player_by_peer(peer_id: int) -> Node:
 	return utils.find_player_by_peer(peer_id)
