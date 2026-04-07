@@ -137,6 +137,27 @@ func update_sprite() -> void:
 	sprite.rotation_degrees = target_rot
 	update_clothing_sprites()
 
+func update_hand_positions() -> void:
+	if player.backend == null: return
+	for i in range(2):
+		var obj = player.hands[i]
+		if obj == null or (i == player.active_hand and player._is_throwing): continue
+		var hand_key:    String = "right" if i == 0 else "left"
+		var facing_name: String = player.FACING_NAMES[player.facing]
+		var item_name = obj.get("item_type")
+		if item_name == null: item_name = obj.name.get_slice("@", 0)
+		var hand_transform = player.backend.get_hand_transform(item_name, facing_name, hand_key)
+		var flip_h: bool = hand_transform.flip_h
+		if player.facing == 3: flip_h = not flip_h
+		obj.global_position = player.pixel_pos + hand_transform.offset
+		obj.z_index = player.z_index - 1 if player.facing == 1 else player.z_index + 6
+		var sprite: Sprite2D = obj.get_node_or_null("Sprite2D")
+		if sprite != null:
+			sprite.rotation_degrees = hand_transform.rotation
+			var mag_x := absf(sprite.scale.x)
+			var mag_y := absf(sprite.scale.y)
+			sprite.scale = Vector2(-mag_x if flip_h else mag_x, mag_y)
+
 func update_water_submerge() -> void:
 	const FULL_H: int = 32
 	const CLIP_H: int = 22

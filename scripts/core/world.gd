@@ -22,18 +22,22 @@ var grab_map: Dictionary = {}
 var grab_cooldown_map:   Dictionary = {}
 var resist_cooldown_map: Dictionary = {}
 
-var utils = null
-var tiles = null
-var combat = null
+var utils   = null
+var tiles   = null
+var combat  = null
 var objects = null
+var physics = null
+var session = null
 
 var _tilemap_cache: Dictionary = {}
 
 func _ready() -> void:
-	utils = preload("res://scripts/world/world_utils.gd").new(self)
-	tiles = preload("res://scripts/world/world_tiles.gd").new(self)
-	combat = preload("res://scripts/world/world_combat.gd").new(self)
+	utils   = preload("res://scripts/world/world_utils.gd").new(self)
+	tiles   = preload("res://scripts/world/world_tiles.gd").new(self)
+	combat  = preload("res://scripts/world/world_combat.gd").new(self)
 	objects = preload("res://scripts/world/world_objects.gd").new(self)
+	physics = preload("res://scripts/world/world_physics.gd").new(self)
+	session = preload("res://scripts/world/world_session.gd").new(self)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 func get_tilemap(z: int) -> TileMapLayer:
@@ -117,78 +121,22 @@ func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
 	objects.drop_item_at(obj, tile, spread)
 
 func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
-	var check_z = current_z
-	while check_z > 1:
-		var tm = get_tilemap(check_z)
-		if tm != null and tm.get_cell_source_id(tile_pos) != -1:
-			return check_z
-		
-		# If there is a solid object/wall on the level immediately below us, it acts as a floor.
-		if is_solid(tile_pos, check_z - 1):
-			return check_z
-			
-		check_z -= 1
-	return 1
+	return physics.calculate_gravity_z(tile_pos, current_z)
 
 func apply_gravity_to_player(player: Node2D) -> void:
-	if player == null or player.dead: return
-	var land_z = calculate_gravity_z(player.tile_pos, player.z_level)
-	if land_z < player.z_level:
-		var drop = player.z_level - land_z
-		player.rpc_sync_z_level(land_z)
-		player.rpc_sync_z_level.rpc(land_z)
-		
-		var agility = 10
-		if "stats" in player and player.stats.has("agility"):
-			agility = player.stats.get("agility", 10)
-			
-		var avoid_chance = clamp(50.0 + (agility - 10) * 5.0 - ((drop - 1) * 20.0), 0.0, 100.0)
-		var avoided = randf() * 100.0 < avoid_chance
-		
-		if avoided:
-			var peer_id = player.get_multiplayer_authority()
-			rpc_send_direct_message.rpc_id(peer_id, "[color=#aaffaa]You land safely.[/color]")
-		else:
-			var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
-			var target_limb = "chest"
-			if drop >= 2:
-				target_limb = Defs.LIMBS.pick_random()
-			
-			player.receive_damage.rpc(dmg, target_limb)
-			rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")
-			
-			if not player.get("is_lying_down"):
-				player.set("is_lying_down", true)
-				if player.has_method("_update_sprite"): player.call("_update_sprite")
-				if player.has_method("_update_water_submerge"): player.call("_update_water_submerge")
-				player.rpc("_rpc_sync_lying_down", true)
+	physics.apply_gravity_to_player(player)
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_request_respawn(request_peer_id: int) -> void:
 	if not multiplayer.is_server(): return
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()
-	if sender_id != request_peer_id: return
-	
-	var old_player = utils.find_player_by_peer(sender_id) as Node2D
-	if old_player != null and old_player.dead:
-		old_player.rpc_make_corpse.rpc()
-		Host.peers.erase(sender_id)
-		if LateJoin._disconnected_players.has(sender_id):
-			LateJoin._disconnected_players.erase(sender_id)
-		if grab_map.has(sender_id):
-			combat.release_grab_for_peer(sender_id, true)
-		for gp_id in grab_map:
-			var entry = grab_map[gp_id]
-			if entry.get("is_player") and entry.get("target") == old_player:
-				entry["target_peer_id"] = 1 
-		rpc_return_to_lobby.rpc_id(sender_id)
+	session.handle_rpc_request_respawn(sender_id, request_peer_id)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_return_to_lobby() -> void:
 	if has_node("/root/Lobby"):
-		var lobby = get_node("/root/Lobby")
-		lobby.show_lobby()
+		get_node("/root/Lobby").show_lobby()
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_set_object_z_level(obj_path: NodePath, new_z: int) -> void:
@@ -573,18 +521,12 @@ func rpc_confirm_table_place(peer_id: int, table_path: NodePath, hand_idx: int, 
 func rpc_request_round_end() -> void:
 	if not multiplayer.is_server(): return
 	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id != 1 and sender_id != 0: return # Only host can restart
+	if sender_id != 1 and sender_id != 0: return
 	rpc("rpc_execute_round_end")
 
 @rpc("authority", "call_local", "reliable")
 func rpc_execute_round_end() -> void:
-	if has_node("/root/Sidebar"):
-		get_node("/root/Sidebar").add_message("\n[color=#ff4444][b][font_size=24]THE ROUND HAS ENDED! RESTARTING IN 5 SECONDS...[/font_size][/b][/color]\n")
-	get_tree().create_timer(5.0).timeout.connect(_on_round_restart_timeout)
-
-func _on_round_restart_timeout() -> void:
-	if get_tree().current_scene.name != "MainMenu":
-		Host.execute_round_restart()
+	session.handle_rpc_execute_round_end()
 
 @rpc("authority", "call_local", "reliable")
 func rpc_send_direct_message(message: String) -> void:
