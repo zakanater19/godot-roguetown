@@ -5,12 +5,14 @@ extends Area2D
 const TILE_SIZE: int = 64
 const HITS_TO_BREAK: int = 5
 const LOG_SCENE: PackedScene = preload("res://objects/log.tscn")
+const DEFAULT_MATERIAL: MaterialData = preload("res://materials/wood.tres")
 
 const DROP_SPREAD: float = 14.0
 
 @export var z_level: int = 3
+@export var material_data: MaterialData = DEFAULT_MATERIAL
 
-var hits: int = 0
+var hits: float = 0.0
 
 func get_description() -> String:
 	return "a dark, bare tree"

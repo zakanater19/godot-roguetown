@@ -21,15 +21,13 @@ func handle_rpc_request_hit_gate(sender_id: int, gate_path: NodePath) -> void:
 		if gate.state != gate.GateState.DESTROYED:
 			world.rpc_confirm_toggle_gate.rpc(gate_path)
 	else:
-		var is_sword = Defs.is_tool_sword(held_item)
-		var is_pickaxe = Defs.is_tool_pickaxe(held_item)
-
-		if is_sword or (is_pickaxe and player.combat_mode):
+		var hit_strength := MaterialRegistry.get_tool_efficiency(gate, held_item)
+		if hit_strength > 0.0:
 			if not world.utils.server_check_action_cooldown(player): return
-			gate.hits += 1
+			gate.hits += hit_strength
 			if gate.hits >= gate.HITS_TO_BREAK * 2:
 				world.rpc_confirm_remove_gate.rpc(gate_path)
-			elif gate.hits == gate.HITS_TO_BREAK:
+			elif gate.hits >= gate.HITS_TO_BREAK:
 				world.rpc_confirm_destroy_gate.rpc(gate_path)
 			else:
 				world.rpc_confirm_hit_gate.rpc(gate_path)

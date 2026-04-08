@@ -6,6 +6,9 @@ var world: Node
 func _init(p_world: Node) -> void:
 	world = p_world
 
+func _get_material_hit_strength(target: Node, held_item: Node) -> float:
+	return MaterialRegistry.get_tool_efficiency(target, held_item)
+
 func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 	if not world.multiplayer.is_server(): return
 	var rock = world.get_node_or_null(rock_path)
@@ -17,8 +20,10 @@ func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 
 	if not world.utils.is_within_interaction_range(player, rock.global_position): return
 	if not world.utils.server_check_action_cooldown(player): return
+	var hit_strength := _get_material_hit_strength(rock, player.hands[player.active_hand])
+	if hit_strength <= 0.0: return
 
-	rock.hits += 1
+	rock.hits += hit_strength
 	LateJoin.register_object_state(rock_path, {"hits": rock.hits, "type": "rock"})
 
 	if rock.hits >= rock.HITS_TO_BREAK:
@@ -54,8 +59,10 @@ func handle_rpc_request_hit_tree(sender_id: int, tree_path: NodePath) -> void:
 
 	if not world.utils.is_within_interaction_range(player, tree.global_position): return
 	if not world.utils.server_check_action_cooldown(player): return
+	var hit_strength := _get_material_hit_strength(tree, player.hands[player.active_hand])
+	if hit_strength <= 0.0: return
 
-	tree.hits += 1
+	tree.hits += hit_strength
 	LateJoin.register_object_state(tree_path, {"hits": tree.hits, "type": "tree"})
 
 	if tree.hits >= tree.HITS_TO_BREAK:
@@ -87,8 +94,10 @@ func handle_rpc_request_hit_breakable(sender_id: int, obj_path: NodePath) -> voi
 	if player.body != null and player.body.is_arm_broken(player.active_hand): return
 	if not world.utils.is_within_interaction_range(player, obj.global_position): return
 	if not world.utils.server_check_action_cooldown(player): return
+	var hit_strength := _get_material_hit_strength(obj, player.hands[player.active_hand])
+	if hit_strength <= 0.0: return
 
-	obj.hits += 1
+	obj.hits += hit_strength
 	LateJoin.register_object_state(obj_path, {"hits": obj.hits, "type": "breakable"})
 
 	if obj.hits >= obj.HITS_TO_BREAK:

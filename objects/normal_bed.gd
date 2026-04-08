@@ -3,9 +3,11 @@ extends Area2D
 
 const TILE_SIZE: int = 64
 const HITS_TO_BREAK: int = 4
+const DEFAULT_MATERIAL: MaterialData = preload("res://materials/wood.tres")
 
-var hits: int = 0
+var hits: float = 0.0
 @export var z_level: int = 3
+@export var material_data: MaterialData = DEFAULT_MATERIAL
 
 func get_description() -> String:
 	return "a normal bed, looks somewhat comfortable"
@@ -23,7 +25,7 @@ func _ready() -> void:
 	add_to_group("breakable_object")
 	add_to_group("bed")
 
-func set_hits(val: int) -> void:
+func set_hits(val: float) -> void:
 	hits = val
 
 func perform_hit(main_node: Node) -> void:

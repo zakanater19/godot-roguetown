@@ -3,12 +3,13 @@ extends Node
 
 ## Keep this for executable/binary level compatibility only. Runtime content,
 ## scenes, scripts, and maps are synced via the server bundle hash below.
-const APP_VERSION: String = "1775661626"
+const APP_VERSION: String = "1775665438"
 
 ## Directories that still support lightweight resource diffs as a fallback when
 ## talking to older servers. Full bundle sync does not depend on this list.
 const RESOURCE_DIFF_DIRS: Array[String] = [
 	"res://items/",
+	"res://materials/",
 	"res://recipes/",
 	"res://clothing/",
 	"res://objects/",
@@ -56,6 +57,7 @@ func _apply_pending_patch() -> void:
 		print("GameVersion: applied patch from ", pck_path)
 		patch_applied = true
 		ItemRegistry.reload()
+		MaterialRegistry.reload()
 		RecipeRegistry.reload()
 		# File is now fully loaded into the virtual FS — safe to remove.
 		DirAccess.remove_absolute(pck_path)
@@ -179,6 +181,13 @@ func apply_resource_diff(diffs: Dictionary) -> void:
 					item.set(key, val)
 			if item.item_type != "":
 				ItemRegistry.patch_item(item)
+		elif path.begins_with("res://materials/"):
+			var material: MaterialData = MaterialData.new()
+			for key in props:
+				if key in material and props[key] != null:
+					material.set(key, props[key])
+			if material.material_id != "":
+				MaterialRegistry.patch_material(material)
 		elif path.begins_with("res://recipes/"):
 			var recipe: RecipeData = RecipeData.new()
 			for key in props:

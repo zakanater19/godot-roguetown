@@ -4,12 +4,14 @@ extends Area2D
 
 const TILE_SIZE:     int = 64
 const HITS_TO_BREAK: int = 2
+const DEFAULT_MATERIAL: MaterialData = preload("res://materials/coarse_rock.tres")
 
 const PEBBLE_SCENE: PackedScene = preload("res://objects/pebble.tscn")
 const DROP_SPREAD: float = 14.0
 
-var hits: int = 0
+var hits: float = 0.0
 @export var z_level: int = 3
+@export var material_data: MaterialData = DEFAULT_MATERIAL
 
 func get_description() -> String:
 	return "a rock, solid and heavy"

@@ -4,13 +4,15 @@ extends Area2D
 const TILE_SIZE: int = 64
 const HITS_TO_BREAK: int = 5
 const SPRITE_SCALE: float = 2.0
+const DEFAULT_MATERIAL: MaterialData = preload("res://materials/metal.tres")
 
 enum GateState { CLOSED, OPEN, DESTROYED, OPENING, CLOSING }
 
 var state: GateState = GateState.CLOSED
-var hits: int = 0
+var hits: float = 0.0
 var blocks_fov: bool = false  # Solid but lets light/FOV through like windows
 @export var z_level: int = 3
+@export var material_data: MaterialData = DEFAULT_MATERIAL
 
 @onready var sprite: Sprite2D = $Sprite2D
 

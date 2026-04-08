@@ -21,15 +21,13 @@ func handle_rpc_request_hit_door(sender_id: int, door_path: NodePath) -> void:
 		if door.state != door.DoorState.DESTROYED:
 			world.rpc_confirm_toggle_door.rpc(door_path)
 	else:
-		var is_sword = Defs.is_tool_sword(held_item)
-		var is_pickaxe = Defs.is_tool_pickaxe(held_item)
-
-		if is_sword or (is_pickaxe and player.combat_mode):
+		var hit_strength := MaterialRegistry.get_tool_efficiency(door, held_item)
+		if hit_strength > 0.0:
 			if not world.utils.server_check_action_cooldown(player): return
-			door.hits += 1
+			door.hits += hit_strength
 			if door.hits >= door.HITS_TO_BREAK * 2:
 				world.rpc_confirm_remove_door.rpc(door_path)
-			elif door.hits == door.HITS_TO_BREAK:
+			elif door.hits >= door.HITS_TO_BREAK:
 				world.rpc_confirm_destroy_door.rpc(door_path)
 			else:
 				world.rpc_confirm_hit_door.rpc(door_path)

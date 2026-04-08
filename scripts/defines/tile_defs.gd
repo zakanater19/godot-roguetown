@@ -1,12 +1,12 @@
 # res://scripts/defines/tile_defs.gd
-# Authoritative tile/material definition table.
-# All per-tile properties live here: opacity, break behaviour, tool rules, descriptions.
+# Authoritative tile definition table.
+# All per-tile properties live here: opacity, break behaviour, material tags, descriptions.
 #
 # Usage:
 #   TileDefs.get_def(source_id, atlas_coords)              → Dictionary (empty if unknown)
 #   TileDefs.is_opaque(source_id, atlas_coords)            → bool
 #   TileDefs.get_description(source_id, atlas_coords)      → String
-#   TileDefs.is_tool_allowed(def, tool_type, in_combat)    → bool
+#   TileDefs.get_material_id(source_id, atlas_coords)      → String
 class_name TileDefs
 
 # ---------------------------------------------------------------------------
@@ -26,9 +26,7 @@ const BREAK_REPLACE = "replace"  # places a floor tile only
 #   "break_type"        : String   — BREAK_DEBRIS or BREAK_REPLACE
 #   "break_floor"       : Vector2i — floor tile (source_id 0) placed after breaking
 #   "break_debris"      : String   — scene path for debris object (BREAK_DEBRIS only)
-#   "required_tools"    : Array    — tool types that can break it; [] = any tool works
-#   "forbidden_tools"   : Array    — tool types that are never allowed
-#   "combat_only_tools" : Array    — tool types that only work in combat mode
+#   "material_id"       : String   — MaterialRegistry key that governs tool efficiency
 # }
 #
 # Solidity for source_id 1 is always implicit — all walls block movement.
@@ -58,9 +56,7 @@ const DEFS: Dictionary = {
 			"break_type"        : "debris",
 			"break_floor"       : Vector2i(9, 0),
 			"break_debris"      : "res://objects/rock.tscn",
-			"required_tools"    : [],
-			"forbidden_tools"   : ["slashing"],
-			"combat_only_tools" : [],
+			"material_id"       : "coarse_rock",
 		},
 		Vector2i(6, 0): {
 			"opaque"            : true,
@@ -68,9 +64,7 @@ const DEFS: Dictionary = {
 			"break_hits"        : 10,
 			"break_type"        : "replace",
 			"break_floor"       : Vector2i(5, 0),
-			"required_tools"    : [],
-			"forbidden_tools"   : ["slashing"],
-			"combat_only_tools" : [],
+			"material_id"       : "stone",
 		},
 		Vector2i(7, 0): {
 			"opaque"            : true,
@@ -78,9 +72,7 @@ const DEFS: Dictionary = {
 			"break_hits"        : 5,
 			"break_type"        : "replace",
 			"break_floor"       : Vector2i(4, 0),
-			"required_tools"    : ["slashing", "pickaxe"],
-			"forbidden_tools"   : [],
-			"combat_only_tools" : ["pickaxe"],
+			"material_id"       : "wood",
 		},
 		Vector2i(10, 0): {
 			"opaque"            : false,   # solid but transparent — light and FOV pass through
@@ -88,9 +80,7 @@ const DEFS: Dictionary = {
 			"break_hits"        : 5,
 			"break_type"        : "replace",
 			"break_floor"       : Vector2i(4, 0),
-			"required_tools"    : ["slashing", "pickaxe"],
-			"forbidden_tools"   : [],
-			"combat_only_tools" : ["pickaxe"],
+			"material_id"       : "wood",
 		},
 	},
 	# -------------------------------------------------------------------------
@@ -132,18 +122,6 @@ static func get_description(source_id: int, atlas_coords: Vector2i) -> String:
 		return "empty space, nothing here"
 	return get_def(source_id, atlas_coords).get("description", "something")
 
-## True if tool_type (or "" for bare hands) may attack the given wall def.
-## def must be the result of get_def() for a source_id-1 tile.
-static func is_tool_allowed(def: Dictionary, tool_type: String, in_combat: bool) -> bool:
-	if not def.has("break_hits"):
-		return false  # not a breakable wall
-	var required: Array    = def.get("required_tools",    [])
-	var forbidden: Array   = def.get("forbidden_tools",   [])
-	var combat_only: Array = def.get("combat_only_tools", [])
-	if required.size() > 0 and tool_type not in required:
-		return false
-	if tool_type in forbidden:
-		return false
-	if tool_type in combat_only and not in_combat:
-		return false
-	return true
+## Material tag for a tile. Empty string means no material-driven wall logic.
+static func get_material_id(source_id: int, atlas_coords: Vector2i) -> String:
+	return get_def(source_id, atlas_coords).get("material_id", "")

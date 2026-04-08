@@ -10,6 +10,7 @@ extends Area2D
 
 var item_type: String = ""
 var tool_type: String = ""
+var material_data: MaterialData = null
 var slot: String = ""
 var weaponizable: bool = false
 var too_large_for_satchel: bool = false
@@ -28,6 +29,7 @@ func _ready() -> void:
 		return
 	item_type             = item_data.item_type
 	tool_type             = item_data.tool_type
+	material_data         = item_data.material_data
 	slot                  = item_data.slot
 	weaponizable          = item_data.weaponizable
 	too_large_for_satchel = item_data.too_large_for_satchel

@@ -68,17 +68,19 @@ func _check_pending_reconnect() -> void:
 		return
 	var ip: String = str(parsed.get("ip", ""))
 	var port: int  = int(parsed.get("port", Host.PORT))
-	var pack_path: String = str(parsed.get("pack_path", ""))
 	if ip == "":
 		DirAccess.remove_absolute(path)
 		return
-	var has_matching_patch: bool = GameVersion.has_active_content_patch()
-	if not has_matching_patch and pack_path != "":
-		has_matching_patch = FileAccess.file_exists(pack_path)
-	if not has_matching_patch:
+
+	# Only auto-reconnect immediately after a patch/main-pack restart.
+	# A stale pending_reconnect marker should not force every normal launch
+	# into a reconnect loop just because the downloaded bundle file still exists.
+	if not GameVersion.has_active_content_patch():
 		DirAccess.remove_absolute(path)
 		return
 
+	# Consume the marker before attempting reconnect so the behavior is one-shot.
+	DirAccess.remove_absolute(path)
 	_begin_client_connection(ip, port, "Reconnecting after update...")
 
 func _on_host_pressed() -> void:

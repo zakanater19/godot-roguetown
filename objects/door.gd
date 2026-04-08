@@ -3,12 +3,14 @@ extends Area2D
 
 const TILE_SIZE: int = 64
 const HITS_TO_BREAK: int = 3
+const DEFAULT_MATERIAL: MaterialData = preload("res://materials/wood.tres")
 
 enum DoorState { CLOSED, OPEN, DESTROYED, OPENING, CLOSING }
 
 var state: DoorState = DoorState.CLOSED
-var hits: int = 0
+var hits: float = 0.0
 @export var z_level: int = 3
+@export var material_data: MaterialData = DEFAULT_MATERIAL
 
 @onready var sprite: Sprite2D = $Sprite2D
 

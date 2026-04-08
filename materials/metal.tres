@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MaterialData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defines/material_data.gd" id="1_matmetal"]
+
+[resource]
+script = ExtResource("1_matmetal")
+material_id = "metal"
+display_name = "Metal"
+tool_efficiencies = {
+"pickaxe": 0.6,
+"slashing": 0.35
+}

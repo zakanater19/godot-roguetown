@@ -203,12 +203,6 @@ func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool
 	if player.has_method("_start_move_lerp"): player._start_move_lerp()
 	LateJoin.update_player_state(peer_id, {"position": player.position})
 
-func _get_held_tool_type(item: Node) -> String:
-	if item == null: return ""
-	var t = item.get("tool_type")
-	if t != null and t is String: return t
-	return ""
-
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if not world.multiplayer.is_server(): return
 	var attacker: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
@@ -221,13 +215,11 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if not world.utils.server_check_action_cooldown(attacker): return
 	var def: Dictionary = TileDefs.get_def(1, atlas_coords)
 	if def.is_empty(): return
-	var tool_type: String = ""
-	if attacker.hands[attacker.active_hand] != null:
-		tool_type = _get_held_tool_type(attacker.hands[attacker.active_hand])
-	if not TileDefs.is_tool_allowed(def, tool_type, attacker.combat_mode): return
+	var hit_strength := MaterialRegistry.get_tool_efficiency(TileDefs.get_material_id(1, atlas_coords), attacker.hands[attacker.active_hand])
+	if hit_strength <= 0.0: return
 	var hits_needed: int = def["break_hits"]
 	if not world.tile_hit_counts[attacker.z_level].has(pos): world.tile_hit_counts[attacker.z_level][pos] = 0
-	world.tile_hit_counts[attacker.z_level][pos] += 1
+	world.tile_hit_counts[attacker.z_level][pos] += hit_strength
 	if world.tile_hit_counts[attacker.z_level][pos] >= hits_needed:
 		world.tile_hit_counts[attacker.z_level].erase(pos)
 		if def.get("break_type") == TileDefs.BREAK_DEBRIS:

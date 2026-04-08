@@ -38,6 +38,10 @@ extends Resource
 ## Add new tool types in Defs.gd before referencing them here.
 @export var tool_type: String = ""
 
+## What this item is physically made from.
+## Not required for current crafting, but keeps material metadata separate from recipes.
+@export var material_data: MaterialData = null
+
 ## If true, this item cannot be placed inside a satchel.
 @export var too_large_for_satchel: bool = false
 
