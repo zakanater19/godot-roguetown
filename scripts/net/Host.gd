@@ -37,43 +37,40 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*", custom_nam
 	if bind_ip != "" and bind_ip != "*":
 		enet.set_bind_ip(bind_ip)
 
-	var err: int = enet.create_server(PORT, max_clients, 3)
+	var err: Error = enet.create_server(PORT, max_clients, 3) as Error
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
 		print("Host: server listening on %s:%d with max players %d" %[bind_ip, PORT, max_clients])
 		session_ids[1] = 1.0
 		ServerBrowser.start_broadcasting(server_name)
 		_setup_spawner()
-		print("Host: generating server_patch.pck...")
+		print("Host: generating server bundle...")
 		var pck_err: Error = GameVersion.generate_server_pck()
 		if pck_err != OK:
 			push_error("Host: server_patch.pck generation FAILED (error %d) — %s" %[
 				pck_err, GameVersion.pck_generation_error])
-			push_error("Host: clients with version mismatches will receive a partial patch (items/recipes only).")
+			push_error("Host: out-of-date clients will be rejected until the bundle can be generated.")
 		else:
-			print("Host: server_patch.pck ready.")
+			print("Host: server bundle ready.")
 
 		Sidebar.refresh_admin_visibility()
 	else:
 		push_error("Host: failed to start server (error %d)" % err)
 
 
-func start_client_custom(ip: String, port: int) -> void:
+func start_client_custom(ip: String, port: int) -> Error:
 	last_server_address = ip
 	last_server_port    = port
 	is_host_mode = false
 
 	var enet := ENetMultiplayerPeer.new()
 
-	var err: int = enet.create_client(ip, port, 3)
+	var err: Error = enet.create_client(ip, port, 3) as Error
 	if err == OK:
 		multiplayer.multiplayer_peer = enet
-		print("Host: joined as client to %s:%d" % [ip, port])
-		_setup_spawner()
-
+		print("Host: attempting client connection to %s:%d" % [ip, port])
 		Sidebar.refresh_admin_visibility()
-	else:
-		push_error("Host: failed to start client (error %d)" % err)
+	return err
 
 
 func execute_round_restart() -> void:

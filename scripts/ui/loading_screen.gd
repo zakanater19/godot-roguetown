@@ -10,9 +10,15 @@
 
 extends CanvasLayer
 
+signal primary_action_pressed
+signal secondary_action_pressed
+
 var _status_label:   RichTextLabel
 var _progress_bar:   ProgressBar
 var _detail_label:   Label
+var _primary_button: Button
+var _secondary_button: Button
+var _action_row: HBoxContainer
 
 func _ready() -> void:
 	layer = 100
@@ -81,6 +87,28 @@ func _build_ui() -> void:
 	_detail_label.visible = false
 	vbox.add_child(_detail_label)
 
+	_action_row = HBoxContainer.new()
+	_action_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_action_row.add_theme_constant_override("separation", 12)
+	_action_row.visible = false
+	vbox.add_child(_action_row)
+
+	_primary_button = Button.new()
+	_primary_button.text = "Retry"
+	_primary_button.custom_minimum_size = Vector2(120, 38)
+	_primary_button.pressed.connect(func() -> void:
+		primary_action_pressed.emit()
+	)
+	_action_row.add_child(_primary_button)
+
+	_secondary_button = Button.new()
+	_secondary_button.text = "Server List"
+	_secondary_button.custom_minimum_size = Vector2(120, 38)
+	_secondary_button.pressed.connect(func() -> void:
+		secondary_action_pressed.emit()
+	)
+	_action_row.add_child(_secondary_button)
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -91,6 +119,7 @@ func show_loading(status: String) -> void:
 	_status_label.text     = status
 	_progress_bar.visible  = false
 	_detail_label.visible  = false
+	_action_row.visible    = false
 	show()
 
 
@@ -107,6 +136,20 @@ func update_status(status: String, progress: float = -1.0, detail: String = "") 
 	_detail_label.visible = detail != ""
 
 
+func show_action_prompt(
+	status: String,
+	detail: String = "",
+	primary_text: String = "Retry",
+	secondary_text: String = "Server List"
+) -> void:
+	show_loading(status)
+	update_status(status, -1.0, detail)
+	_primary_button.text = primary_text
+	_secondary_button.text = secondary_text
+	_action_row.visible = true
+
+
 ## Hide the overlay.  Safe to call even when already hidden.
 func hide_loading() -> void:
+	_action_row.visible = false
 	hide()

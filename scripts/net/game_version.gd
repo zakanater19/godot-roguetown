@@ -1,20 +1,34 @@
 # res://scripts/net/game_version.gd
 extends Node
 
-## Bump this whenever scripts, compiled code, or scene structure changes in a way
-## that a PCK patch alone cannot fix (i.e. any .gd change, new node types, etc.).
-## Clients with a different APP_VERSION are told to download the new executable
-## rather than being patched — preventing crashes from script/binary mismatches.
-const APP_VERSION: String = "a14f90d"
+## Keep this for executable/binary level compatibility only. Runtime content,
+## scenes, scripts, and maps are synced via the server bundle hash below.
+const APP_VERSION: String = "1775649370"
 
-## Directories whose .tres files are included in both the version hash AND the
-## server PCK.  Keep this list in sync with _stage_res_dir_recursive's allowed[].
-const HASHED_DIRS: Array[String] = [
+## Directories that still support lightweight resource diffs as a fallback when
+## talking to older servers. Full bundle sync does not depend on this list.
+const RESOURCE_DIFF_DIRS: Array[String] = [
 	"res://items/",
 	"res://recipes/",
 	"res://clothing/",
 	"res://objects/",
 ]
+const SERVER_BUNDLE_PATH: String = "user://server_bundle.pck"
+const PACK_EXCLUDED_DIR_PREFIXES: Array[String] = [
+	".git/",
+	".claude/",
+	".godot/editor/",
+	".godot/exported/",
+]
+const PACK_EXCLUDED_FILES: Array[String] = [
+	".gitattributes",
+	".gitignore",
+	"README.md",
+	"LICENSE",
+	"export_presets.cfg",
+	".godot/export_credentials.cfg",
+]
+const PACK_EXCLUDED_EXTENSIONS: Array[String] = ["md", "md5", "cache"]
 
 var _version: String = ""
 var server_pck_ready: bool = false
@@ -22,9 +36,12 @@ var server_pck_ready: bool = false
 var pck_generation_error: String = ""
 ## True after _apply_pending_patch() successfully loaded a patch this session.
 var patch_applied: bool = false
+var launched_with_main_pack: bool = false
+var active_main_pack_path: String = ""
 
 
 func _ready() -> void:
+	_detect_main_pack_launch()
 	_apply_pending_patch()
 	_version = _compute_version()
 	print("GameVersion: APP_VERSION=%s  content=%s..." % [APP_VERSION, _version.left(8)])
@@ -51,6 +68,35 @@ func get_version() -> String:
 	return _version
 
 
+func has_active_content_patch() -> bool:
+	return patch_applied or launched_with_main_pack
+
+
+func get_server_bundle_path() -> String:
+	return SERVER_BUNDLE_PATH
+
+
+func build_restart_args(main_pack_path: String = "") -> PackedStringArray:
+	var args: PackedStringArray = OS.get_cmdline_args()
+	var cleaned := PackedStringArray()
+	var skip_next: bool = false
+
+	for arg in args:
+		if skip_next:
+			skip_next = false
+			continue
+		if arg == "--main-pack":
+			skip_next = true
+			continue
+		cleaned.append(arg)
+
+	if main_pack_path != "":
+		cleaned.append("--main-pack")
+		cleaned.append(ProjectSettings.globalize_path(main_pack_path))
+
+	return cleaned
+
+
 func compute_version() -> String:
 	return _compute_version()
 
@@ -58,41 +104,15 @@ func compute_version() -> String:
 func _compute_version() -> String:
 	var ctx: HashingContext = HashingContext.new()
 	ctx.start(HashingContext.HASH_MD5)
-	for dir in HASHED_DIRS:
-		_hash_resource_dir(ctx, dir)
+	for entry in _get_runtime_entries():
+		ctx.update(entry["dest"].to_utf8_buffer())
+		ctx.update(_read_file_bytes(entry["source"]))
 	return ctx.finish().hex_encode()
-
-
-func _hash_resource_dir(ctx: HashingContext, dir_path: String) -> void:
-	var dir: DirAccess = DirAccess.open(dir_path)
-	if dir == null:
-		return
-	var files: Array[String] = []
-	dir.list_dir_begin()
-	var fname: String = dir.get_next()
-	while fname != "":
-		if not dir.current_is_dir():
-			var clean_name: String = fname.replace(".remap", "")
-			if clean_name.ends_with(".tres"):
-				files.append(clean_name)
-		fname = dir.get_next()
-	dir.list_dir_end()
-
-	var unique_files: Dictionary = {}
-	for f in files:
-		unique_files[f] = true
-	var sorted_files: Array = unique_files.keys()
-	sorted_files.sort()
-
-	for f in sorted_files:
-		var res: Resource = load(dir_path + f)
-		if res != null:
-			ctx.update(var_to_bytes(_serialize(res)))
 
 
 func build_manifest() -> Dictionary:
 	var manifest: Dictionary = {}
-	for dir in HASHED_DIRS:
+	for dir in RESOURCE_DIFF_DIRS:
 		_add_dir_to_manifest(manifest, dir)
 	return manifest
 
@@ -177,11 +197,16 @@ func generate_server_pck() -> Error:
 	_rmdir_recursive(stage_user)
 	DirAccess.make_dir_recursive_absolute(stage_user)
 
-	_stage_res_dir_recursive("res://", stage_user)
+	var entry_count: int = _stage_runtime_bundle(stage_user)
+	if entry_count <= 0:
+		pck_generation_error = "no runtime files were collected for staging"
+		push_error("GameVersion: generate_server_pck - " + pck_generation_error)
+		_rmdir_recursive(stage_user)
+		server_pck_ready = false
+		return ERR_CANT_CREATE
 
-	var user_os: String  = OS.get_user_data_dir()
-	var pck_os: String   = user_os + "/server_patch.pck"
-	var stage_os: String = user_os + "/pck_stage"
+	var pck_os: String   = ProjectSettings.globalize_path(SERVER_BUNDLE_PATH)
+	var stage_os: String = ProjectSettings.globalize_path(stage_user)
 
 	var pck: PCKPacker = PCKPacker.new()
 	var err: Error = pck.pck_start(pck_os)
@@ -202,72 +227,144 @@ func generate_server_pck() -> Error:
 		server_pck_ready = false
 		return err
 
-	print("GameVersion: server_patch.pck ready (%d files)" % file_count)
+	print("GameVersion: server bundle ready (%d files)" % file_count)
 	server_pck_ready = true
 	return OK
 
 
-func _stage_res_dir_recursive(res_dir: String, stage_base: String) -> void:
+func _detect_main_pack_launch() -> void:
+	var args: PackedStringArray = OS.get_cmdline_args()
+	for i in range(args.size()):
+		if args[i] == "--main-pack" and i + 1 < args.size():
+			launched_with_main_pack = true
+			active_main_pack_path = args[i + 1]
+			return
+
+
+func _get_runtime_entries() -> Array:
+	var entry_map: Dictionary = {}
+	_collect_runtime_entries_recursive("res://", entry_map)
+
+	var dests: Array = entry_map.keys()
+	dests.sort()
+
+	var entries: Array = []
+	for dest in dests:
+		entries.append({
+			"dest": dest,
+			"source": entry_map[dest],
+		})
+	return entries
+
+
+func _collect_runtime_entries_recursive(res_dir: String, entry_map: Dictionary) -> void:
 	var dir: DirAccess = DirAccess.open(res_dir)
 	if dir == null:
 		return
+
 	dir.list_dir_begin()
 	var entry: String = dir.get_next()
 	while entry != "":
 		if entry != "." and entry != "..":
 			var res_path: String = res_dir + entry
+			var relative: String = res_path.substr(6)
 			if dir.current_is_dir():
-				var allowed: Array = ["items", "recipes", "clothing", "objects", "assets", "animated", "doors", "ui", ".godot"]
-				if res_dir != "res://" or entry in allowed:
-					_stage_res_dir_recursive(res_path + "/", stage_base)
-			else:
-				var ext: String = entry.get_extension()
-				if ext in ["tres", "tscn", "png", "jpg", "remap", "import"]:
-					_stage_file(res_path, stage_base)
+				if _should_include_dir(relative + "/"):
+					_collect_runtime_entries_recursive(res_path + "/", entry_map)
+			elif _should_include_file(relative):
+				_collect_runtime_file_entries(res_path, entry_map)
 		entry = dir.get_next()
 	dir.list_dir_end()
 
 
-func _stage_file(res_path: String, stage_base: String) -> Error:
-	var relative: String = res_path.substr(6)
-	var dest: String = stage_base + "/" + relative
+func _should_include_dir(relative_dir: String) -> bool:
+	for prefix in PACK_EXCLUDED_DIR_PREFIXES:
+		if relative_dir.begins_with(prefix):
+			return false
+	return true
 
+
+func _should_include_file(relative_file: String) -> bool:
+	for prefix in PACK_EXCLUDED_DIR_PREFIXES:
+		if relative_file.begins_with(prefix):
+			return false
+
+	if relative_file in PACK_EXCLUDED_FILES:
+		return false
+
+	var ext: String = relative_file.get_extension().to_lower()
+	return not PACK_EXCLUDED_EXTENSIONS.has(ext)
+
+
+func _collect_runtime_file_entries(res_path: String, entry_map: Dictionary) -> void:
 	if res_path.ends_with(".remap"):
-		var target_path: String = ""
-		var remap_data: String = FileAccess.get_file_as_bytes(res_path).get_string_from_utf8()
-		for line in remap_data.split("\n"):
-			if line.strip_edges().begins_with("path="):
-				target_path = line.strip_edges().trim_prefix("path=").replace("\"", "")
-				break
-		if target_path != "":
-			var clean_dest: String = dest.replace(".remap", "")
-			DirAccess.make_dir_recursive_absolute(clean_dest.get_base_dir())
-			var bin_data: PackedByteArray = FileAccess.get_file_as_bytes(target_path)
-			if not bin_data.is_empty():
-				var dst: FileAccess = FileAccess.open(clean_dest, FileAccess.WRITE)
-				if dst:
-					dst.store_buffer(bin_data)
-					dst.close()
-					return OK
+		var remap_target: String = _extract_pack_target_path(res_path)
+		if remap_target != "" and FileAccess.file_exists(remap_target):
+			_register_runtime_entry(entry_map, res_path.trim_suffix(".remap"), remap_target)
+		return
+
+	_register_runtime_entry(entry_map, res_path, res_path)
+
+	if res_path.ends_with(".import"):
+		var import_target: String = _extract_pack_target_path(res_path)
+		if import_target.begins_with("res://.godot/imported/") and FileAccess.file_exists(import_target):
+			_register_runtime_entry(entry_map, import_target, import_target)
+
+
+func _register_runtime_entry(entry_map: Dictionary, dest_res_path: String, source_res_path: String) -> void:
+	if not entry_map.has(dest_res_path):
+		entry_map[dest_res_path] = source_res_path
+
+
+func _extract_pack_target_path(res_path: String) -> String:
+	var file: FileAccess = FileAccess.open(res_path, FileAccess.READ)
+	if file == null:
+		return ""
+	var text: String = file.get_as_text()
+	file.close()
+
+	for line in text.split("\n"):
+		var stripped: String = line.strip_edges()
+		if stripped.begins_with("path="):
+			return stripped.trim_prefix("path=").replace("\"", "")
+	return ""
+
+
+func _read_file_bytes(res_path: String) -> PackedByteArray:
+	var file: FileAccess = FileAccess.open(res_path, FileAccess.READ)
+	if file == null:
+		return PackedByteArray()
+	var data: PackedByteArray = file.get_buffer(file.get_length())
+	file.close()
+	return data
+
+
+func _stage_runtime_bundle(stage_base: String) -> int:
+	var count: int = 0
+	for entry in _get_runtime_entries():
+		if _stage_runtime_entry(entry["dest"], entry["source"], stage_base) == OK:
+			count += 1
+	return count
+
+
+func _stage_runtime_entry(dest_res_path: String, source_res_path: String, stage_base: String) -> Error:
+	var relative: String = dest_res_path.substr(6)
+	var dest: String = stage_base + "/" + relative
+	DirAccess.make_dir_recursive_absolute(dest.get_base_dir())
+
+	var src: FileAccess = FileAccess.open(source_res_path, FileAccess.READ)
+	if src == null:
 		return ERR_FILE_CANT_READ
 
-	DirAccess.make_dir_recursive_absolute(dest.get_base_dir())
-	var data: PackedByteArray = FileAccess.get_file_as_bytes(res_path)
-	if not data.is_empty():
-		var dst: FileAccess = FileAccess.open(dest, FileAccess.WRITE)
-		if dst:
-			dst.store_buffer(data)
-			dst.close()
+	var data: PackedByteArray = src.get_buffer(src.get_length())
+	src.close()
 
-		if res_path.ends_with(".import"):
-			var txt: String = data.get_string_from_utf8()
-			for line in txt.split("\n"):
-				if line.strip_edges().begins_with("path="):
-					var ctex_path: String = line.strip_edges().trim_prefix("path=").replace("\"", "")
-					if ctex_path.begins_with("res://.godot/imported/"):
-						_stage_file(ctex_path, stage_base)
-		return OK
-	return ERR_FILE_CANT_WRITE
+	var dst: FileAccess = FileAccess.open(dest, FileAccess.WRITE)
+	if dst == null:
+		return ERR_FILE_CANT_WRITE
+	dst.store_buffer(data)
+	dst.close()
+	return OK
 
 
 func _add_to_pck_recursive(pck: PCKPacker, stage_user: String, stage_os: String, res_prefix: String) -> int:
