@@ -2,9 +2,9 @@
 # Builder helper — constructs all HUD panels and assigns refs back to the HUD node.
 extends RefCounted
 
-const BOX:  int = 48
-const GAP:  int = 4
-const STEP: int = BOX + GAP
+const BOX:  int = UIDefs.HUD_BOX_SIZE
+const GAP:  int = UIDefs.HUD_GAP
+const STEP: int = UIDefs.HUD_STEP
 
 const SLOT_LAYOUT: Array = [
 	["head",      1, 0],
@@ -47,10 +47,10 @@ func build_clothing_panel(parent: Control) -> void:
 	panel.anchor_right  = 0.5
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
-	panel.offset_left   = -(50 + 8 + panel_w) - 166
-	panel.offset_right  = -(50 + 8) - 166
-	panel.offset_bottom = -16
-	panel.offset_top    = -16 - panel_h
+	panel.offset_left   = -(abs(UIDefs.HUD_HAND_START_X) + (2 * GAP) + panel_w) - UIDefs.HUD_CENTER_OFFSET_X
+	panel.offset_right  = -(abs(UIDefs.HUD_HAND_START_X) + (2 * GAP)) - UIDefs.HUD_CENTER_OFFSET_X
+	panel.offset_bottom = -UIDefs.HUD_PANEL_BOTTOM_MARGIN
+	panel.offset_top    = -UIDefs.HUD_PANEL_BOTTOM_MARGIN - panel_h
 	panel.mouse_filter  = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(panel)
 	hud._clothing_panel = panel
@@ -94,7 +94,7 @@ func _create_slot_box(slot_name: String, col: int, row: int) -> void:
 
 	var icon := Sprite2D.new()
 	icon.position = Vector2(BOX / 2.0, BOX / 2.0)
-	icon.scale    = Vector2(0.75, 0.75)
+	icon.scale    = Vector2(UIDefs.HUD_ITEM_ICON_SCALE, UIDefs.HUD_ITEM_ICON_SCALE)
 	icon.visible  = false
 	ctrl.add_child(icon)
 
@@ -163,16 +163,16 @@ func build_hand_boxes(parent: Control) -> void:
 	hands_ctrl.anchor_right  = 0.5
 	hands_ctrl.anchor_top    = 1.0
 	hands_ctrl.anchor_bottom = 1.0
-	hands_ctrl.offset_left   = -166
-	hands_ctrl.offset_right  = -166
-	hands_ctrl.offset_top    = -(BOX + 16)
-	hands_ctrl.offset_bottom = -16
+	hands_ctrl.offset_left   = -UIDefs.HUD_CENTER_OFFSET_X
+	hands_ctrl.offset_right  = -UIDefs.HUD_CENTER_OFFSET_X
+	hands_ctrl.offset_top    = -(BOX + UIDefs.HUD_PANEL_BOTTOM_MARGIN)
+	hands_ctrl.offset_bottom = -UIDefs.HUD_PANEL_BOTTOM_MARGIN
 	hands_ctrl.mouse_filter  = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(hands_ctrl)
 
 	for i in range(2):
 		var ctrl := Control.new()
-		ctrl.position            = Vector2(-50 + i * STEP, 0)
+		ctrl.position            = Vector2(UIDefs.HUD_HAND_START_X + i * STEP, 0)
 		ctrl.size                = Vector2(BOX, BOX)
 		ctrl.custom_minimum_size = Vector2(BOX, BOX)
 		ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
@@ -188,7 +188,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 		var icon := Sprite2D.new()
 		icon.position = Vector2(BOX / 2.0, BOX / 2.0)
-		icon.scale    = Vector2(0.6, 0.6)
+		icon.scale    = Vector2(UIDefs.HUD_HAND_ICON_SCALE, UIDefs.HUD_HAND_ICON_SCALE)
 		icon.visible  = false
 		ctrl.add_child(icon)
 		hud._hand_icons.append(icon)
@@ -235,7 +235,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Release grab button
 	hud._release_ctrl = Control.new()
-	hud._release_ctrl.position            = Vector2(-50, -(BOX + GAP))
+	hud._release_ctrl.position            = Vector2(UIDefs.HUD_HAND_START_X, -(BOX + GAP))
 	hud._release_ctrl.size                = Vector2(BOX, BOX)
 	hud._release_ctrl.custom_minimum_size = Vector2(BOX, BOX)
 	hud._release_ctrl.mouse_filter        = Control.MOUSE_FILTER_STOP
@@ -256,7 +256,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Resist grab button
 	hud._resist_ctrl = Control.new()
-	hud._resist_ctrl.position            = Vector2(2, -(BOX + GAP))
+	hud._resist_ctrl.position            = Vector2(UIDefs.HUD_HAND_START_X + STEP, -(BOX + GAP))
 	hud._resist_ctrl.size                = Vector2(BOX, BOX)
 	hud._resist_ctrl.custom_minimum_size = Vector2(BOX, BOX)
 	hud._resist_ctrl.mouse_filter        = Control.MOUSE_FILTER_IGNORE
@@ -284,7 +284,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Intent button
 	var intent_ctrl := Control.new()
-	intent_ctrl.position = Vector2(54, 0)
+	intent_ctrl.position = Vector2(UIDefs.HUD_BUTTON_STRIP_START_X, 0)
 	intent_ctrl.size     = Vector2(BOX, BOX)
 	hands_ctrl.add_child(intent_ctrl)
 	_add_bg(intent_ctrl)
@@ -299,7 +299,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Crafting button
 	var craft_ctrl := Control.new()
-	craft_ctrl.position = Vector2(106, 0)
+	craft_ctrl.position = Vector2(UIDefs.HUD_BUTTON_STRIP_START_X + UIDefs.HUD_BUTTON_STRIP_STEP_X, 0)
 	craft_ctrl.size     = Vector2(BOX, BOX)
 	hands_ctrl.add_child(craft_ctrl)
 	_add_bg(craft_ctrl)
@@ -314,7 +314,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Stats button
 	var stats_ctrl := Control.new()
-	stats_ctrl.position = Vector2(158, 0)
+	stats_ctrl.position = Vector2(UIDefs.HUD_BUTTON_STRIP_START_X + (2 * UIDefs.HUD_BUTTON_STRIP_STEP_X), 0)
 	stats_ctrl.size     = Vector2(BOX, BOX)
 	hands_ctrl.add_child(stats_ctrl)
 	_add_bg(stats_ctrl)
@@ -329,7 +329,7 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Sleep button
 	var sleep_ctrl := Control.new()
-	sleep_ctrl.position = Vector2(210, 0)
+	sleep_ctrl.position = Vector2(UIDefs.HUD_BUTTON_STRIP_START_X + (3 * UIDefs.HUD_BUTTON_STRIP_STEP_X), 0)
 	sleep_ctrl.size     = Vector2(BOX, BOX)
 	hands_ctrl.add_child(sleep_ctrl)
 	_add_bg(sleep_ctrl)
@@ -344,12 +344,12 @@ func build_hand_boxes(parent: Control) -> void:
 
 	# Vertical bars
 	var bar_container := HBoxContainer.new()
-	bar_container.position = Vector2(264, -32)
-	bar_container.add_theme_constant_override("separation", 6)
+	bar_container.position = UIDefs.HUD_BAR_CONTAINER_POS
+	bar_container.add_theme_constant_override("separation", UIDefs.HUD_BAR_SEPARATION)
 	hands_ctrl.add_child(bar_container)
 
 	var hb_cont := Control.new()
-	hb_cont.custom_minimum_size = Vector2(10, 80)
+	hb_cont.custom_minimum_size = UIDefs.HUD_BAR_SIZE
 	bar_container.add_child(hb_cont)
 	var hb_bg := ColorRect.new()
 	hb_bg.color = Color(0.2, 0.2, 0.2)
@@ -357,11 +357,11 @@ func build_hand_boxes(parent: Control) -> void:
 	hb_cont.add_child(hb_bg)
 	hud._health_bar = ColorRect.new()
 	hud._health_bar.color = Color(0.8, 0.1, 0.1)
-	hud._health_bar.size  = Vector2(10, 80)
+	hud._health_bar.size  = UIDefs.HUD_BAR_SIZE
 	hb_cont.add_child(hud._health_bar)
 
 	var sb_cont := Control.new()
-	sb_cont.custom_minimum_size = Vector2(10, 80)
+	sb_cont.custom_minimum_size = UIDefs.HUD_BAR_SIZE
 	bar_container.add_child(sb_cont)
 	var sb_bg := ColorRect.new()
 	sb_bg.color = Color(0.2, 0.2, 0.2)
@@ -369,7 +369,7 @@ func build_hand_boxes(parent: Control) -> void:
 	sb_cont.add_child(sb_bg)
 	hud._stamina_bar = ColorRect.new()
 	hud._stamina_bar.color = Color(0.1, 0.8, 0.1)
-	hud._stamina_bar.size  = Vector2(10, 80)
+	hud._stamina_bar.size  = UIDefs.HUD_BAR_SIZE
 	sb_cont.add_child(hud._stamina_bar)
 
 # ── Limb targeting panel ──────────────────────────────────────────────────────
@@ -381,9 +381,9 @@ func build_limb_panel(parent: Control) -> void:
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
 	panel.offset_right  = -388
-	panel.offset_left   = -388 - 64
-	panel.offset_bottom = -16
-	panel.offset_top    = -16 - 64
+	panel.offset_left   = -388 - UIDefs.LIMB_PANEL_SIZE
+	panel.offset_bottom = -UIDefs.HUD_PANEL_BOTTOM_MARGIN
+	panel.offset_top    = -UIDefs.HUD_PANEL_BOTTOM_MARGIN - UIDefs.LIMB_PANEL_SIZE
 	panel.mouse_filter  = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(panel)
 
@@ -393,7 +393,7 @@ func build_limb_panel(parent: Control) -> void:
 		base.texture      = base_tex
 		base.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		base.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
-		base.size         = Vector2(64, 64)
+		base.size         = Vector2(UIDefs.LIMB_PANEL_SIZE, UIDefs.LIMB_PANEL_SIZE)
 		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(base)
 
@@ -428,7 +428,7 @@ void fragment() {
 		hl.texture      = hl_tex
 		hl.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		hl.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
-		hl.size         = Vector2(64, 64)
+		hl.size         = Vector2(UIDefs.LIMB_PANEL_SIZE, UIDefs.LIMB_PANEL_SIZE)
 		hl.modulate     = Color(1.0, 0.2, 0.2)
 		hl.visible      = (limb_name == hud.targeted_limb)
 		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -439,7 +439,7 @@ void fragment() {
 		broken_hl.texture      = hl_tex
 		broken_hl.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		broken_hl.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
-		broken_hl.size         = Vector2(64, 64)
+		broken_hl.size         = Vector2(UIDefs.LIMB_PANEL_SIZE, UIDefs.LIMB_PANEL_SIZE)
 		broken_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		broken_hl.visible      = false
 		var mat = ShaderMaterial.new()
@@ -467,16 +467,16 @@ func build_stance_icon(parent: Control) -> void:
 	panel.anchor_right  = 0.5
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
-	panel.offset_right  = -460
-	panel.offset_left   = -524
-	panel.offset_bottom = -16
-	panel.offset_top    = -16 - 64
+	panel.offset_right  = UIDefs.STANCE_PANEL_RIGHT
+	panel.offset_left   = UIDefs.STANCE_PANEL_LEFT
+	panel.offset_bottom = -UIDefs.HUD_PANEL_BOTTOM_MARGIN
+	panel.offset_top    = -UIDefs.HUD_PANEL_BOTTOM_MARGIN - UIDefs.STANCE_PANEL_SIZE
 	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
 	parent.add_child(panel)
 
 	var bg := ColorRect.new()
 	bg.color        = Color(0.1, 0.1, 0.1, 0.7)
-	bg.size         = Vector2(64, 64)
+	bg.size         = Vector2(UIDefs.STANCE_PANEL_SIZE, UIDefs.STANCE_PANEL_SIZE)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(bg)
 
@@ -485,7 +485,7 @@ func build_stance_icon(parent: Control) -> void:
 	hud._stance_icon.texture      = dodge_tex
 	hud._stance_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	hud._stance_icon.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
-	hud._stance_icon.size         = Vector2(64, 64)
+	hud._stance_icon.size         = Vector2(UIDefs.STANCE_PANEL_SIZE, UIDefs.STANCE_PANEL_SIZE)
 	hud._stance_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(hud._stance_icon)
 
@@ -497,16 +497,16 @@ func build_sneak_button(parent: Control) -> void:
 	# Same size and style as the stance icon (64x64 with dark background),
 	# placed directly to the left of it, touching, no gap.
 	# Stance icon: offset_left=-524, offset_right=-460, offset_top=-80, offset_bottom=-16
-	const SNEAK_SIZE: int = 64
+	const SNEAK_SIZE: int = UIDefs.STANCE_PANEL_SIZE
 	var panel := Control.new()
 	panel.anchor_left   = 0.5
 	panel.anchor_right  = 0.5
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
-	panel.offset_right  = -524
-	panel.offset_left   = -524 - SNEAK_SIZE
-	panel.offset_bottom = -16
-	panel.offset_top    = -16 - SNEAK_SIZE
+	panel.offset_right  = UIDefs.STANCE_PANEL_LEFT
+	panel.offset_left   = UIDefs.STANCE_PANEL_LEFT - SNEAK_SIZE
+	panel.offset_bottom = -UIDefs.HUD_PANEL_BOTTOM_MARGIN
+	panel.offset_top    = -UIDefs.HUD_PANEL_BOTTOM_MARGIN - SNEAK_SIZE
 	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
 	parent.add_child(panel)
 

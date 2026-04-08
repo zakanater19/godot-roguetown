@@ -1,9 +1,9 @@
 # res://scripts/core/world.gd
 extends Node
 
-const TILE_SIZE:   int = 64
-const GRID_WIDTH:  int = 1000
-const GRID_HEIGHT: int = 1000
+const TILE_SIZE:   int = Defs.TILE_SIZE
+const GRID_WIDTH:  int = Defs.GRID_WIDTH
+const GRID_HEIGHT: int = Defs.GRID_HEIGHT
 
 var tilemap: TileMapLayer = null
 
@@ -151,8 +151,8 @@ func rpc_set_object_z_level(obj_path: NodePath, new_z: int) -> void:
 	if obj != null:
 		var old_z = obj.get("z_level")
 		obj.set("z_level", new_z)
-		var base = obj.z_index % 200
-		obj.z_index = (new_z - 1) * 200 + base
+		var base = obj.z_index % Defs.Z_LAYER_SIZE
+		obj.z_index = Defs.get_z_index(new_z, base)
 		
 		if old_z != null and old_z != new_z:
 			var tile = utils.world_to_tile(obj.global_position)

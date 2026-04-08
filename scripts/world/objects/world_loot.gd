@@ -28,8 +28,7 @@ func handle_rpc_request_loot_item(sender_id: int, target_path: NodePath, looter_
 	var target: Node2D = world.get_node_or_null(target_path) as Node2D
 	var looter: Node2D = world.utils.find_player_by_peer(looter_peer_id) as Node2D
 	if target == null or looter == null or looter.dead: return
-	var diff: Vector2i = (target.tile_pos - looter.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1 or target.z_level != looter.z_level: return
+	if not Defs.is_within_tile_reach(looter.tile_pos, target.tile_pos) or target.z_level != looter.z_level: return
 
 	var drop_tile: Vector2i = target.tile_pos
 	const SPREAD: float = Defs.DROP_SPREAD
@@ -43,7 +42,7 @@ func handle_rpc_request_loot_item(sender_id: int, target_path: NodePath, looter_
 		var equip_slot: String = str(slot_index)
 		var item_name: String  = target.equipped.get(equip_slot, "")
 		if item_name == "": return
-		var new_name := "Loot_" + equip_slot + "_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+		var new_name := Defs.make_runtime_name("Loot", equip_slot)
 		world.rpc_confirm_loot_unequip_drop.rpc(target_path, equip_slot, new_name, drop_tile, SPREAD)
 
 func handle_rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: String, new_node_name: String, drop_tile: Vector2i, spread: float) -> void:

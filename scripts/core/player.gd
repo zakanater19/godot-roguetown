@@ -1,9 +1,9 @@
 # res://scripts/core/player.gd
 extends Node2D
 
-const MOVE_TIME:   float = 0.22
-const THROW_TILES:    int   = 4
-const THROW_DURATION: float = 0.18
+const MOVE_TIME:   float = PlayerDefs.MOVE_TIME
+const THROW_TILES:    int   = PlayerDefs.THROW_TILES
+const THROW_DURATION: float = PlayerDefs.THROW_DURATION
 const DROP_SPREAD:    float = Defs.DROP_SPREAD
 
 const FACING_NAMES: Array = ["south", "north", "east", "west"]
@@ -98,7 +98,7 @@ var _last_synced_sneak_alpha: float = 1.0
 var _sneak_was_hidden: bool = false
 var prices_shown: bool = false
 var stats: Dictionary = {"strength": 10, "agility": 10}
-var health: int = 100
+var health: int = PlayerDefs.DEFAULT_HEALTH
 var stamina: float = CombatDefs.STAMINA_MAX
 var max_stamina: float = CombatDefs.STAMINA_MAX
 var last_exertion_time: float = 0.0
@@ -136,7 +136,7 @@ var _active_chat_messages: Array[Node2D]   = []
 var _drag_candidate:  Node    = null
 @warning_ignore("unused_private_class_variable")
 var _drag_origin:     Vector2 = Vector2.ZERO
-const DRAG_THRESHOLD: float   = 10.0
+const DRAG_THRESHOLD: float   = PlayerDefs.DRAG_THRESHOLD
 @warning_ignore("unused_private_class_variable")
 var _dragging_player: Node = null
 
@@ -361,7 +361,7 @@ func _rpc_sync_lying_down(val: bool) -> void:
 func rpc_sync_z_level(new_z: int) -> void:
 	z_level = new_z
 	view_z_level = new_z
-	z_index = (z_level - 1) * 200 + 10
+	z_index = Defs.get_z_index(z_level, Defs.Z_OFFSET_PLAYERS)
 	_update_water_submerge()
 	for h in hands:
 		if h != null and is_instance_valid(h):
@@ -374,6 +374,8 @@ func rpc_make_corpse() -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id != 1 and sender_id != 0: return
 	is_possessed = false
+	if name.begins_with("Player_"):
+		name = "Corpse_" + name.trim_prefix("Player_")
 	set_multiplayer_authority(1)
 	if _canvas_layer:
 		_canvas_layer.queue_free()
@@ -441,7 +443,7 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	view_z_level = z_level
-	z_index = (z_level - 1) * 200 + 10
+	z_index = Defs.get_z_index(z_level, Defs.Z_OFFSET_PLAYERS)
 	add_to_group("z_entity")
 	backend  = preload("res://scripts/player/playerbackend.gd").new(self)
 	misc     = preload("res://scripts/player/playermisc.gd").new(self)
@@ -460,8 +462,8 @@ func _ready() -> void:
 	_apply_class_defaults()
 
 	if position == Vector2.ZERO and multiplayer.is_server():
-		tile_pos = Vector2i(500, 500)
-		position = Vector2(32032, 32032)
+		tile_pos = Defs.DEFAULT_SPAWN_TILE
+		position = World.tile_to_pixel(tile_pos)
 
 	if tile_pos == Vector2i.ZERO and position != Vector2.ZERO:
 		tile_pos = Vector2i(int(position.x / World.TILE_SIZE), int(position.y / World.TILE_SIZE))
@@ -496,10 +498,10 @@ func _start_move_lerp() -> void:
 		return
 
 	if is_sprinting and _is_local_authority():
-		if stamina < 3.0:
+		if stamina < PlayerDefs.SPRINT_STAMINA_COST:
 			exhausted = true
 			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
-		_spend_stamina(3.0)
+		_spend_stamina(PlayerDefs.SPRINT_STAMINA_COST)
 
 	_update_water_submerge()
 	move_from    = pixel_pos
@@ -591,7 +593,7 @@ func rpc_set_spawn_position(spawn_pos: Vector2) -> void:
 	if _is_local_authority() and camera != null:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
-		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
+		camera.offset = PlayerDefs.get_camera_offset(vp_size)
 
 # ── Process ───────────────────────────────────────────────────────────────────
 
@@ -605,9 +607,13 @@ func _process(delta: float) -> void:
 		_blood_drip_timer += delta
 		var drip_period: float = 0.0
 		var drip_count: int = 0
-		if health <= 30:   drip_period = 2.0;  drip_count = 9
-		elif health <= 40: drip_period = 5.0;  drip_count = 6
-		elif health <= 60: drip_period = 10.0; drip_count = 3
+		var drip_z_offset: int = 50
+		for drip_state in PlayerDefs.BLOOD_DRIP_STATES:
+			if health <= drip_state["health_at_or_below"]:
+				drip_period = drip_state["period"]
+				drip_count = drip_state["count"]
+				drip_z_offset = drip_state["z_offset"]
+				break
 		if drip_count > 0 and _blood_drip_timer >= drip_period:
 			_blood_drip_timer = 0.0
 			var drip = Node2D.new()
@@ -615,7 +621,7 @@ func _process(delta: float) -> void:
 			drip.is_drip = true
 			drip.count = drip_count
 			drip.position = pixel_pos
-			drip.z_index = (z_level - 1) * 200 + 50
+			drip.z_index = Defs.get_z_index(z_level, drip_z_offset)
 			get_parent().add_child(drip)
 
 	if is_local and _hud: _hud.update_stats(health, stamina)
@@ -633,7 +639,7 @@ func _process(delta: float) -> void:
 		if camera and is_local:
 			camera.position = pixel_pos
 			var vp_size = get_viewport_rect().size
-			camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
+			camera.offset = PlayerDefs.get_camera_offset(vp_size)
 		return
 
 	buffered_dir = Vector2i.ZERO
@@ -668,7 +674,7 @@ func _process(delta: float) -> void:
 	if camera and is_local:
 		camera.position = pixel_pos
 		var vp_size = get_viewport_rect().size
-		camera.offset = Vector2((vp_size.x / 2.0) - 500.0, (vp_size.y / 2.0) - 360.0)
+		camera.offset = PlayerDefs.get_camera_offset(vp_size)
 
 	if is_local and _inspect_label != null: _inspect_label.visible = Input.is_key_pressed(KEY_SHIFT)
 

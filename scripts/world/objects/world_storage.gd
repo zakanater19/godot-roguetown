@@ -10,7 +10,7 @@ func _init(p_world: Node) -> void:
 # ── Satchel ───────────────────────────────────────────────────────────────────
 
 func handle_rpc_request_satchel_insert(sender_id: int, satchel_path: NodePath, hand_idx: int) -> void:
-	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	var satchel := world.get_node_or_null(satchel_path)
@@ -52,8 +52,8 @@ func handle_rpc_confirm_satchel_insert(peer_id: int, satchel_path: NodePath, _it
 	if satchel.has_method("_refresh_ui"): satchel._refresh_ui()
 
 func handle_rpc_request_satchel_extract(sender_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int) -> void:
-	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
-	if slot_index < 0 or slot_index >= 10: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
+	if slot_index < 0 or slot_index >= Defs.SATCHEL_SLOT_COUNT: return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	if player.hands[hand_idx] != null: return
@@ -67,7 +67,7 @@ func handle_rpc_request_satchel_extract(sender_id: int, satchel_path: NodePath, 
 	var scene_path: String = slot.get("scene_path", "")
 	if scene_path == "": return
 	var item_state: Dictionary = slot.get("state", {})
-	var new_node_name: String = "SatchelExtract_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	var new_node_name: String = Defs.make_runtime_name("SatchelExtract")
 	world.rpc_confirm_satchel_extract.rpc(sender_id, satchel_path, slot_index, hand_idx, new_node_name, scene_path, item_state)
 
 func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, slot_index: int, hand_idx: int, new_node_name: String, scene_path: String, item_state: Dictionary) -> void:
@@ -99,7 +99,7 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_path: NodePath, sl
 # ── Table placement ───────────────────────────────────────────────────────────
 
 func handle_rpc_request_table_place(sender_id: int, table_path: NodePath, hand_idx: int, place_pos: Vector2) -> void:
-	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
@@ -126,6 +126,6 @@ func handle_rpc_confirm_table_place(peer_id: int, table_path: NodePath, hand_idx
 		sprite.scale = Vector2(abs(sprite.scale.x), abs(sprite.scale.y))
 	item.global_position = place_pos
 	item.set("z_level", table.z_level)
-	item.z_index = (table.z_level - 1) * 200 + 3
+	item.z_index = Defs.get_z_index(table.z_level, 3)
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = false

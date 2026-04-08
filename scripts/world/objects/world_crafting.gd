@@ -18,14 +18,13 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 
 	# Gather nearby items (hands + adjacent ground tiles).
 	var avail: Array = []
-	for i in range(2):
+	for i in range(Defs.HAND_COUNT):
 		if player.hands[i] != null: avail.append(player.hands[i])
 	for obj in world.get_tree().get_nodes_in_group(Defs.GROUP_PICKABLE):
 		if obj == player.hands[0] or obj == player.hands[1]: continue
 		if obj.get("z_level") != null and obj.z_level != player.z_level: continue
 		var obj_tile := Vector2i(int(obj.global_position.x / world.TILE_SIZE), int(obj.global_position.y / world.TILE_SIZE))
-		var diff: Vector2i = (obj_tile - player.tile_pos).abs()
-		if diff.x <= 1 and diff.y <= 1:
+		if Defs.is_within_tile_reach(player.tile_pos, obj_tile):
 			avail.append(obj)
 
 	# Collect the required ingredients.
@@ -37,7 +36,7 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 			matched_nodes.append(obj)
 	if matched_nodes.size() < recipe.req_amount: return
 
-	var result_name := "Craft_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	var result_name := Defs.make_runtime_name("Craft")
 	var consumed_paths: Array = []
 	for n in matched_nodes:
 		consumed_paths.append(n.get_path())
@@ -53,7 +52,7 @@ func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_pa
 		var n = world.get_node_or_null(p)
 		if n != null:
 			if player != null:
-				for i in range(2):
+				for i in range(Defs.HAND_COUNT):
 					if player.hands[i] == n:
 						player.hands[i] = null
 						if player._is_local_authority(): player._update_hands_ui()
@@ -82,7 +81,7 @@ func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos
 		if n != null:
 			var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 			if player != null:
-				for i in range(2):
+				for i in range(Defs.HAND_COUNT):
 					if player.hands[i] == n:
 						player.hands[i] = null
 						if player._is_local_authority(): player._update_hands_ui()

@@ -165,7 +165,8 @@ func _on_peer_disconnected(id: int) -> void:
 
 func _find_player_by_peer(peer_id: int) -> Node:
 	for p in get_tree().get_nodes_in_group("player"):
-		if p.get_multiplayer_authority() == peer_id: return p
+		if p.get_multiplayer_authority() == peer_id and p.get("is_possessed") != false:
+			return p
 	return null
 
 func _attempt_manual_reconnection() -> void:

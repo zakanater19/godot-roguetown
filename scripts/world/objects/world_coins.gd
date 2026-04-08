@@ -10,11 +10,12 @@ func handle_rpc_request_split_coins(sender_id: int, from_hand: int, to_hand: int
 	if not world.multiplayer.is_server(): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
+	if not Defs.is_valid_hand_index(from_hand) or not Defs.is_valid_hand_index(to_hand): return
 	if player.hands[to_hand] != null: return
 	var from_item = player.hands[from_hand]
 	if from_item == null or from_item.get("is_coin_stack") != true: return
 	if from_item.get("amount") <= split_amount or split_amount <= 0: return
-	var new_name = "Coin_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	var new_name = Defs.make_runtime_name("Coin")
 	var m_type = from_item.get("metal_type")
 	world.rpc_confirm_split_coins.rpc(sender_id, from_hand, to_hand, new_name, split_amount, m_type)
 
@@ -43,12 +44,13 @@ func handle_rpc_request_combine_hand_coins(sender_id: int, from_hand: int, to_ha
 	if not world.multiplayer.is_server(): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
+	if not Defs.is_valid_hand_index(from_hand) or not Defs.is_valid_hand_index(to_hand): return
 	var from_item = player.hands[from_hand]
 	var to_item = player.hands[to_hand]
 	if from_item == null or to_item == null: return
 	if from_item.get("is_coin_stack") != true or to_item.get("is_coin_stack") != true: return
 	if from_item.get("item_type") != to_item.get("item_type"): return
-	var available_space = 20 - to_item.get("amount")
+	var available_space = Defs.MAX_COIN_STACK - to_item.get("amount")
 	if available_space <= 0: return
 	var transfer_amt = min(from_item.get("amount"), available_space)
 	world.rpc_confirm_combine_hand_coins.rpc(sender_id, from_hand, to_hand, transfer_amt)
@@ -71,6 +73,7 @@ func handle_rpc_request_combine_ground_coin(sender_id: int, coin_path: NodePath,
 	if not world.multiplayer.is_server(): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
+	if not Defs.is_valid_hand_index(hand_idx): return
 	if not world.utils.server_check_action_cooldown(player): return
 	var hand_item = player.hands[hand_idx]
 	var ground_coin = world.get_node_or_null(coin_path)
@@ -78,7 +81,7 @@ func handle_rpc_request_combine_ground_coin(sender_id: int, coin_path: NodePath,
 	if not world.utils.is_within_interaction_range(player, ground_coin.global_position): return
 	if hand_item.get("is_coin_stack") != true or ground_coin.get("is_coin_stack") != true: return
 	if hand_item.get("item_type") != ground_coin.get("item_type"): return
-	var available_space = 20 - hand_item.get("amount")
+	var available_space = Defs.MAX_COIN_STACK - hand_item.get("amount")
 	if available_space <= 0: return
 	var transfer_amt = min(ground_coin.get("amount"), available_space)
 	world.rpc_confirm_combine_ground_coin.rpc(sender_id, coin_path, hand_idx, transfer_amt)

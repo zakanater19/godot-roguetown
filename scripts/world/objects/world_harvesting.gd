@@ -27,7 +27,7 @@ func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 		if randf() < 0.10: drops.append("ironore")
 		var drop_data = []
 		for d in drops:
-			drop_data.append({"type": d, "name": "Drop_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)})
+			drop_data.append({"type": d, "name": Defs.make_runtime_name("Drop")})
 		world.rpc_confirm_break_rock.rpc(rock_path, drop_data)
 	else:
 		world.rpc_confirm_hit_rock.rpc(rock_path)
@@ -61,7 +61,7 @@ func handle_rpc_request_hit_tree(sender_id: int, tree_path: NodePath) -> void:
 	if tree.hits >= tree.HITS_TO_BREAK:
 		var log_names = []
 		for i in range(3):
-			log_names.append("Log_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
+			log_names.append(Defs.make_runtime_name("Log"))
 		world.rpc_confirm_break_tree.rpc(tree_path, log_names)
 	else:
 		world.rpc_confirm_hit_tree.rpc(tree_path)

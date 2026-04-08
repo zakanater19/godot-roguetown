@@ -25,6 +25,8 @@ func send_world_state_to_peer(peer_id: int) -> void:
 	var player_states = {}
 	for p in lj.get_tree().get_nodes_in_group("player"):
 		var node = p as Node2D
+		if node == null or node.get("is_possessed") == false:
+			continue
 		var pid  = node.get_multiplayer_authority()
 		if pid == peer_id:
 			continue

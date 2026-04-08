@@ -18,8 +18,7 @@ func _init(p_player: Node2D) -> void:
 
 func update(delta: float) -> void:
 	if loot_panel != null and is_instance_valid(loot_target):
-		var diff: Vector2i = (loot_target.tile_pos - player.tile_pos).abs()
-		if diff.x > 1 or diff.y > 1 or loot_target.z_level != player.z_level:
+		if not Defs.is_within_tile_reach(player.tile_pos, loot_target.tile_pos) or loot_target.z_level != player.z_level:
 			close_target_inventory()
 
 	_update_loot_attempts(delta)
@@ -41,8 +40,7 @@ func open_target_inventory(target: Node) -> void:
 	if loot_panel != null:
 		close_target_inventory()
 
-	var diff: Vector2i = (target.tile_pos - player.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1 or target.z_level != player.z_level:
+	if not Defs.is_within_tile_reach(player.tile_pos, target.tile_pos) or target.z_level != player.z_level:
 		return
 
 	loot_target = target
@@ -103,7 +101,7 @@ func open_target_inventory(target: Node) -> void:
 	hands_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	vbox.add_child(hands_lbl)
 
-	for i in range(2):
+	for i in range(Defs.HAND_COUNT):
 		var hand_label: String = "Right hand" if i == 0 else "Left hand"
 		var slot_key:   String = "hand_" + str(i)
 		var row := _build_slot_row(vbox, hand_label, slot_key)
@@ -205,14 +203,9 @@ func refresh_loot_panel() -> void:
 					amt = edata.get("amount", 1)
 					mtype = edata.get("metal_type", 0)
 				
-				var suffix = ["copper", "silver", "gold"][mtype]
-				var thresholds = [20, 15, 10, 5, 4, 3, 2, 1]
-				for ta in thresholds:
-					if amt >= ta:
-						var p = "res://objects/coins/" + str(ta) + suffix + ".png"
-						if ResourceLoader.exists(p):
-							icon_tex = load(p)
-							break
+				var coin_icon_path := Defs.get_coin_icon_path(amt, mtype)
+				if coin_icon_path != "":
+					icon_tex = load(coin_icon_path)
 			# ── General Case: Standard Items ──────────────────────────
 			elif item_registry != null and item_registry.has_method("get_item_icon"):
 				icon_tex = item_registry.get_item_icon(item)
@@ -245,8 +238,7 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 		if attempt["slot_key"] == slot_key:
 			return
 
-	var diff: Vector2i = (loot_target.tile_pos - player.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1 or loot_target.z_level != player.z_level:
+	if not Defs.is_within_tile_reach(player.tile_pos, loot_target.tile_pos) or loot_target.z_level != player.z_level:
 		return
 
 	var item_desc: String = ""
@@ -310,8 +302,7 @@ func _update_loot_attempts(delta: float) -> void:
 			cancelled_keys.append(slot_key)
 			continue
 
-		var diff: Vector2i = (target.tile_pos - player.tile_pos).abs()
-		if diff.x > 1 or diff.y > 1 or target.z_level != player.z_level:
+		if not Defs.is_within_tile_reach(player.tile_pos, target.tile_pos) or target.z_level != player.z_level:
 			cancelled_keys.append(slot_key)
 			continue
 

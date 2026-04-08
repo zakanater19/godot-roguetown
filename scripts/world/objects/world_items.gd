@@ -10,7 +10,7 @@ func _init(p_world: Node) -> void:
 # ── Hand item interaction ─────────────────────────────────────────────────────
 
 func handle_rpc_request_interact_hand_item(sender_id: int, hand_idx: int) -> void:
-	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
@@ -29,7 +29,7 @@ func handle_rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
 # ── Equip / Unequip ───────────────────────────────────────────────────────────
 
 func handle_rpc_request_equip(sender_id: int, item_path: NodePath, slot_name: String, hand_index: int) -> void:
-	if not world.multiplayer.is_server() or hand_index < 0 or hand_index > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
@@ -44,11 +44,11 @@ func handle_rpc_confirm_equip(peer_id: int, item_path: NodePath, slot_name: Stri
 		player._perform_equip(obj, slot_name, hand_index)
 
 func handle_rpc_request_unequip(sender_id: int, slot_name: String, hand_index: int) -> void:
-	if not world.multiplayer.is_server() or hand_index < 0 or hand_index > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
-	var unique_name = "Unequip_" + slot_name + "_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+	var unique_name = Defs.make_runtime_name("Unequip", slot_name)
 	world.rpc_confirm_unequip.rpc(sender_id, slot_name, unique_name, hand_index)
 
 func handle_rpc_confirm_unequip(peer_id: int, slot_name: String, new_node_name: String, hand_index: int) -> void:
@@ -59,7 +59,7 @@ func handle_rpc_confirm_unequip(peer_id: int, slot_name: String, new_node_name: 
 # ── Furnace ───────────────────────────────────────────────────────────────────
 
 func handle_rpc_request_furnace_action(sender_id: int, furnace_path: NodePath, action: String, hand_idx: int) -> void:
-	if not world.multiplayer.is_server() or hand_idx < 0 or hand_idx > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var furnace = world.get_node_or_null(furnace_path)
 	if furnace == null: return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
@@ -71,7 +71,7 @@ func handle_rpc_request_furnace_action(sender_id: int, furnace_path: NodePath, a
 	if action == "eject":
 		var names = []
 		var total = furnace._coal_count + furnace._ironore_count
-		for i in total: names.append("Eject_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000))
+		for i in total: names.append(Defs.make_runtime_name("Eject"))
 		world.rpc_confirm_furnace_action.rpc(sender_id, furnace_path, action, hand_idx, names)
 	else:
 		world.rpc_confirm_furnace_action.rpc(sender_id, furnace_path, action, hand_idx, [])
@@ -85,7 +85,7 @@ func handle_rpc_confirm_furnace_action(peer_id: int, furnace_path: NodePath, act
 # ── Pickup ────────────────────────────────────────────────────────────────────
 
 func handle_rpc_request_pickup(sender_id: int, item_path: NodePath, hand_index: int) -> void:
-	if not world.multiplayer.is_server() or hand_index < 0 or hand_index > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
@@ -107,13 +107,12 @@ func handle_rpc_confirm_pickup(peer_id: int, item_path: NodePath, hand_index: in
 # ── Drop ──────────────────────────────────────────────────────────────────────
 
 func handle_rpc_request_drop(sender_id: int, item_path: NodePath, tile: Vector2i, spread: float, hand_index: int) -> void:
-	if not world.multiplayer.is_server() or hand_index < 0 or hand_index > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	var item = world.get_node_or_null(item_path)
 	if item == null or player.hands[hand_index] != item: return
-	var diff = (tile - player.tile_pos).abs()
-	if diff.x > 1 or diff.y > 1: return
+	if not Defs.is_within_tile_reach(player.tile_pos, tile): return
 	world.rpc_drop_item_at.rpc(player.get_path(), item_path, tile, spread, hand_index)
 
 func handle_rpc_drop_item_at(player_path: NodePath, item_path: NodePath, tile: Vector2i, spread: float, hand_index: int) -> void:
@@ -131,7 +130,7 @@ func handle_rpc_drop_item_at(player_path: NodePath, item_path: NodePath, tile: V
 
 	var land_z = world.calculate_gravity_z(tile, player.z_level if player else obj.get("z_level"))
 	world.rpc_set_object_z_level.rpc(item_path, land_z)
-	obj.z_index = (land_z - 1) * 200 + 2
+	obj.z_index = Defs.get_z_index(land_z, Defs.Z_OFFSET_ITEMS)
 
 	world.objects.drop_item_at(obj, tile, spread)
 	for child in obj.get_children():
@@ -140,7 +139,7 @@ func handle_rpc_drop_item_at(player_path: NodePath, item_path: NodePath, tile: V
 # ── Throw ─────────────────────────────────────────────────────────────────────
 
 func handle_rpc_request_throw(sender_id: int, item_path: NodePath, hand_index: int, dir: Vector2, throw_range: int) -> void:
-	if not world.multiplayer.is_server() or hand_index < 0 or hand_index > 1: return
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
 	var item = world.get_node_or_null(item_path)
@@ -162,7 +161,7 @@ func handle_rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int
 		player._is_throwing = true
 		player._update_hands_ui()
 	var z_lvl = player.z_level
-	obj.z_index = (z_lvl - 1) * 200 + 7
+	obj.z_index = Defs.get_z_index(z_lvl, 7)
 	var sprite: Node = obj.get_node_or_null("Sprite2D")
 	if sprite != null:
 		sprite.rotation_degrees = 0.0
@@ -175,7 +174,7 @@ func handle_rpc_confirm_throw(peer_id: int, item_path: NodePath, hand_index: int
 		if player and player._is_local_authority(): player._is_throwing = false
 
 		obj.set("z_level", land_z)
-		obj.z_index = (land_z - 1) * 200 + 2
+		obj.z_index = Defs.get_z_index(land_z, Defs.Z_OFFSET_ITEMS)
 
 		for child in obj.get_children():
 			if child is CollisionShape2D: child.disabled = false

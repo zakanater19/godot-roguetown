@@ -9,6 +9,7 @@ class_name Defs
 const TILE_SIZE:    int = 64
 const GRID_WIDTH:   int = 1000
 const GRID_HEIGHT:  int = 1000
+const DEFAULT_SPAWN_TILE: Vector2i = Vector2i(int(GRID_WIDTH * 0.5), int(GRID_HEIGHT * 0.5))
 
 # ---------------------------------------------------------------------------
 # Z-index layering — every z_level occupies Z_LAYER_SIZE index slots
@@ -23,6 +24,11 @@ const Z_OFFSET_PLAYERS: int = 10   # players render above items
 const DROP_SPREAD:        float = 14.0   # pixel radius items scatter on drop
 const LOOT_DURATION:      float = 4.0    # seconds to complete a loot action
 const LOOT_BLINK_INTERVAL: float = 0.25  # progress indicator blink rate (s)
+const HAND_COUNT:         int = 2
+const SATCHEL_SLOT_COUNT: int = 10
+const MAX_COIN_STACK:     int = 20
+const COIN_STACK_ICON_THRESHOLDS: Array[int] = [20, 15, 10, 5, 4, 3, 2, 1]
+const COIN_METAL_SUFFIXES: Array[String] = ["copper", "silver", "gold"]
 
 # ---------------------------------------------------------------------------
 # Node groups — used with add_to_group() and get_nodes_in_group()
@@ -136,6 +142,28 @@ static func is_tool_pickaxe(item: Node) -> bool:
 
 static func get_z_index(z_level: int, offset: int = 0) -> int:
 	return (z_level - 1) * Z_LAYER_SIZE + offset
+
+static func is_valid_hand_index(hand_index: int) -> bool:
+	return hand_index >= 0 and hand_index < HAND_COUNT
+
+static func is_within_tile_reach(from_tile: Vector2i, to_tile: Vector2i, reach: int = 1) -> bool:
+	var diff := (to_tile - from_tile).abs()
+	return diff.x <= reach and diff.y <= reach
+
+static func make_runtime_name(prefix: String, detail: String = "") -> String:
+	var base := prefix if detail == "" else prefix + "_" + detail
+	return base + "_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
+
+static func get_coin_icon_path(amount: int, metal_type: int) -> String:
+	if metal_type < 0 or metal_type >= COIN_METAL_SUFFIXES.size():
+		return ""
+	var suffix := COIN_METAL_SUFFIXES[metal_type]
+	for threshold in COIN_STACK_ICON_THRESHOLDS:
+		if amount >= threshold:
+			var path := "res://objects/coins/" + str(threshold) + suffix + ".png"
+			if ResourceLoader.exists(path):
+				return path
+	return ""
 
 static func world_to_tile(world_pos: Vector2) -> Vector2i:
 	return Vector2i(int(world_pos.x / TILE_SIZE), int(world_pos.y / TILE_SIZE))

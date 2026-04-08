@@ -3,9 +3,9 @@ extends CanvasLayer
 
 var player: Node = null
 
-const BOX:  int = 48
-const GAP:  int = 4
-const STEP: int = BOX + GAP
+const BOX:  int = UIDefs.HUD_BOX_SIZE
+const GAP:  int = UIDefs.HUD_GAP
+const STEP: int = UIDefs.HUD_STEP
 
 var _hud_tex:          Texture2D = null
 var _clothing_visible: bool      = false
@@ -72,13 +72,13 @@ func _on_limb_gui_input(event: InputEvent, limb_name: String) -> void:
 
 func update_stats(health: int, stamina: float) -> void:
 	if _health_bar:
-		var h = (clamp(health, 0, 100) / 100.0) * 80.0
+		var h = (clamp(health, 0, PlayerDefs.DEFAULT_HEALTH) / float(PlayerDefs.DEFAULT_HEALTH)) * UIDefs.HUD_BAR_SIZE.y
 		_health_bar.size.y     = h
-		_health_bar.position.y = 80 - h
+		_health_bar.position.y = UIDefs.HUD_BAR_SIZE.y - h
 	if _stamina_bar:
-		var s = (clamp(stamina, 0, 100) / 100.0) * 80.0
+		var s = (clamp(stamina, 0, 100) / 100.0) * UIDefs.HUD_BAR_SIZE.y
 		_stamina_bar.size.y     = s
-		_stamina_bar.position.y = 80 - s
+		_stamina_bar.position.y = UIDefs.HUD_BAR_SIZE.y - s
 
 	if player != null and player.body != null:
 		for limb_name in _limb_broken_overlays.keys():
@@ -173,7 +173,7 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 					icon.region_enabled = true
 					icon.region_rect    = Rect2(0, 0, hood_tex.get_width(), hood_tex.get_height())
 					var max_dim = max(hood_tex.get_width(), hood_tex.get_height())
-					icon.scale   = Vector2(32.0 / max_dim, 32.0 / max_dim) if max_dim > 0 else Vector2(1.0, 1.0)
+					icon.scale   = Vector2(UIDefs.HUD_ITEM_ICON_TARGET_SIZE / max_dim, UIDefs.HUD_ITEM_ICON_TARGET_SIZE / max_dim) if max_dim > 0 else Vector2(1.0, 1.0)
 					icon.visible = true
 				else:
 					icon.visible = false
@@ -196,23 +196,14 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 						amt = edata.get("amount", 1)
 						mtype = edata.get("metal_type", 0)
 				
-				var suffix = ["copper", "silver", "gold"][mtype]
-				var thresholds = [20, 15, 10, 5, 4, 3, 2, 1]
-				var icon_path = ""
-				for ta in thresholds:
-					if amt >= ta:
-						var p = "res://objects/coins/" + str(ta) + suffix + ".png"
-						if ResourceLoader.exists(p):
-							icon_path = p
-							break
-							
+				var icon_path := Defs.get_coin_icon_path(amt, mtype)
 				if icon_path != "":
 					var tex = load(icon_path)
 					if tex != null:
 						icon.texture        = tex
 						icon.region_enabled = false
 						var max_dim = max(tex.get_width(), tex.get_height())
-						icon.scale   = Vector2(32.0 / max_dim, 32.0 / max_dim) if max_dim > 0 else Vector2.ONE
+						icon.scale   = Vector2(UIDefs.HUD_ITEM_ICON_TARGET_SIZE / max_dim, UIDefs.HUD_ITEM_ICON_TARGET_SIZE / max_dim) if max_dim > 0 else Vector2.ONE
 						icon.visible = true
 						amt_lbl.visible = false
 						continue
@@ -223,7 +214,7 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 				icon.texture        = atlas
 				icon.region_enabled = false
 				var max_dim: float  = max(atlas.region.size.x, atlas.region.size.y)
-				icon.scale   = Vector2(32.0 / max_dim, 32.0 / max_dim) if max_dim > 0 else Vector2(1.0, 1.0)
+				icon.scale   = Vector2(UIDefs.HUD_ITEM_ICON_TARGET_SIZE / max_dim, UIDefs.HUD_ITEM_ICON_TARGET_SIZE / max_dim) if max_dim > 0 else Vector2(1.0, 1.0)
 				icon.visible = true
 				var data = equipped_data.get(slot_name)
 				if typeof(data) == TYPE_DICTIONARY and data.has("amount") and data["amount"] > 1:
