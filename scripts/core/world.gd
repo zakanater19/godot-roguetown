@@ -53,12 +53,16 @@ func ensure_entity_id(node: Node, preferred_id: String = "") -> String:
 		_entity_registry[existing_id] = node
 		return existing_id
 
+	var root_scene: Node = main_scene
+	if root_scene == null:
+		root_scene = get_tree().current_scene
+
 	var entity_id := preferred_id
 	if entity_id == "":
 		if node.is_in_group("player"):
 			entity_id = "player:%s" % node.name
-		elif main_scene != null and node.get_parent() == main_scene:
-			entity_id = "scene:%s" % str(main_scene.get_path_to(node))
+		elif root_scene != null and node.get_parent() == root_scene:
+			entity_id = "scene:%s" % str(root_scene.get_path_to(node))
 		else:
 			entity_id = _make_entity_id()
 
