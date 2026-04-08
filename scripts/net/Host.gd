@@ -53,8 +53,7 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*", custom_nam
 		else:
 			print("Host: server_patch.pck ready.")
 
-		if has_node("/root/Sidebar"):
-			get_node("/root/Sidebar").refresh_admin_visibility()
+		Sidebar.refresh_admin_visibility()
 	else:
 		push_error("Host: failed to start server (error %d)" % err)
 
@@ -72,8 +71,7 @@ func start_client_custom(ip: String, port: int) -> void:
 		print("Host: joined as client to %s:%d" % [ip, port])
 		_setup_spawner()
 
-		if has_node("/root/Sidebar"):
-			get_node("/root/Sidebar").refresh_admin_visibility()
+		Sidebar.refresh_admin_visibility()
 	else:
 		push_error("Host: failed to start client (error %d)" % err)
 
@@ -88,40 +86,33 @@ func execute_round_restart() -> void:
 	peers.clear()
 	_spawner = null
 
-	if has_node("/root/Lobby"):
-		get_node("/root/Lobby").reset_lobby_state()
+	Lobby.reset_lobby_state()
 
-	if has_node("/root/LateJoin"):
-		var lj = get_node("/root/LateJoin")
-		lj._world_state = {"tiles": {}, "objects": {}, "players": {}}
-		lj._pending_joins.clear()
-		lj._disconnected_players.clear()
-		lj._state_dirty = false
-		lj.client_connected = false
-		lj.map_loaded = false
-		lj.sync_requested = false
-		lj.is_manual_reconnect = false
+	LateJoin._world_state = {"tiles": {}, "objects": {}, "players": {}}
+	LateJoin._pending_joins.clear()
+	LateJoin._disconnected_players.clear()
+	LateJoin._state_dirty = false
+	LateJoin.client_connected = false
+	LateJoin.map_loaded = false
+	LateJoin.sync_requested = false
+	LateJoin.is_manual_reconnect = false
 
-	if has_node("/root/Sidebar"):
-		var sidebar = get_node("/root/Sidebar")
-		sidebar._messages.clear()
-		if sidebar._rtl != null:
-			sidebar._rtl.text = ""
-		sidebar.set_visible(false)
+	Sidebar._messages.clear()
+	if Sidebar._rtl != null:
+		Sidebar._rtl.text = ""
+	Sidebar.set_visible(false)
 
-	if has_node("/root/ServerBrowser"):
-		var sb = get_node("/root/ServerBrowser")
-		sb.stop_listening()
-		sb.stop_broadcasting()
+	ServerBrowser.stop_listening()
+	ServerBrowser.stop_broadcasting()
 
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 func _setup_spawner() -> void:
-	while get_tree().root.get_node_or_null("Main") == null:
+	while World.main_scene == null:
 		await get_tree().process_frame
 
-	var main: Node = get_tree().root.get_node("Main")
+	var main: Node = World.main_scene
 
 	if _spawner == null or not is_instance_valid(_spawner):
 		_spawner = MultiplayerSpawner.new()
@@ -269,7 +260,7 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 	if peers.has(peer_id):
 		return
 
-	var main: Node = get_tree().root.get_node_or_null("Main")
+	var main: Node = World.main_scene
 	if main == null:
 		return
 

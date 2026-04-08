@@ -42,19 +42,19 @@ func handle_rpc_confirm_toggle_gate(_gate_path: NodePath) -> void:
 func handle_rpc_confirm_hit_gate(gate_path: NodePath) -> void:
 	var gate = world.get_node_or_null(gate_path)
 	if gate != null:
-		var main = world.get_tree().root.get_node_or_null("Main")
+		var main = World.main_scene
 		gate.perform_hit(main)
 
 func handle_rpc_confirm_destroy_gate(gate_path: NodePath) -> void:
 	var gate = world.get_node_or_null(gate_path)
 	if gate != null:
-		var main = world.get_tree().root.get_node_or_null("Main")
+		var main = World.main_scene
 		gate.perform_hit(main)
 		gate.destroy_gate()
 
 func handle_rpc_confirm_remove_gate(gate_path: NodePath) -> void:
 	var gate = world.get_node_or_null(gate_path)
 	if gate != null:
-		var main = world.get_tree().root.get_node_or_null("Main")
+		var main = World.main_scene
 		gate.perform_hit(main)
 		gate.remove_completely()

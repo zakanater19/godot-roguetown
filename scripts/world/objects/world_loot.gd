@@ -52,9 +52,7 @@ func handle_rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: Str
 	var item_name: String = target.equipped.get(equip_slot, "")
 	if item_name == "": return
 
-	var scene_path = ""
-	if world.has_node("/root/ItemRegistry"):
-		scene_path = world.get_node("/root/ItemRegistry").get_scene_path(item_name)
+	var scene_path = ItemRegistry.get_scene_path(item_name)
 	if scene_path == "": return
 	var scene := load(scene_path) as PackedScene
 	if scene == null: return

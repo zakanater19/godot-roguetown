@@ -24,7 +24,7 @@ func handle_rpc_confirm_split_coins(peer_id: int, from_hand: int, to_hand: int, 
 	var from_item = player.hands[from_hand]
 	if from_item == null: return
 	from_item.amount -= split_amount
-	var scene_path = world.get_node("/root/ItemRegistry").get_scene_path(from_item.item_type) if world.has_node("/root/ItemRegistry") else ""
+	var scene_path = ItemRegistry.get_scene_path(from_item.item_type)
 	if scene_path == "": return
 	var scene = load(scene_path) as PackedScene
 	if scene == null: return
@@ -91,11 +91,9 @@ func handle_rpc_confirm_combine_ground_coin(peer_id: int, coin_path: NodePath, h
 	if ground_coin != null and is_instance_valid(ground_coin):
 		ground_coin.amount -= amount
 		if ground_coin.amount <= 0:
-			if world.has_node("/root/LateJoin"):
-				world.get_node("/root/LateJoin").unregister_object(coin_path)
+			LateJoin.unregister_object(coin_path)
 			if is_instance_valid(ground_coin): ground_coin.queue_free()
 		else:
-			if world.has_node("/root/LateJoin"):
-				world.get_node("/root/LateJoin").register_object_state(coin_path, {"amount": ground_coin.amount, "metal_type": ground_coin.metal_type, "type": "coin"})
+			LateJoin.register_object_state(coin_path, {"amount": ground_coin.amount, "metal_type": ground_coin.metal_type, "type": "coin"})
 	if player and player._is_local_authority():
 		player._update_hands_ui()

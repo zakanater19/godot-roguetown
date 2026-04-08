@@ -176,9 +176,7 @@ func handle_rpc_request_update_laws(sender_id: int, new_laws: Array) -> void:
 
 func handle_rpc_update_laws(new_laws: Array) -> void:
 	world.current_laws = new_laws
-	if world.has_node("/root/Sidebar"):
-		var sidebar = world.get_node("/root/Sidebar")
-		if sidebar.has_method("refresh_laws_ui"): sidebar.refresh_laws_ui()
+	if Sidebar.has_method("refresh_laws_ui"): Sidebar.refresh_laws_ui()
 
 func handle_rpc_broadcast_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
 	var local_player := get_local_player()
@@ -186,8 +184,7 @@ func handle_rpc_broadcast_sneak_reveal(character_name: String, source_tile: Vect
 	if local_player.get("z_level") != source_z: return
 	var diff: Vector2i = local_player.get("tile_pos") - source_tile
 	if diff.length_squared() > 144: return
-	var Sidebar = world.get_node("/root/Sidebar") if world.has_node("/root/Sidebar") else null
-	if Sidebar: Sidebar.add_message("[color=#ff4444][font_size=28]" + character_name + " is revealed!![/font_size][/color]")
+	Sidebar.add_message("[color=#ff4444][font_size=28]" + character_name + " is revealed!![/font_size][/color]")
 
 func handle_rpc_send_chat(sender_id: int, message: String) -> void:
 	if not world.multiplayer.is_server(): return
@@ -204,8 +201,7 @@ func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile
 	var sender_node = find_player_by_peer(sender_peer_id)
 	if sender_node == null: return
 	if local_player.get("sleep_state") == 2:
-		if world.has_node("/root/Sidebar"):
-			world.get_node("/root/Sidebar").add_message("[color=#aaaaaa]you hear someone talking...[/color]")
+		Sidebar.add_message("[color=#aaaaaa]you hear someone talking...[/color]")
 		return
 	if sender_node.has_method("_show_chat_message"): sender_node._show_chat_message(message)
 	if local_player.has_method("_show_inspect_text"):
@@ -218,8 +214,6 @@ func handle_rpc_broadcast_damage_log(attacker_name: String, target_name: String,
 	if local_player.get("z_level") != source_z: return
 	var diff: Vector2i = local_player.get("tile_pos") - source_tile
 	if diff.length_squared() > 144: return
-	var Sidebar = world.get_node("/root/Sidebar") if world.has_node("/root/Sidebar") else null
-	if Sidebar == null: return
 	if local_player.get("sleep_state") == 2:
 		if target_name == local_player.get("character_name"): Sidebar.add_message("[color=#ff0000][b]YOU FEEL PAIN!!![/b][/color]")
 		else: Sidebar.add_message("[color=#aaaaaa]you hear a scuffle...[/color]")

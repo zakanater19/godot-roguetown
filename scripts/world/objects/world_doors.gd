@@ -42,19 +42,19 @@ func handle_rpc_confirm_toggle_door(_door_path: NodePath) -> void:
 func handle_rpc_confirm_hit_door(door_path: NodePath) -> void:
 	var door = world.get_node_or_null(door_path)
 	if door != null:
-		var main = world.get_tree().root.get_node_or_null("Main")
+		var main = World.main_scene
 		door.perform_hit(main)
 
 func handle_rpc_confirm_destroy_door(door_path: NodePath) -> void:
 	var door = world.get_node_or_null(door_path)
 	if door != null:
-		var main = world.get_tree().root.get_node_or_null("Main")
+		var main = World.main_scene
 		door.perform_hit(main)
 		door.destroy_door()
 
 func handle_rpc_confirm_remove_door(door_path: NodePath) -> void:
 	var door = world.get_node_or_null(door_path)
 	if door != null:
-		var main = world.get_tree().root.get_node_or_null("Main")
+		var main = World.main_scene
 		door.perform_hit(main)
 		door.remove_completely()

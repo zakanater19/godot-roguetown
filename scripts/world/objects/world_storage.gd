@@ -20,9 +20,7 @@ func handle_rpc_request_satchel_insert(sender_id: int, satchel_path: NodePath, h
 	if item == null or not is_instance_valid(item): return
 	var itype: String = item.get("item_type") if item.get("item_type") != null else item.name.get_slice("@", 0)
 
-	var scene_path = ""
-	if world.has_node("/root/ItemRegistry"):
-		scene_path = world.get_node("/root/ItemRegistry").get_scene_path(itype)
+	var scene_path = ItemRegistry.get_scene_path(itype)
 	if scene_path == "": return
 
 	var slot_index: int = -1

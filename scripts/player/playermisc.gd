@@ -154,7 +154,7 @@ func refresh_loot_panel() -> void:
 		close_target_inventory()
 		return
 
-	var item_registry = player.get_node_or_null("/root/ItemRegistry")
+	var item_registry = ItemRegistry
 
 	for i in range(2):
 		var sk: String = "hand_" + str(i)

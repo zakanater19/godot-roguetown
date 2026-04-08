@@ -189,7 +189,7 @@ func _open_ui() -> void:
 	_refresh_ui()
 
 func _refresh_ui() -> void:
-	var item_registry = get_node_or_null("/root/ItemRegistry")
+	var item_registry = ItemRegistry
 	for i in _slot_btns.size():
 		var btn: Button     = _slot_btns[i]
 		var slot_entry      = contents[i] if i < contents.size() else null

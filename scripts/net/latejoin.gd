@@ -241,9 +241,8 @@ func receive_reconnect_state(player_path: NodePath, player_state: Dictionary) ->
 
 @rpc("any_peer", "call_remote", "reliable")
 func client_reconnection_confirmed() -> void:
-	if has_node("/root/Main"):
-		var main = get_node("/root/Main")
-		if main.has_method("_on_client_reconnected"): main.call("_on_client_reconnected")
+	if World.main_scene != null and World.main_scene.has_method("_on_client_reconnected"):
+		World.main_scene.call("_on_client_reconnected")
 
 # ---------------------------------------------------------------------------
 # Version check — server-side handler

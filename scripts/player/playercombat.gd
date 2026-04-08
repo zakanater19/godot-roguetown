@@ -105,8 +105,7 @@ func die() -> void:
 	if local_player != null and local_player.z_level == player.z_level:
 		var diff = local_player.tile_pos - player.tile_pos
 		if diff.x * diff.x + diff.y * diff.y <= 144:
-			if player.get_tree().root.has_node("Sidebar"):
-				player.get_tree().root.get_node("Sidebar").add_message("[color=purple]" + player.character_name + " Seizes up and goes limp.[/color]")
+			Sidebar.add_message("[color=purple]" + player.character_name + " Seizes up and goes limp.[/color]")
 
 func die_visuals() -> void:
 	var sprite: Sprite2D = player.get_node_or_null("Sprite2D")

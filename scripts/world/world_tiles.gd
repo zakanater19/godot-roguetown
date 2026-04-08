@@ -195,7 +195,7 @@ func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool
 	player.is_sprinting = is_sprinting
 	player.tile_pos = new_pos
 	if player.has_method("_start_move_lerp"): player._start_move_lerp()
-	if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").update_player_state(peer_id, {"position": player.position})
+	LateJoin.update_player_state(peer_id, {"position": player.position})
 
 func _get_held_tool_type(item: Node) -> String:
 	if item == null: return ""
@@ -231,19 +231,16 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	else: world.rpc_confirm_hit_wall.rpc(pos, attacker.z_level)
 
 func handle_rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
-	var main = world.get_tree().root.get_node_or_null("Main")
-	if main != null and main.has_method("shake_tile"): main.shake_tile(pos, z_level)
+	if World.main_scene != null and World.main_scene.has_method("shake_tile"): World.main_scene.shake_tile(pos, z_level)
 
 func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i) -> void:
-	var main = world.get_tree().root.get_node_or_null("Main")
-	if main != null:
-		break_wall(pos, z_level, main, rock_name, break_floor)
-		if world.has_node("/root/LateJoin"): world.get_node("/root/LateJoin").register_tile_change(pos, z_level, 0, break_floor)
+	if World.main_scene != null:
+		break_wall(pos, z_level, World.main_scene, rock_name, break_floor)
+		LateJoin.register_tile_change(pos, z_level, 0, break_floor)
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, source_id, atlas_coords)
 	Lighting.update_roof_map_at(pos)
-	if world.has_node("/root/LateJoin"):
-		world.get_node("/root/LateJoin").register_tile_change(pos, z_level, source_id, atlas_coords)
+	LateJoin.register_tile_change(pos, z_level, source_id, atlas_coords)

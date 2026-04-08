@@ -29,7 +29,15 @@ var objects = null
 var physics = null
 var session = null
 
+var main_scene: Node = null
+
 var _tilemap_cache: Dictionary = {}
+
+func register_main(node: Node) -> void:
+	main_scene = node
+
+func unregister_main() -> void:
+	main_scene = null
 
 func _ready() -> void:
 	utils   = preload("res://scripts/world/world_utils.gd").new(self)
@@ -43,9 +51,8 @@ func _ready() -> void:
 func get_tilemap(z: int) -> TileMapLayer:
 	if _tilemap_cache.has(z) and is_instance_valid(_tilemap_cache[z]):
 		return _tilemap_cache[z]
-	var main = get_tree().root.get_node_or_null("Main")
-	if main != null:
-		var tm = main.get_node_or_null("TileMapLayer_Z" + str(z)) as TileMapLayer
+	if main_scene != null:
+		var tm = main_scene.get_node_or_null("TileMapLayer_Z" + str(z)) as TileMapLayer
 		if tm != null:
 			_tilemap_cache[z] = tm
 		return tm
@@ -135,8 +142,7 @@ func rpc_request_respawn(request_peer_id: int) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func rpc_return_to_lobby() -> void:
-	if has_node("/root/Lobby"):
-		get_node("/root/Lobby").show_lobby()
+	Lobby.show_lobby()
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_set_object_z_level(obj_path: NodePath, new_z: int) -> void:
@@ -530,5 +536,4 @@ func rpc_execute_round_end() -> void:
 
 @rpc("authority", "call_local", "reliable")
 func rpc_send_direct_message(message: String) -> void:
-	if has_node("/root/Sidebar"):
-		get_node("/root/Sidebar").add_message(message)
+	Sidebar.add_message(message)

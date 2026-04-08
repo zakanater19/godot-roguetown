@@ -54,7 +54,7 @@ func send_world_state_to_peer(peer_id: int) -> void:
 	lj.rpc_id(peer_id, "receive_laws", World.current_laws)
 
 func sync_objects_for_late_joiner(peer_id: int) -> void:
-	var main_node = lj.get_tree().root.get_node_or_null("Main")
+	var main_node = World.main_scene
 	if main_node == null:
 		return
 
@@ -188,7 +188,7 @@ func _retry_receive_player_states(player_states: Dictionary, retries: int) -> vo
 		_retry_receive_player_states(missing, retries - 1)
 
 func handle_purge_missing_objects(valid_names: Array) -> void:
-	var main_node = lj.get_tree().root.get_node_or_null("Main")
+	var main_node = World.main_scene
 	if main_node == null: return
 	var groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 	for group in groups:
@@ -197,7 +197,7 @@ func handle_purge_missing_objects(valid_names: Array) -> void:
 				obj.queue_free()
 
 func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
-	var main_node = lj.get_tree().root.get_node_or_null("Main")
+	var main_node = World.main_scene
 	if main_node == null: return
 	var obj_name = str(obj_data["name"])
 	var obj      = main_node.get_node_or_null(NodePath(obj_name))

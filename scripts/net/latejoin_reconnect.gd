@@ -110,7 +110,7 @@ func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node
 
 	lj.update_player_state(new_peer_id, {"position": node.position, "disconnected": false, "health": node.get("health"), "hands": hand_names})
 	if node.has_method("_on_reconnection_confirmed"): node.call("_on_reconnection_confirmed")
-	if lj.has_node("/root/Lobby"): lj.get_node("/root/Lobby").rpc_hide_lobby.rpc_id(new_peer_id)
+	Lobby.rpc_hide_lobby.rpc_id(new_peer_id)
 
 	lj.receive_reconnect_state.rpc_id(new_peer_id, node.get_path(), current_state)
 	return true
@@ -284,7 +284,7 @@ func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void
 	if player_node.has_method("_update_water_submerge"):   player_node.call("_update_water_submerge")
 
 func _recreate_hand_item(hand_data: Dictionary) -> Node:
-	var main_node = lj.get_tree().root.get_node_or_null("Main")
+	var main_node = World.main_scene
 	if main_node == null: return null
 	var existing = main_node.get_node_or_null(NodePath(hand_data["name"]))
 	if existing != null: return existing

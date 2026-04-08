@@ -285,12 +285,11 @@ func handle_rpc_confirm_grab_start(grabber_peer_id: int, is_player: bool, target
 			if g_player and not g_player.get("dead") and g_player.has_method("_is_local_authority") and g_player._is_local_authority():
 				g_player.set("grabbed_by", grabber)
 				if g_player.has_method("_update_grab_ui"): g_player._update_grab_ui()
-		if is_player and target_name != "" and world.has_node("/root/Sidebar"):
+		if is_player and target_name != "":
 			var lp: Node2D = world.utils.get_local_player() as Node2D
 			if lp:
-				var sidebar = world.get_node("/root/Sidebar")
-				if lp.get_multiplayer_authority() == grabber_peer_id: sidebar.add_message("[color=#ffcc44]You grab " + target_name + " by the " + Defs.LIMB_DISPLAY.get(limb, limb) + "![/color]")
-				elif lp.get_multiplayer_authority() == target_peer_id: sidebar.add_message("[color=#ff4444]" + grabber_name + " grabs you by the " + Defs.LIMB_DISPLAY.get(limb, limb) + "![/color]")
+				if lp.get_multiplayer_authority() == grabber_peer_id: Sidebar.add_message("[color=#ffcc44]You grab " + target_name + " by the " + Defs.LIMB_DISPLAY.get(limb, limb) + "![/color]")
+				elif lp.get_multiplayer_authority() == target_peer_id: Sidebar.add_message("[color=#ff4444]" + grabber_name + " grabs you by the " + Defs.LIMB_DISPLAY.get(limb, limb) + "![/color]")
 
 func handle_rpc_confirm_grab_released(grabber_peer_id: int, is_player: bool, target_peer_id: int, grabber_name: String, target_name: String, silent: bool) -> void:
 	var grabber: Node2D = world.utils.find_player_by_peer(grabber_peer_id) as Node2D
@@ -303,20 +302,18 @@ func handle_rpc_confirm_grab_released(grabber_peer_id: int, is_player: bool, tar
 		if g_player and g_player.has_method("_is_local_authority") and g_player._is_local_authority():
 			g_player.set("grabbed_by", null)
 			if g_player.has_method("_update_grab_ui"): g_player._update_grab_ui()
-	if is_player and target_name != "" and not silent and world.has_node("/root/Sidebar"):
+	if is_player and target_name != "" and not silent:
 		var lp: Node2D = world.utils.get_local_player() as Node2D
 		if lp:
-			var sidebar = world.get_node("/root/Sidebar")
-			if lp.get_multiplayer_authority() == grabber_peer_id: sidebar.add_message("[color=#aaaaaa]You release " + target_name + ".[/color]")
-			elif lp.get_multiplayer_authority() == target_peer_id: sidebar.add_message("[color=#aaffaa]" + grabber_name + " releases you.[/color]")
+			if lp.get_multiplayer_authority() == grabber_peer_id: Sidebar.add_message("[color=#aaaaaa]You release " + target_name + ".[/color]")
+			elif lp.get_multiplayer_authority() == target_peer_id: Sidebar.add_message("[color=#aaffaa]" + grabber_name + " releases you.[/color]")
 
 func handle_rpc_confirm_resist_result(grabber_peer_id: int, grabbed_peer_id: int, broke_free: bool) -> void:
 	var lp: Node2D = world.utils.get_local_player() as Node2D
 	if not lp: return
 	var l_peer = lp.get_multiplayer_authority()
-	var sidebar = world.get_node("/root/Sidebar") if world.has_node("/root/Sidebar") else null
 	if grabber_peer_id == -1:
-		if l_peer == grabbed_peer_id and sidebar: sidebar.add_message("[color=#ffaaaa]You are not being grabbed.[/color]")
+		if l_peer == grabbed_peer_id: Sidebar.add_message("[color=#ffaaaa]You are not being grabbed.[/color]")
 		return
 	if broke_free:
 		var grabber: Node2D = world.utils.find_player_by_peer(grabber_peer_id) as Node2D
@@ -328,10 +325,9 @@ func handle_rpc_confirm_resist_result(grabber_peer_id: int, grabbed_peer_id: int
 		if grabbed and grabbed.has_method("_is_local_authority") and grabbed._is_local_authority():
 			grabbed.set("grabbed_by", null)
 			if grabbed.has_method("_update_grab_ui"): grabbed._update_grab_ui()
-		if sidebar:
-			if l_peer == grabbed_peer_id: sidebar.add_message("[color=#aaffaa]You broke free from the grab![/color]")
-			elif l_peer == grabber_peer_id: sidebar.add_message("[color=#ffaaaa]Your target broke free![/color]")
-	elif l_peer == grabbed_peer_id and sidebar: sidebar.add_message("[color=#ffaaaa]You failed to resist the grab.[/color]")
+		if l_peer == grabbed_peer_id: Sidebar.add_message("[color=#aaffaa]You broke free from the grab![/color]")
+		elif l_peer == grabber_peer_id: Sidebar.add_message("[color=#ffaaaa]Your target broke free![/color]")
+	elif l_peer == grabbed_peer_id: Sidebar.add_message("[color=#ffaaaa]You failed to resist the grab.[/color]")
 
 func handle_rpc_confirm_drag_object(obj_path: NodePath, new_pixel: Vector2) -> void:
 	var obj := world.get_node_or_null(obj_path)

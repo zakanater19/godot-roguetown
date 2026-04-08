@@ -82,8 +82,7 @@ func process_sneak_alpha(delta: float) -> void:
 
 func broadcast_sneak_revealed() -> void:
 	if not player.multiplayer.has_multiplayer_peer():
-		if player.has_node("/root/Sidebar"):
-			player.get_node("/root/Sidebar").add_message("[color=#ff4444][font_size=28]" + player.character_name + " is revealed!![/font_size][/color]")
+		Sidebar.add_message("[color=#ff4444][font_size=28]" + player.character_name + " is revealed!![/font_size][/color]")
 	elif player.multiplayer.is_server():
 		World.rpc_broadcast_sneak_reveal.rpc(player.character_name, player.tile_pos, player.z_level)
 	else:

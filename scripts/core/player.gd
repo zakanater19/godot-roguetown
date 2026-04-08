@@ -551,7 +551,7 @@ func _on_authority_changed() -> void:
 		if _dead_container: _dead_container.visible = dead
 
 func sync_hands(hand_names: Array) -> void:
-	var main = get_tree().root.get_node_or_null("Main")
+	var main = World.main_scene
 	if not main: return
 	for i in range(2):
 		var base_name = hand_names[i]

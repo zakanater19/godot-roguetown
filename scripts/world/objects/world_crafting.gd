@@ -69,7 +69,7 @@ func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_pa
 		var land_z: int = world.calculate_gravity_z(drop_tile, player.z_level)
 		item.set("z_level", land_z)
 
-	var main = world.get_tree().root.get_node_or_null("Main")
+	var main = World.main_scene
 	if main:
 		main.add_child(item)
 		world.objects.drop_item_at(item, drop_tile, Defs.DROP_SPREAD)
@@ -92,5 +92,4 @@ func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos
 	var tm = world.get_tilemap(z_level)
 	if tm != null:
 		tm.set_cell(tile_pos, source_id, atlas_coords)
-		if world.has_node("/root/LateJoin"):
-			world.get_node("/root/LateJoin").register_tile_change(tile_pos, z_level, source_id, atlas_coords)
+		LateJoin.register_tile_change(tile_pos, z_level, source_id, atlas_coords)

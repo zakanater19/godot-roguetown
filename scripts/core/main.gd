@@ -39,6 +39,7 @@ func _ready() -> void:
 				darken.visible = false
 		return
 
+	World.register_main(self)
 	Engine.max_fps = target_fps
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 	
@@ -52,9 +53,12 @@ func _ready() -> void:
 			LoadingScreen.hide_loading()
 		else:
 			# Flag the map as fully loaded; LateJoin will now start the version check.
-			if has_node("/root/LateJoin"):
-				get_node("/root/LateJoin").map_loaded = true
+			LateJoin.map_loaded = true
 			LoadingScreen.update_status("Checking version...")
+
+func _exit_tree() -> void:
+	if not Engine.is_editor_hint():
+		World.unregister_main()
 
 func shake_tile(tile_pos: Vector2i, z_level: int = 3) -> void:
 	var tile_origin := Vector2(tile_pos.x * World.TILE_SIZE, tile_pos.y * World.TILE_SIZE)

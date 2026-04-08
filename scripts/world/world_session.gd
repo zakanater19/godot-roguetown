@@ -24,10 +24,9 @@ func handle_rpc_request_respawn(sender_id: int, request_peer_id: int) -> void:
 		world.rpc_return_to_lobby.rpc_id(sender_id)
 
 func handle_rpc_execute_round_end() -> void:
-	if world.has_node("/root/Sidebar"):
-		world.get_node("/root/Sidebar").add_message(
-			"\n[color=#ff4444][b][font_size=24]THE ROUND HAS ENDED! RESTARTING IN 5 SECONDS...[/font_size][/b][/color]\n"
-		)
+	Sidebar.add_message(
+		"\n[color=#ff4444][b][font_size=24]THE ROUND HAS ENDED! RESTARTING IN 5 SECONDS...[/font_size][/b][/color]\n"
+	)
 	world.get_tree().create_timer(5.0).timeout.connect(_on_round_restart_timeout)
 
 func _on_round_restart_timeout() -> void:
