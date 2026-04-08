@@ -21,9 +21,9 @@ func set_sneak_mode_local(val: bool) -> void:
 		player.sneak_alpha = 1.0
 		player._sneak_was_hidden = false
 		apply_sneak_alpha(1.0)
-		if player.multiplayer.has_multiplayer_peer() and player._is_local_authority():
-			player._rpc_sync_sneak_alpha.rpc(1.0)
 	player._update_water_submerge()
+	if player.multiplayer.has_multiplayer_peer() and player._is_local_authority() and Lighting.has_method("report_local_world_light_now"):
+		Lighting.report_local_world_light_now()
 	if player._hud != null and player._is_local_authority():
 		player._hud.update_sneak_display(player.is_sneaking)
 
@@ -43,6 +43,8 @@ func handle_sync_sneak_alpha(alpha: float) -> void:
 	apply_sneak_alpha(alpha)
 
 func process_sneak_alpha(delta: float) -> void:
+	if player.multiplayer.has_multiplayer_peer():
+		return
 	var tile_light: float = Lighting.get_tile_world_light(player.tile_pos)
 	var sneak_level: int = player.skills.get("sneaking", 0)
 	var dark_threshold: float = 0.10 + sneak_level * 0.08
@@ -63,11 +65,10 @@ func process_sneak_alpha(delta: float) -> void:
 			player.sneak_alpha = 1.0
 			apply_sneak_alpha(1.0)
 			player._last_synced_sneak_alpha = 1.0
-			if player.multiplayer.has_multiplayer_peer():
-				player._rpc_sync_sneak_alpha.rpc(1.0)
 		if player._sneak_was_hidden:
 			player._sneak_was_hidden = false
-			broadcast_sneak_revealed()
+			if not player.multiplayer.has_multiplayer_peer():
+				broadcast_sneak_revealed()
 	else:
 		var new_alpha := move_toward(player.sneak_alpha, 0.0, fade_speed * delta)
 		if abs(new_alpha - player.sneak_alpha) > 0.001:
@@ -75,8 +76,6 @@ func process_sneak_alpha(delta: float) -> void:
 			apply_sneak_alpha(player.sneak_alpha)
 			if abs(player.sneak_alpha - player._last_synced_sneak_alpha) >= 0.04:
 				player._last_synced_sneak_alpha = player.sneak_alpha
-				if player.multiplayer.has_multiplayer_peer():
-					player._rpc_sync_sneak_alpha.rpc(player.sneak_alpha)
 		if player.sneak_alpha <= 0.5:
 			player._sneak_was_hidden = true
 

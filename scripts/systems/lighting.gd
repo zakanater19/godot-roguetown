@@ -24,12 +24,19 @@ var _last_player_z: int = -1
 # CPU Shadow mapping variables
 var roof_map_image: Image
 var active_lamps: Array[Node] =[]
+var _roof_map_revision: int = 0
 
 # Precalculated kernel for CPU blur — surface only (z >= 3)
 var _blur_weights: Dictionary = {}
 
 # How many tiles stair light bleeds into the underground
 const STAIR_BLEED_TILES: float = 5.0
+const SUNLIGHT_EXT_RX: int = 20
+const SUNLIGHT_EXT_RY: int = 15
+const TILE_FLAG_VALID: int = 1
+const TILE_FLAG_WINDOW: int = 2
+const TILE_FLAG_OPAQUE: int = 4
+const LIGHT_REPORT_EPSILON: float = 0.02
 
 # Node to handle drawing the CPU-calculated light blocks
 class LightDrawNode extends Node2D:
@@ -44,6 +51,18 @@ class LightDrawNode extends Node2D:
 var _draw_node: LightDrawNode = null
 # Light cache excluding the local player's personal vision radius (used for sneak checks)
 var world_light_cache: Dictionary = {}
+var _sunlight_dist_cache: Dictionary = {}
+var _sunlight_cache_key: String = ""
+var _sunlight_task_id: int = -1
+var _sunlight_task_request_id: int = 0
+var _sunlight_result_mutex: Mutex = Mutex.new()
+var _sunlight_result_ready: bool = false
+var _sunlight_result_request_id: int = -1
+var _sunlight_result_key: String = ""
+var _sunlight_result_cache: Dictionary = {}
+var _last_reported_light_tile: Vector2i = Vector2i(-9999, -9999)
+var _last_reported_light_z: int = -1
+var _last_reported_light_value: float = -1.0
 
 func _ready() -> void:
 	# 1. Setup the heightmap image tracking opaque blocks on the CPU
@@ -72,6 +91,12 @@ func get_tile_light(tile: Vector2i) -> float:
 
 func get_tile_world_light(tile: Vector2i) -> float:
 	return world_light_cache.get(tile, 1.0)
+
+func report_local_world_light_now() -> void:
+	var local_player = World.get_local_player()
+	if local_player == null or not is_instance_valid(local_player):
+		return
+	_report_local_world_light(local_player, local_player.z_level)
 
 func register_lamp(lamp: Node) -> void:
 	if not active_lamps.has(lamp): active_lamps.append(lamp)
@@ -129,6 +154,7 @@ func rebuild_roof_map() -> void:
 						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
 
 	roof_map_image = Image.create_from_data(1000, 1000, false, Image.FORMAT_RG8, roof_data)
+	_roof_map_revision += 1
 
 func update_roof_map_at(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.x >= 1000 or pos.y < 0 or pos.y >= 1000: return
@@ -173,6 +199,7 @@ func update_roof_map_at(pos: Vector2i) -> void:
 	var new_col = Color(highest_wall_z / 255.0, highest_floor_z / 255.0, 0, 1)
 	if roof_map_image.get_pixel(pos.x, pos.y) != new_col:
 		roof_map_image.set_pixel(pos.x, pos.y, new_col)
+		_roof_map_revision += 1
 
 # Helper function to see if light can travel vertically between two Z levels at a specific tile
 func _can_light_pass_z(pos: Vector2i, z1: int, z2: int) -> bool:
@@ -242,7 +269,206 @@ func refresh_local_lighting() -> void:
 	invalidate_local_lighting()
 	_rebuild_local_light_cache()
 
+func _poll_async_sunlight_task() -> void:
+	if _sunlight_task_id == -1:
+		return
+	if not WorkerThreadPool.is_task_completed(_sunlight_task_id):
+		return
+	WorkerThreadPool.wait_for_task_completion(_sunlight_task_id)
+	_sunlight_task_id = -1
+
+	_sunlight_result_mutex.lock()
+	var has_result := _sunlight_result_ready
+	var result_key := _sunlight_result_key
+	var result_cache := _sunlight_result_cache
+	_sunlight_result_ready = false
+	_sunlight_result_request_id = -1
+	_sunlight_result_key = ""
+	_sunlight_result_cache = {}
+	_sunlight_result_mutex.unlock()
+
+	if has_result:
+		_sunlight_cache_key = result_key
+		_sunlight_dist_cache = result_cache
+		_update_timer = UPDATE_INTERVAL
+
+func _run_sunlight_task(request_id: int, job_key: String, payload: Dictionary) -> void:
+	var result := _compute_sunlight_dist_snapshot(payload)
+	_sunlight_result_mutex.lock()
+	_sunlight_result_ready = true
+	_sunlight_result_request_id = request_id
+	_sunlight_result_key = job_key
+	_sunlight_result_cache = result
+	_sunlight_result_mutex.unlock()
+
+func _queue_async_sunlight_job(job_key: String, payload: Dictionary) -> void:
+	if _sunlight_task_id != -1:
+		return
+	_sunlight_task_request_id += 1
+	_sunlight_task_id = WorkerThreadPool.add_task(
+		Callable(self, "_run_sunlight_task").bind(_sunlight_task_request_id, job_key, payload),
+		false,
+		"lighting_sunlight_bfs"
+	)
+
+func _build_sunlight_job(player_tile: Vector2i, current_z: int, roof_data: PackedByteArray, is_underground: bool) -> Dictionary:
+	var origin_x := player_tile.x - SUNLIGHT_EXT_RX
+	var origin_y := player_tile.y - SUNLIGHT_EXT_RY
+	var width := SUNLIGHT_EXT_RX * 2 + 1
+	var height := SUNLIGHT_EXT_RY * 2 + 1
+	var wall_z_data := PackedByteArray()
+	var floor_z_data := PackedByteArray()
+	var tile_flags := PackedByteArray()
+	wall_z_data.resize(width * height)
+	floor_z_data.resize(width * height)
+	tile_flags.resize(width * height)
+
+	var tm = World.get_tilemap(current_z)
+	for ly in range(height):
+		for lx in range(width):
+			var idx := ly * width + lx
+			var tile := Vector2i(origin_x + lx, origin_y + ly)
+			if tile.x < 0 or tile.x >= 1000 or tile.y < 0 or tile.y >= 1000:
+				wall_z_data[idx] = 0
+				floor_z_data[idx] = 0
+				tile_flags[idx] = 0
+				continue
+
+			var roof_idx := (tile.y * 1000 + tile.x) * 2
+			wall_z_data[idx] = roof_data[roof_idx]
+			floor_z_data[idx] = roof_data[roof_idx + 1]
+
+			var flags := TILE_FLAG_VALID
+			if tm != null and tm.get_cell_source_id(tile) == 1:
+				var atlas := tm.get_cell_atlas_coords(tile)
+				if atlas == Vector2i(10, 0):
+					flags |= TILE_FLAG_WINDOW
+				if TileDefs.is_opaque(1, atlas):
+					flags |= TILE_FLAG_OPAQUE
+			elif World.solid_grid.has(current_z) and World.solid_grid[current_z].has(tile):
+				var valid_objs: Array = []
+				for obj in World.solid_grid[current_z][tile]:
+					if not is_instance_valid(obj):
+						continue
+					valid_objs.append(obj)
+					if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
+						flags |= TILE_FLAG_OPAQUE
+						break
+				World.solid_grid[current_z][tile] = valid_objs
+
+			tile_flags[idx] = flags
+
+	return {
+		"origin_x": origin_x,
+		"origin_y": origin_y,
+		"width": width,
+		"height": height,
+		"current_z": current_z,
+		"is_underground": is_underground,
+		"wall_z_data": wall_z_data,
+		"floor_z_data": floor_z_data,
+		"tile_flags": tile_flags,
+	}
+
+func _report_local_world_light(local_player: Node, current_z: int) -> void:
+	if local_player == null or not is_instance_valid(local_player):
+		return
+	if not multiplayer.has_multiplayer_peer():
+		return
+	var tile: Vector2i = local_player.tile_pos
+	var light_value: float = world_light_cache.get(tile, 1.0)
+	if tile == _last_reported_light_tile and current_z == _last_reported_light_z and abs(light_value - _last_reported_light_value) < LIGHT_REPORT_EPSILON:
+		return
+
+	_last_reported_light_tile = tile
+	_last_reported_light_z = current_z
+	_last_reported_light_value = light_value
+
+	if multiplayer.is_server():
+		World.update_client_light_sample(multiplayer.get_unique_id(), tile, current_z, light_value)
+	else:
+		World.rpc_report_client_light_sample.rpc_id(1, tile, current_z, light_value)
+
+static func _compute_sunlight_dist_snapshot(payload: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	var queue: Array[Vector2i] = []
+	var head: int = 0
+
+	var origin_x: int = payload["origin_x"]
+	var origin_y: int = payload["origin_y"]
+	var width: int = payload["width"]
+	var height: int = payload["height"]
+	var current_z: int = payload["current_z"]
+	var is_underground: bool = payload["is_underground"]
+	var wall_z_data: PackedByteArray = payload["wall_z_data"]
+	var floor_z_data: PackedByteArray = payload["floor_z_data"]
+	var tile_flags: PackedByteArray = payload["tile_flags"]
+
+	for ly in range(height):
+		for lx in range(width):
+			var idx: int = ly * width + lx
+			var flags: int = tile_flags[idx]
+			if (flags & TILE_FLAG_VALID) == 0:
+				continue
+			var is_roofed: bool = false
+			var wz: int = wall_z_data[idx]
+			var fz: int = floor_z_data[idx]
+			if is_underground:
+				is_roofed = (fz > current_z or wz >= current_z)
+			else:
+				is_roofed = (wz >= current_z or fz > current_z)
+			if (flags & TILE_FLAG_WINDOW) != 0:
+				is_roofed = false
+			if not is_roofed:
+				var source_tile: Vector2i = Vector2i(origin_x + lx, origin_y + ly)
+				result[source_tile] = 0.0
+				queue.append(source_tile)
+
+	var dirs: Array[Vector2i] = [
+		Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+		Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)
+	]
+	var dists: Array[float] = [1.0, 1.0, 1.0, 1.0, 1.414, 1.414, 1.414, 1.414]
+
+	while head < queue.size():
+		var curr: Vector2i = queue[head]
+		head += 1
+		var d: float = result[curr]
+		if d > 12.0:
+			continue
+
+		var curr_lx: int = curr.x - origin_x
+		var curr_ly: int = curr.y - origin_y
+		for i in range(8):
+			var next_lx: int = curr_lx + dirs[i].x
+			var next_ly: int = curr_ly + dirs[i].y
+			if next_lx < 0 or next_lx >= width or next_ly < 0 or next_ly >= height:
+				continue
+
+			if i >= 4:
+				var w1_idx: int = curr_ly * width + (curr_lx + dirs[i].x)
+				var w2_idx: int = (curr_ly + dirs[i].y) * width + curr_lx
+				var w1_flags: int = tile_flags[w1_idx]
+				var w2_flags: int = tile_flags[w2_idx]
+				if (w1_flags & TILE_FLAG_VALID) != 0 and (w2_flags & TILE_FLAG_VALID) != 0 and (w1_flags & TILE_FLAG_OPAQUE) != 0 and (w2_flags & TILE_FLAG_OPAQUE) != 0:
+					continue
+
+			var next_tile: Vector2i = Vector2i(origin_x + next_lx, origin_y + next_ly)
+			var nd: float = d + dists[i]
+			if not result.has(next_tile) or nd < result[next_tile]:
+				result[next_tile] = nd
+				var next_idx: int = next_ly * width + next_lx
+				var next_flags: int = tile_flags[next_idx]
+				var next_is_window: bool = (next_flags & TILE_FLAG_WINDOW) != 0
+				var next_is_opaque: bool = (next_flags & TILE_FLAG_OPAQUE) != 0
+				if not next_is_opaque or next_is_window:
+					queue.append(next_tile)
+
+	return result
+
 func _process(delta: float) -> void:
+	_poll_async_sunlight_task()
+
 	# --- TIME CYCLE LOGIC ---
 	var total_time = Lobby.round_time + time_offset
 	current_day = 1 + int(total_time / CYCLE_DURATION)
@@ -328,100 +554,19 @@ func _rebuild_local_light_cache() -> void:
 
 		var is_underground = current_z < 3
 		var valid_holes_for_lamps: Array =[]
-		var sunlight_dist: Dictionary = {}
+		var sunlight_job_key := "%s:%s:%s:%s" % [player_tile, current_z, int(round(sun_weight * 1000.0)), _roof_map_revision]
+		var sunlight_dist: Dictionary = _sunlight_dist_cache
 
 		# Flood Fill (BFS) to softly scatter daylight around corners and through windows
 		if sun_weight > 0.001:
-			var ext_rx = 20
-			var ext_ry = 15
-			var queue =[]
-			
-			# 1. Identify light sources (Unroofed tiles, windows, doors)
-			for dy in range(-ext_ry, ext_ry + 1):
-				for dx in range(-ext_rx, ext_rx + 1):
-					var t = player_tile + Vector2i(dx, dy)
-					if t.x < 0 or t.x >= 1000 or t.y < 0 or t.y >= 1000:
-						continue
-						
-					var idx = (t.y * 1000 + t.x) * 2
-					var wz = roof_data[idx]
-					var fz = roof_data[idx + 1]
-					
-					var is_roofed = false
-					# Solid walls don't emit scattered light. Only air/windows/doors.
-					if is_underground:
-						is_roofed = (fz > current_z or wz >= current_z)
-					else:
-						is_roofed = (wz >= current_z or fz > current_z)
-					
-					var tm = World.get_tilemap(current_z)
-					var is_window = (tm != null and tm.get_cell_source_id(t) == 1 and tm.get_cell_atlas_coords(t) == Vector2i(10, 0))
-					if is_window: is_roofed = false
-					
-					if not is_roofed:
-						sunlight_dist[t] = 0.0
-						queue.append(t)
-						
-			# 2. Propagate the light outward like a fluid
-			var dirs =[
-				Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
-				Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)
-			]
-			var dists =[1.0, 1.0, 1.0, 1.0, 1.414, 1.414, 1.414, 1.414]
-			
-			var head = 0
-			while head < queue.size():
-				var curr = queue[head]
-				head += 1
-				var d = sunlight_dist[curr]
-				
-				# Max light propagation distance (optimization)
-				if d > 12.0: continue
-				
-				for i in range(8):
-					var n = curr + dirs[i]
-					if n.x < 0 or n.x >= 1000 or n.y < 0 or n.y >= 1000: continue
-					if abs(n.x - player_tile.x) > ext_rx or abs(n.y - player_tile.y) > ext_ry: continue
-					
-					# Avoid light leaking diagonally through tight solid corners
-					if i >= 4:
-						var w1 = curr + Vector2i(dirs[i].x, 0)
-						var w2 = curr + Vector2i(0, dirs[i].y)
-						var tm = World.get_tilemap(current_z)
-						var w1_op = false
-						var w2_op = false
-						if tm != null:
-							if tm.get_cell_source_id(w1) == 1 and TileDefs.is_opaque(1, tm.get_cell_atlas_coords(w1)): w1_op = true
-							if tm.get_cell_source_id(w2) == 1 and TileDefs.is_opaque(1, tm.get_cell_atlas_coords(w2)): w2_op = true
-						if w1_op and w2_op:
-							continue
-					
-					var nd = d + dists[i]
-					if not sunlight_dist.has(n) or nd < sunlight_dist[n]:
-						sunlight_dist[n] = nd
-						
-						# Check opacity to see if light can keep traveling through this tile
-						var tm = World.get_tilemap(current_z)
-						var src = -1 if tm == null else tm.get_cell_source_id(n)
-						var coords = Vector2i(-1, -1) if tm == null else tm.get_cell_atlas_coords(n)
-						
-						var n_is_window = (src == 1 and coords == Vector2i(10, 0))
-						var n_is_opaque = false
-						if src == 1:
-							if TileDefs.is_opaque(src, coords): n_is_opaque = true
-						elif World.solid_grid.has(current_z) and World.solid_grid[current_z].has(n):
-							var valid_objs: Array = []
-							for obj in World.solid_grid[current_z][n]:
-								if not is_instance_valid(obj):
-									continue
-								valid_objs.append(obj)
-								if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
-									n_is_opaque = true
-									break
-							World.solid_grid[current_z][n] = valid_objs
-									
-						if not n_is_opaque or n_is_window:
-							queue.append(n)
+			if _sunlight_cache_key != sunlight_job_key and _sunlight_task_id == -1:
+				_queue_async_sunlight_job(
+					sunlight_job_key,
+					_build_sunlight_job(player_tile, current_z, roof_data, is_underground)
+				)
+		else:
+			_sunlight_cache_key = ""
+			_sunlight_dist_cache = {}
 						
 		# Scan view radius for lamp transit holes
 		if not other_z_lamps.is_empty():
@@ -557,6 +702,8 @@ func _rebuild_local_light_cache() -> void:
 	# Submit to draw node
 	_draw_node.light_cache = new_cache
 	_draw_node.queue_redraw()
+	if local_player != null:
+		_report_local_world_light(local_player, current_z)
 
 # Called by the UI button
 func toggle_time_of_day() -> void:

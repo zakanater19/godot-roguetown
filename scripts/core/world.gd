@@ -12,6 +12,11 @@ var tile_hit_counts: Dictionary = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}}
 
 
 var server_action_cooldowns: Dictionary = {}
+const SERVER_SNEAK_VISUAL_INTERVAL: float = 0.1
+const CLIENT_LIGHT_SAMPLE_STALE_MS: int = 1500
+const SERVER_SNEAK_SYNC_EPSILON: float = 0.04
+var _server_sneak_visual_timer: float = 0.0
+var _client_light_samples: Dictionary = {}
 
 var current_laws: Array =[
 	"1. You may not injure a king or, through inaction, allow a king to come to harm.",
@@ -123,6 +128,18 @@ func _ready() -> void:
 	session = preload("res://scripts/world/world_session.gd").new(self)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
+func _process(delta: float) -> void:
+	if not multiplayer.has_multiplayer_peer():
+		return
+	if not multiplayer.is_server():
+		return
+	_server_sneak_visual_timer += delta
+	if _server_sneak_visual_timer < SERVER_SNEAK_VISUAL_INTERVAL:
+		return
+	var step := _server_sneak_visual_timer
+	_server_sneak_visual_timer = 0.0
+	_update_server_sneak_visuals(step)
+
 func get_tilemap(z: int) -> TileMapLayer:
 	if _tilemap_cache.has(z) and is_instance_valid(_tilemap_cache[z]):
 		return _tilemap_cache[z]
@@ -138,6 +155,89 @@ func _on_peer_disconnected(id: int) -> void:
 		print("LateJoin: Peer disconnected - ", id)
 		if grab_map.has(id):
 			combat.release_grab_for_peer(id, true)
+		_client_light_samples.erase(id)
+
+func update_client_light_sample(peer_id: int, tile: Vector2i, z_level: int, light_value: float) -> void:
+	_client_light_samples[peer_id] = {
+		"tile": tile,
+		"z_level": z_level,
+		"light": clampf(light_value, 0.0, 1.0),
+		"updated_ms": Time.get_ticks_msec(),
+	}
+
+func _push_server_sneak_alpha(player: Node, alpha: float) -> void:
+	var clamped_alpha := clampf(alpha, 0.0, 1.0)
+	player.set("sneak_alpha", clamped_alpha)
+	player.call("_apply_sneak_alpha", clamped_alpha)
+	var last_synced := float(player.get("_last_synced_sneak_alpha"))
+	if abs(clamped_alpha - last_synced) >= SERVER_SNEAK_SYNC_EPSILON or (clamped_alpha >= 0.999 and last_synced < 0.999):
+		player.set("_last_synced_sneak_alpha", clamped_alpha)
+		if multiplayer.has_multiplayer_peer():
+			rpc_sync_player_sneak_alpha.rpc(player.get_multiplayer_authority(), clamped_alpha)
+
+func _update_server_sneak_visuals(delta: float) -> void:
+	var now_ms := Time.get_ticks_msec()
+	var players := get_tree().get_nodes_in_group("player")
+	for player in players:
+		if player == null or not is_instance_valid(player):
+			continue
+		if utils.is_ghost(player) or player.get("dead") == true:
+			if float(player.get("sneak_alpha")) < 0.999:
+				_push_server_sneak_alpha(player, 1.0)
+			player.set("_sneak_was_hidden", false)
+			continue
+		if player.get("is_sneaking") != true:
+			if float(player.get("sneak_alpha")) < 0.999:
+				_push_server_sneak_alpha(player, 1.0)
+			player.set("_sneak_was_hidden", false)
+			continue
+
+		var sample = _client_light_samples.get(player.get_multiplayer_authority(), {})
+		var has_fresh_light_sample := false
+		var tile_light := 1.0
+		if sample is Dictionary and not sample.is_empty():
+			var sample_tile: Vector2i = sample.get("tile", Vector2i(-9999, -9999))
+			var sample_z: int = int(sample.get("z_level", -1))
+			var sample_age: int = now_ms - int(sample.get("updated_ms", 0))
+			if sample_tile == player.tile_pos and sample_z == player.z_level and sample_age <= CLIENT_LIGHT_SAMPLE_STALE_MS:
+				has_fresh_light_sample = true
+				tile_light = float(sample.get("light", 1.0))
+
+		if not has_fresh_light_sample:
+			continue
+
+		var sneak_level: int = int(player.skills.get("sneaking", 0))
+		var dark_threshold: float = 0.10 + sneak_level * 0.08
+		var fade_speed: float = 0.3 + sneak_level * 0.15
+		var reveal_radius: int = max(1, 5 - sneak_level * 2)
+		var proximity_revealed := false
+
+		if reveal_radius > 0:
+			for other in players:
+				if other == player or other == null or not is_instance_valid(other):
+					continue
+				if other.get("dead") == true or utils.is_ghost(other):
+					continue
+				if other.z_level != player.z_level:
+					continue
+				var dist: int = (other.tile_pos - player.tile_pos).abs().x + (other.tile_pos - player.tile_pos).abs().y
+				if dist <= reveal_radius:
+					proximity_revealed = true
+					break
+
+		var target_alpha := float(player.get("sneak_alpha"))
+		if tile_light >= dark_threshold or proximity_revealed:
+			target_alpha = 1.0
+			if player.get("_sneak_was_hidden") == true:
+				player.set("_sneak_was_hidden", false)
+				rpc_broadcast_sneak_reveal.rpc(player.character_name, player.tile_pos, player.z_level)
+		else:
+			target_alpha = move_toward(target_alpha, 0.0, fade_speed * delta)
+			if target_alpha <= 0.5:
+				player.set("_sneak_was_hidden", true)
+
+		if abs(target_alpha - float(player.get("sneak_alpha"))) > 0.001:
+			_push_server_sneak_alpha(player, target_alpha)
 
 func _is_within_interaction_range(player: Node, target_pos: Vector2, target_z: int) -> bool:
 	if player.z_level != target_z: return false
@@ -516,13 +616,28 @@ func rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vecto
 func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount: int, source_tile: Vector2i, source_z: int, blocked: bool = false, is_shove: bool = false, targeted_limb: String = "", block_type: String = "", weapon_type: String = "") -> void:
 	utils.handle_rpc_broadcast_damage_log(attacker_name, target_name, amount, source_tile, source_z, blocked, is_shove, targeted_limb, block_type, weapon_type)
 
+@rpc("any_peer", "call_remote", "unreliable")
+func rpc_report_client_light_sample(tile: Vector2i, z_level: int, light_value: float) -> void:
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var player = utils.find_player_by_peer(sender_id)
+	if player == null: return
+	update_client_light_sample(sender_id, tile, z_level, light_value)
+
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
 	if not multiplayer.is_server(): return
-	var sender_id = multiplayer.get_remote_sender_id()
-	var requester = utils.find_player_by_peer(sender_id)
-	if requester == null: return
 	rpc_broadcast_sneak_reveal.rpc(character_name, source_tile, source_z)
+
+@rpc("authority", "call_remote", "unreliable")
+func rpc_sync_player_sneak_alpha(peer_id: int, alpha: float) -> void:
+	var player = utils.find_player_by_peer(peer_id)
+	if player == null: return
+	player.set("sneak_alpha", alpha)
+	if player.has_method("_apply_sneak_alpha"):
+		player.call("_apply_sneak_alpha", alpha)
+	player.set("_last_synced_sneak_alpha", alpha)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_broadcast_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
