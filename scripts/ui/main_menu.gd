@@ -68,14 +68,17 @@ func _check_pending_reconnect() -> void:
 		return
 	var ip: String = str(parsed.get("ip", ""))
 	var port: int  = int(parsed.get("port", Host.PORT))
+	var pack_path: String = str(parsed.get("pack_path", "")).strip_edges()
 	if ip == "":
 		DirAccess.remove_absolute(path)
 		return
 
-	# Only auto-reconnect immediately after a patch/main-pack restart.
-	# A stale pending_reconnect marker should not force every normal launch
-	# into a reconnect loop just because the downloaded bundle file still exists.
-	if not GameVersion.has_active_content_patch():
+	# Older clients already write a reconnect marker before restarting into the
+	# downloaded pack. Trust that marker when the downloaded pack still exists,
+	# because Godot may consume --main-pack before it reaches OS.get_cmdline_args().
+	var launched_from_patch: bool = GameVersion.has_active_content_patch()
+	var has_downloaded_pack: bool = pack_path != "" and FileAccess.file_exists(pack_path)
+	if not launched_from_patch and not has_downloaded_pack:
 		DirAccess.remove_absolute(path)
 		return
 

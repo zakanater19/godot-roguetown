@@ -3,7 +3,7 @@ extends Node
 
 ## Keep this for executable/binary level compatibility only. Runtime content,
 ## scenes, scripts, and maps are synced via the server bundle hash below.
-const APP_VERSION: String = "a14f90d"
+const APP_VERSION: String = "1775669078"
 
 ## Directories that still support lightweight resource diffs as a fallback when
 ## talking to older servers. Full bundle sync does not depend on this list.
@@ -307,9 +307,13 @@ func _should_include_file(relative_file: String) -> bool:
 
 func _collect_runtime_file_entries(res_path: String, entry_map: Dictionary) -> void:
 	if res_path.ends_with(".remap"):
+		# Exported clients replace text scenes/scripts with .remap stubs that point
+		# at compiled resources under .godot/exported/. Keep that indirection intact
+		# so restarted outdated clients can boot the downloaded pack as a main pack.
+		_register_runtime_entry(entry_map, res_path, res_path)
 		var remap_target: String = _extract_pack_target_path(res_path)
 		if remap_target != "" and FileAccess.file_exists(remap_target):
-			_register_runtime_entry(entry_map, res_path.trim_suffix(".remap"), remap_target)
+			_register_runtime_entry(entry_map, remap_target, remap_target)
 		return
 
 	_register_runtime_entry(entry_map, res_path, res_path)
