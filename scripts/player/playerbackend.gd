@@ -162,7 +162,7 @@ func equip_clothing(item: Node) -> void:                                        
 func equip_clothing_to_slot(item: Node, slot_name: String) -> void:                  equipment.equip_clothing_to_slot(item, slot_name)
 func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:          equipment.perform_equip(item, slot_name, hand_index)
 func unequip_clothing_from_slot(slot_name: String) -> void:                          equipment.unequip_clothing_from_slot(slot_name)
-func perform_unequip(slot_name: String, new_node_name: String, hand_index: int) -> void: equipment.perform_unequip(slot_name, new_node_name, hand_index)
+func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void: equipment.perform_unequip(slot_name, new_entity_id, hand_index)
 
 # ===========================================================================
 # Action delegation

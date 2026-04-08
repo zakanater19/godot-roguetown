@@ -281,11 +281,11 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 	active_loot_attempts.append(attempt)
 
 	var my_peer_id: int = player.multiplayer.get_unique_id()
-	var target_path: NodePath = loot_target.get_path()
+	var target_id := World.get_entity_id(loot_target)
 	if player.multiplayer.is_server():
-		World.rpc_notify_loot_warning(target_path, my_peer_id, item_desc)
+		World.rpc_notify_loot_warning(target_id, my_peer_id, item_desc)
 	else:
-		World.rpc_notify_loot_warning.rpc_id(1, target_path, my_peer_id, item_desc)
+		World.rpc_notify_loot_warning.rpc_id(1, target_id, my_peer_id, item_desc)
 
 func _update_loot_attempts(delta: float) -> void:
 	var completed_keys: Array = []
@@ -379,7 +379,7 @@ func _complete_loot_attempt(slot_key: String) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 
-	var target_path: NodePath = target.get_path()
+	var target_id := World.get_entity_id(target)
 	var my_peer_id:     int = player.multiplayer.get_unique_id()
 
 	var slot_type:  String = ""
@@ -393,9 +393,9 @@ func _complete_loot_attempt(slot_key: String) -> void:
 		slot_index = slot_key.trim_prefix("equip_")
 
 	if player.multiplayer.is_server():
-		World.rpc_request_loot_item(target_path, my_peer_id, slot_type, slot_index)
+		World.rpc_request_loot_item(target_id, my_peer_id, slot_type, slot_index)
 	else:
-		World.rpc_request_loot_item.rpc_id(1, target_path, my_peer_id, slot_type, slot_index)
+		World.rpc_request_loot_item.rpc_id(1, target_id, my_peer_id, slot_type, slot_index)
 
 func show_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 	if player.sleep_state == 2: # SleepState.ASLEEP

@@ -179,7 +179,7 @@ func _equip_clothing(item: Node) -> void:                                      i
 func _equip_clothing_to_slot(item: Node, slot_name: String) -> void:          if backend: backend.equip_clothing_to_slot(item, slot_name)
 func _perform_equip(item: Node, slot_name: String, hand_index: int) -> void:  if backend: backend.perform_equip(item, slot_name, hand_index)
 func _unequip_clothing_from_slot(slot_name: String) -> void:                   if backend: backend.unequip_clothing_from_slot(slot_name)
-func _perform_unequip(slot_name: String, new_node_name: String, hand_index: int) -> void: if backend: backend.perform_unequip(slot_name, new_node_name, hand_index)
+func _perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void: if backend: backend.perform_unequip(slot_name, new_entity_id, hand_index)
 func _inspect_at(world_pos: Vector2) -> void:                                  if inspect: inspect.inspect_at(world_pos)
 func _show_inspect_text(text: String, detailed_desc: String) -> void:         if inspect: inspect.show_inspect_text(text, detailed_desc)
 func _apply_action_cooldown(item: Node, is_attack: bool = false) -> void:     if backend: backend.apply_action_cooldown(item, is_attack)
@@ -366,6 +366,8 @@ func rpc_sync_z_level(new_z: int) -> void:
 	for h in hands:
 		if h != null and is_instance_valid(h):
 			h.set("z_level", new_z)
+	if _is_local_authority():
+		Lighting.refresh_local_lighting()
 	if _is_local_authority() and _hud:
 		_hud.update_stats(health, stamina)
 
@@ -459,6 +461,7 @@ func _ready() -> void:
 	inspect  = preload("res://scripts/player/playerinspect.gd").new(self)
 
 	add_to_group("player")
+	World.register_entity(self, "player:%s" % name)
 	_apply_class_defaults()
 
 	if position == Vector2.ZERO and multiplayer.is_server():
@@ -552,25 +555,22 @@ func _on_authority_changed() -> void:
 		if _hud: _hud.update_stats(health, stamina)
 		if _dead_container: _dead_container.visible = dead
 
-func sync_hands(hand_names: Array) -> void:
-	var main = World.main_scene
-	if not main: return
+func sync_hands(hand_ids: Array) -> void:
 	for i in range(2):
-		var base_name = hand_names[i]
-		if base_name == null or base_name == "":
+		var entity_id = str(hand_ids[i]) if i < hand_ids.size() else ""
+		if entity_id == "":
 			hands[i] = null
 			continue
-		var found = null
-		for child in main.get_children():
-			if child.name.begins_with(base_name):
-				found = child
-				break
+		var found = World.get_entity(entity_id)
 		if found:
 			hands[i] = found
 			for child in found.get_children():
 				if child is CollisionShape2D: child.disabled = true
 			found.set("z_level", z_level)
 	_update_hands_ui()
+
+func _exit_tree() -> void:
+	World.unregister_entity(self)
 
 # ── Reconnection ──────────────────────────────────────────────────────────────
 

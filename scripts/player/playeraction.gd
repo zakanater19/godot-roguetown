@@ -36,29 +36,31 @@ func on_object_picked_up(object_node: Node) -> void:
 		return
 
 	var active_item = player.hands[player.active_hand]
+	var target_object_id := World.get_entity_id(object_node)
 	if active_item != null:
 		# Combine ground coins
 		if active_item.get("is_coin_stack") and object_node.get("is_coin_stack"):
 			if active_item.get("item_type") == object_node.get("item_type"):
 				if player.multiplayer.is_server():
-					World.rpc_request_combine_ground_coin(object_node.get_path(), player.active_hand)
+					World.rpc_request_combine_ground_coin(target_object_id, player.active_hand)
 				else:
-					World.rpc_request_combine_ground_coin.rpc_id(1, object_node.get_path(), player.active_hand)
+					World.rpc_request_combine_ground_coin.rpc_id(1, target_object_id, player.active_hand)
 		return
 
 	if player.multiplayer.is_server():
-		World.rpc_request_pickup(object_node.get_path(), player.active_hand)
+		World.rpc_request_pickup(target_object_id, player.active_hand)
 	else:
-		World.rpc_request_pickup.rpc_id(1, object_node.get_path(), player.active_hand)
+		World.rpc_request_pickup.rpc_id(1, target_object_id, player.active_hand)
 
 func drop_item_from_hand(hand_idx: int) -> void:
 	if player.hands[hand_idx] == null:
 		return
 	var obj = player.hands[hand_idx]
+	var obj_id := World.get_entity_id(obj)
 	if player.multiplayer.is_server():
-		World.rpc_drop_item_at.rpc(player.get_path(), obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
+		World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx)
 	else:
-		World.rpc_request_drop.rpc_id(1, obj.get_path(), player.tile_pos, player.DROP_SPREAD, hand_idx)
+		World.rpc_request_drop.rpc_id(1, obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx)
 
 func drop_held_object() -> void:
 	drop_item_from_hand(player.active_hand)
@@ -76,15 +78,16 @@ func throw_held_object(mouse_world_pos: Vector2) -> void:
 	apply_action_cooldown(player.hands[player.active_hand], true)
 
 	var obj: Node = player.hands[player.active_hand]
+	var obj_id := World.get_entity_id(obj)
 
 	player.throwing_mode = false
 	if player._throw_label != null:
 		player._throw_label.visible = false
 
 	if player.multiplayer.is_server():
-		World.rpc_request_throw(obj.get_path(), player.active_hand, dir, throw_range)
+		World.rpc_request_throw(obj_id, player.active_hand, dir, throw_range)
 	else:
-		World.rpc_request_throw.rpc_id(1, obj.get_path(), player.active_hand, dir, throw_range)
+		World.rpc_request_throw.rpc_id(1, obj_id, player.active_hand, dir, throw_range)
 
 func interact_held_object() -> void:
 	if player.hands[player.active_hand] != null:

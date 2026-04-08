@@ -15,6 +15,7 @@ func _ready() -> void:
 	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return
+	World.register_entity(self)
 	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	global_position = Vector2((tile_pos.x + 0.5) * TILE_SIZE, (tile_pos.y + 0.5) * TILE_SIZE)
 	World.register_solid(tile_pos, z_level, self)
@@ -25,6 +26,7 @@ func _exit_tree() -> void:
 		return
 	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	World.unregister_solid(tile_pos, z_level, self)
+	World.unregister_entity(self)
 
 func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
 	if Engine.is_editor_hint():
@@ -44,7 +46,8 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			return # Let the click pass through to the item on the table
 		get_viewport().set_input_as_handled()
 		var place_pos: Vector2 = get_global_mouse_position()
+		var table_id := World.get_entity_id(self)
 		if multiplayer.is_server():
-			World.rpc_request_table_place(get_path(), player.active_hand, place_pos)
+			World.rpc_request_table_place(table_id, player.active_hand, place_pos)
 		else:
-			World.rpc_request_table_place.rpc_id(1, get_path(), player.active_hand, place_pos)
+			World.rpc_request_table_place.rpc_id(1, table_id, player.active_hand, place_pos)

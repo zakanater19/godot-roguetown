@@ -141,9 +141,9 @@ func drag_grabbed_entity(grabber_peer_id: int, old_tile: Vector2i) -> void:
 		if tgt_peer != -1:
 			world.rpc_confirm_move.rpc(tgt_peer, old_tile, false)
 		else:
-			world.rpc_confirm_drag_corpse.rpc(target.get_path(), old_tile)
+			world.rpc_confirm_drag_corpse.rpc(world.get_entity_id(target), old_tile)
 	else:
-		world.rpc_confirm_drag_object.rpc(target.get_path(), world.utils.tile_to_pixel(old_tile))
+		world.rpc_confirm_drag_object.rpc(world.get_entity_id(target), world.utils.tile_to_pixel(old_tile))
 
 func server_try_resist(peer_id: int) -> void:
 	var now_ms := Time.get_ticks_msec()
@@ -239,7 +239,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 		var w_type: String = held_item.get("tool_type") if held_item != null else ""
 		world.rpc_broadcast_damage_log.rpc(attacker.get("character_name"), t_name, roll.damage, attacker.get("tile_pos"), attacker.get("z_level"), roll.blocked, false, targeted_limb, roll.get("block_type", ""), w_type)
 
-func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String) -> void:
+func handle_rpc_request_grab(sender_id: int, target_id: String, limb: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var grabber: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if grabber == null or grabber.get("dead") or grabber.hands[grabber.get("active_hand")] != null: return
@@ -247,7 +247,7 @@ func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String
 	var now_ms := Time.get_ticks_msec()
 	if world.grab_cooldown_map.has(sender_id) and now_ms < world.grab_cooldown_map[sender_id]: return
 	world.grab_cooldown_map[sender_id] = now_ms + CombatDefs.GRAB_COOLDOWN_MS
-	var target := world.get_node_or_null(target_path)
+	var target: Node = world.get_entity(target_id)
 	if target == null or not is_instance_valid(target) or target.get("z_level") != grabber.get("z_level"): return
 	if world.grab_map.has(sender_id): release_grab_for_peer(sender_id)
 	if not world.utils.is_within_interaction_range(grabber, target.global_position): return
@@ -256,7 +256,7 @@ func handle_rpc_request_grab(sender_id: int, target_path: NodePath, limb: String
 	var safe_limb = limb if limb in Defs.LIMBS else "chest"
 	world.grab_map[sender_id] = {"target": target, "is_player": is_player, "target_peer_id": target_peer, "limb": safe_limb}
 	var t_name = (target as Node2D).get("character_name") if is_player else (target.get("item_type") if target.get("item_type") else target.name.get_slice("@", 0))
-	world.rpc_confirm_grab_start.rpc(sender_id, is_player, target_peer, target_path, grabber.get("character_name"), t_name, safe_limb, grabber.get("active_hand"))
+	world.rpc_confirm_grab_start.rpc(sender_id, is_player, target_peer, target_id, grabber.get("character_name"), t_name, safe_limb, grabber.get("active_hand"))
 
 func handle_rpc_request_release_grab(sender_id: int) -> void:
 	if world.multiplayer.is_server(): release_grab_for_peer(sender_id)
@@ -272,9 +272,9 @@ func handle_rpc_request_resist(sender_id: int) -> void:
 	if not is_grabbed: world.rpc_confirm_resist_result.rpc(-1, sender_id, false)
 	else: server_try_resist(sender_id)
 
-func handle_rpc_confirm_grab_start(grabber_peer_id: int, is_player: bool, target_peer_id: int, target_path: NodePath, grabber_name: String, target_name: String, limb: String, grab_hand: int) -> void:
+func handle_rpc_confirm_grab_start(grabber_peer_id: int, is_player: bool, target_peer_id: int, target_id: String, grabber_name: String, target_name: String, limb: String, grab_hand: int) -> void:
 	var grabber: Node2D = world.utils.find_player_by_peer(grabber_peer_id) as Node2D
-	var target = world.get_node_or_null(target_path)
+	var target = world.get_entity(target_id)
 	if grabber and target:
 		if grabber.has_method("_is_local_authority") and grabber._is_local_authority():
 			grabber.set("grabbed_target", target)
@@ -329,12 +329,12 @@ func handle_rpc_confirm_resist_result(grabber_peer_id: int, grabbed_peer_id: int
 		elif l_peer == grabber_peer_id: Sidebar.add_message("[color=#ffaaaa]Your target broke free![/color]")
 	elif l_peer == grabbed_peer_id: Sidebar.add_message("[color=#ffaaaa]You failed to resist the grab.[/color]")
 
-func handle_rpc_confirm_drag_object(obj_path: NodePath, new_pixel: Vector2) -> void:
-	var obj := world.get_node_or_null(obj_path)
+func handle_rpc_confirm_drag_object(obj_id: String, new_pixel: Vector2) -> void:
+	var obj: Node = world.get_entity(obj_id)
 	if obj: obj.global_position = new_pixel
 
-func handle_rpc_confirm_drag_corpse(corpse_path: NodePath, new_pos: Vector2i) -> void:
-	var corpse = world.get_node_or_null(corpse_path)
+func handle_rpc_confirm_drag_corpse(corpse_id: String, new_pos: Vector2i) -> void:
+	var corpse = world.get_entity(corpse_id)
 	if corpse != null:
 		corpse.set("tile_pos", new_pos)
 		if corpse.has_method("_start_move_lerp"):

@@ -28,6 +28,7 @@ func _ready() -> void:
 	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return
+	World.register_entity(self)
 	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	global_position = Vector2((tile_pos.x + 0.5) * TILE_SIZE, (tile_pos.y + 0.5) * TILE_SIZE)
 	World.register_solid(tile_pos, z_level, self)
@@ -39,6 +40,7 @@ func _exit_tree() -> void:
 	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
 	World.unregister_solid(tile_pos, z_level, self)
 	Lighting.unregister_lamp(self)
+	World.unregister_entity(self)
 
 func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
 	if Engine.is_editor_hint():
@@ -63,21 +65,23 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		var held: Node = player.hands[player.active_hand]
 		if held != null:
 			var itype: String = held.get("item_type") if held.get("item_type") != null else ""
+			var furnace_id := World.get_entity_id(self)
 			if held.get("is_fuel") == true:
 				if _coal_count >= 1: player._show_inspect_text("already has fuel", "")
 				else:
-					if multiplayer.is_server(): World.rpc_request_furnace_action(get_path(), "insert_fuel:" + itype, player.active_hand)
-					else: World.rpc_request_furnace_action.rpc_id(1, get_path(), "insert_fuel:" + itype, player.active_hand)
+					if multiplayer.is_server(): World.rpc_request_furnace_action(furnace_id, "insert_fuel:" + itype, player.active_hand)
+					else: World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_fuel:" + itype, player.active_hand)
 			elif held.get("is_smeltable_ore") == true:
 				if _ironore_count >= 1: player._show_inspect_text("already has ore", "")
 				else:
-					if multiplayer.is_server(): World.rpc_request_furnace_action(get_path(), "insert_ore", player.active_hand)
-					else: World.rpc_request_furnace_action.rpc_id(1, get_path(), "insert_ore", player.active_hand)
+					if multiplayer.is_server(): World.rpc_request_furnace_action(furnace_id, "insert_ore", player.active_hand)
+					else: World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_ore", player.active_hand)
 			else: player._show_inspect_text("that can't be added to the furnace", "")
 		else:
 			if _coal_count >= 1 and _ironore_count >= 1:
-				if multiplayer.is_server(): World.rpc_request_furnace_action(get_path(), "start_smelt", player.active_hand)
-				else: World.rpc_request_furnace_action.rpc_id(1, get_path(), "start_smelt", player.active_hand)
+				var furnace_id := World.get_entity_id(self)
+				if multiplayer.is_server(): World.rpc_request_furnace_action(furnace_id, "start_smelt", player.active_hand)
+				else: World.rpc_request_furnace_action.rpc_id(1, furnace_id, "start_smelt", player.active_hand)
 			else: player._show_inspect_text("needs fuel and iron ore to start", "")
 
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -88,8 +92,9 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		if _coal_count == 0 and _ironore_count == 0:
 			player._show_inspect_text("the furnace is already empty", "")
 			return
-		if multiplayer.is_server(): World.rpc_request_furnace_action(get_path(), "eject", player.active_hand)
-		else: World.rpc_request_furnace_action.rpc_id(1, get_path(), "eject", player.active_hand)
+		var furnace_id := World.get_entity_id(self)
+		if multiplayer.is_server(): World.rpc_request_furnace_action(furnace_id, "eject", player.active_hand)
+		else: World.rpc_request_furnace_action.rpc_id(1, furnace_id, "eject", player.active_hand)
 
 func _perform_action(action: String, player: Node, hand_idx: int, generated_names: Array) -> void:
 	if action.begins_with("insert_fuel:"):
@@ -117,7 +122,7 @@ func _consume_held(player: Node, hand_idx: int) -> void:
 			player._update_hands_ui()
 			player._apply_action_cooldown(null)
 
-func _eject_contents(player: Node, generated_names: Array) -> void:
+func _eject_contents(player: Node, generated_ids: Array) -> void:
 	var drop_offsets :=[Vector2(-TILE_SIZE, 0), Vector2(TILE_SIZE, 0), Vector2(0, TILE_SIZE), Vector2(-TILE_SIZE, TILE_SIZE)]
 	var slot := 0
 	var name_idx := 0
@@ -125,14 +130,14 @@ func _eject_contents(player: Node, generated_names: Array) -> void:
 		var scene_path: String = ItemRegistry.get_scene_path(_fuel_type)
 		if scene_path != "":
 			var s := load(scene_path) as PackedScene
-			if s != null and name_idx < generated_names.size():
-				_spawn_item(s, drop_offsets[slot % drop_offsets.size()], player, generated_names[name_idx])
+			if s != null and name_idx < generated_ids.size():
+				_spawn_item(s, drop_offsets[slot % drop_offsets.size()], player, generated_ids[name_idx])
 				slot += 1
 				name_idx += 1
 	if _ironore_count > 0:
 		var ironore_scene := load("res://objects/ironore.tscn") as PackedScene
-		if ironore_scene != null and name_idx < generated_names.size():
-			_spawn_item(ironore_scene, drop_offsets[slot % drop_offsets.size()], player, generated_names[name_idx])
+		if ironore_scene != null and name_idx < generated_ids.size():
+			_spawn_item(ironore_scene, drop_offsets[slot % drop_offsets.size()], player, generated_ids[name_idx])
 			slot += 1
 			name_idx += 1
 	_coal_count    = 0
@@ -140,13 +145,13 @@ func _eject_contents(player: Node, generated_names: Array) -> void:
 	_fuel_type     = ""
 	if player != null and player._is_local_authority(): player._show_inspect_text("furnace emptied", "")
 
-func _spawn_item(scene: PackedScene, offset: Vector2, _player: Node, node_name: String = "") -> void:
+func _spawn_item(scene: PackedScene, offset: Vector2, _player: Node, entity_id: String = "") -> void:
 	var obj: Node2D = scene.instantiate()
-	if node_name != "": obj.name = node_name
 	obj.global_position = global_position + offset
 	# Ensure the spawned item is on the same Z as the furnace
 	if obj.has_method("set"): obj.set("z_level", z_level)
 	get_parent().add_child(obj)
+	World.register_entity(obj, entity_id)
 
 func _start_smelting() -> void:
 	_smelting = true
@@ -156,8 +161,8 @@ func _start_smelting() -> void:
 		get_tree().create_timer(SMELT_TIME).timeout.connect(_on_server_smelt_finished)
 
 func _on_server_smelt_finished() -> void:
-	var ingot_name = "Ingot_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000)
-	World.rpc_confirm_furnace_action.rpc(1, get_path(), "finish_smelt", -1,[ingot_name])
+	var ingot_id = World._make_entity_id("ingot")
+	World.rpc_confirm_furnace_action.rpc(1, World.get_entity_id(self), "finish_smelt", -1, [ingot_id])
 
 func _finish_smelting(generated_names: Array) -> void:
 	_smelting      = false

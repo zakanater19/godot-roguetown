@@ -159,8 +159,9 @@ func handle_input(event: InputEvent) -> void:
 			if grab_target != null:
 				var grab_limb: String = "chest"
 				if player._hud != null: grab_limb = player._hud.targeted_limb
-				if player.multiplayer.is_server(): World.rpc_request_grab(grab_target.get_path(), grab_limb)
-				else: World.rpc_request_grab.rpc_id(1, grab_target.get_path(), grab_limb)
+				var grab_target_id := World.get_entity_id(grab_target)
+				if player.multiplayer.is_server(): World.rpc_request_grab(grab_target_id, grab_limb)
+				else: World.rpc_request_grab.rpc_id(1, grab_target_id, grab_limb)
 			player.get_viewport().set_input_as_handled()
 			return
 

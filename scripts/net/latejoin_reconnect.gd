@@ -33,15 +33,15 @@ func handle_player_disconnection(peer_id: int, player_node: Node) -> void:
 
 	lj.rpc_set_disconnect_indicator.rpc(node.get_path(), true)
 
-	var hand_names = []
+	var hand_ids = []
 	for h in node.get("hands"):
-		hand_names.append(h.name if h != null else "")
+		hand_ids.append(World.get_entity_id(h) if h != null else "")
 
 	lj.update_player_state(peer_id, {
 		"position":     node.position,
 		"disconnected": true,
 		"health":       node.get("health"),
-		"hands":        hand_names
+		"hands":        hand_ids
 	})
 
 # ---------------------------------------------------------------------------
@@ -104,11 +104,11 @@ func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node
 
 	lj.rpc_set_disconnect_indicator.rpc(node.get_path(), false)
 
-	var hand_names = []
+	var hand_ids = []
 	for h in node.get("hands"):
-		hand_names.append(h.name if h != null else "")
+		hand_ids.append(World.get_entity_id(h) if h != null else "")
 
-	lj.update_player_state(new_peer_id, {"position": node.position, "disconnected": false, "health": node.get("health"), "hands": hand_names})
+	lj.update_player_state(new_peer_id, {"position": node.position, "disconnected": false, "health": node.get("health"), "hands": hand_ids})
 	if node.has_method("_on_reconnection_confirmed"): node.call("_on_reconnection_confirmed")
 	Lobby.rpc_hide_lobby.rpc_id(new_peer_id)
 
@@ -185,6 +185,7 @@ func capture_hands_state(player_node: Node2D) -> Array:
 		if hand_item != null and is_instance_valid(hand_item):
 			var item_data = {
 				"name":            hand_item.name,
+				"entity_id":       World.get_entity_id(hand_item),
 				"scene_file_path": hand_item.scene_file_path,
 				"item_type":       hand_item.get("item_type") if hand_item.has_method("get") else "",
 				"position":        hand_item.position,
@@ -253,7 +254,7 @@ func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void
 			if grabber != null and is_instance_valid(grabber):
 				player_node.set("grabbed_by", grabber)
 				grabber.set("grabbed_target", player_node)
-				World.rpc_confirm_grab_start.rpc(grabber_peer, true, player_node.get_multiplayer_authority(), player_node.get_path(), grabber.get("character_name"), player_node.get("character_name"), "chest", grabber.get("active_hand"))
+				World.rpc_confirm_grab_start.rpc(grabber_peer, true, player_node.get_multiplayer_authority(), World.get_entity_id(player_node), grabber.get("character_name"), player_node.get("character_name"), "chest", grabber.get("active_hand"))
 
 	var eq_data   = player_state["equipped"]
 	var eq        = player_node.get("equipped")
@@ -286,7 +287,8 @@ func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void
 func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	var main_node = World.main_scene
 	if main_node == null: return null
-	var existing = main_node.get_node_or_null(NodePath(hand_data["name"]))
+	var entity_id := str(hand_data.get("entity_id", ""))
+	var existing = World.get_entity(entity_id)
 	if existing != null: return existing
 	var scene_path = hand_data.get("scene_file_path", "")
 	if scene_path.is_empty():
@@ -298,7 +300,9 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 		if hand_data.has("contents") and "contents" in fallback: fallback.set("contents", hand_data["contents"].duplicate(true))
 		if hand_data.has("amount")   and "amount"   in fallback: fallback.set("amount",   hand_data["amount"])
 		if hand_data.has("metal_type") and "metal_type" in fallback: fallback.set("metal_type", hand_data["metal_type"])
-		main_node.add_child(fallback); return fallback
+		main_node.add_child(fallback)
+		World.register_entity(fallback, entity_id)
+		return fallback
 	var scene = load(scene_path) as PackedScene
 	if scene == null: return null
 	var item = scene.instantiate()
@@ -306,7 +310,9 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	if hand_data.has("contents") and "contents" in item: item.set("contents", hand_data["contents"].duplicate(true))
 	if hand_data.has("amount")   and "amount"   in item: item.set("amount",   hand_data["amount"])
 	if hand_data.has("metal_type") and "metal_type" in item: item.set("metal_type", hand_data["metal_type"])
-	main_node.add_child(item); return item
+	main_node.add_child(item)
+	World.register_entity(item, entity_id)
+	return item
 
 # ---------------------------------------------------------------------------
 # Retry helpers (async — must be called as coroutines via the lj node)

@@ -6,12 +6,12 @@ var world: Node
 func _init(p_world: Node) -> void:
 	world = p_world
 
-func handle_rpc_notify_loot_warning(target_path: NodePath, looter_peer_id: int, item_desc: String) -> void:
+func handle_rpc_notify_loot_warning(target_id: String, looter_peer_id: int, item_desc: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var looter: Node2D = world.utils.find_player_by_peer(looter_peer_id) as Node2D
 	if looter == null or looter.dead: return
 
-	var target = world.get_node_or_null(target_path)
+	var target = world.get_entity(target_id)
 	if target == null: return
 	var target_peer_id = target.get_multiplayer_authority() if target.is_in_group("player") and target.get("is_possessed") == true else -1
 
@@ -23,9 +23,9 @@ func handle_rpc_deliver_loot_warning(looter_peer_id: int, item_desc: String) -> 
 	if local_player != null and local_player.has_method("show_loot_warning"):
 		local_player.show_loot_warning(looter_peer_id, item_desc)
 
-func handle_rpc_request_loot_item(sender_id: int, target_path: NodePath, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void:
+func handle_rpc_request_loot_item(sender_id: int, target_id: String, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void:
 	if not world.multiplayer.is_server() or sender_id != looter_peer_id: return
-	var target: Node2D = world.get_node_or_null(target_path) as Node2D
+	var target: Node2D = world.get_entity(target_id) as Node2D
 	var looter: Node2D = world.utils.find_player_by_peer(looter_peer_id) as Node2D
 	if target == null or looter == null or looter.dead: return
 	if not Defs.is_within_tile_reach(looter.tile_pos, target.tile_pos) or target.z_level != looter.z_level: return
@@ -37,16 +37,16 @@ func handle_rpc_request_loot_item(sender_id: int, target_path: NodePath, looter_
 		var idx: int  = int(slot_index)
 		var obj: Node = target.hands[idx]
 		if obj == null or not is_instance_valid(obj): return
-		world.rpc_drop_item_at.rpc(target_path, obj.get_path(), drop_tile, SPREAD, idx)
+		world.rpc_drop_item_at.rpc(target.get_multiplayer_authority(), world.get_entity_id(obj), drop_tile, SPREAD, idx)
 	elif slot_type == "equip":
 		var equip_slot: String = str(slot_index)
 		var item_name: String  = target.equipped.get(equip_slot, "")
 		if item_name == "": return
-		var new_name := Defs.make_runtime_name("Loot", equip_slot)
-		world.rpc_confirm_loot_unequip_drop.rpc(target_path, equip_slot, new_name, drop_tile, SPREAD)
+		var new_entity_id: String = world._make_entity_id("loot")
+		world.rpc_confirm_loot_unequip_drop.rpc(target_id, equip_slot, new_entity_id, drop_tile, SPREAD)
 
-func handle_rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: String, new_node_name: String, drop_tile: Vector2i, spread: float) -> void:
-	var target: Node2D = world.get_node_or_null(target_path) as Node2D
+func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_tile: Vector2i, spread: float) -> void:
+	var target: Node2D = world.get_entity(target_id) as Node2D
 	if target == null: return
 	var item_name: String = target.equipped.get(equip_slot, "")
 	if item_name == "": return
@@ -64,7 +64,6 @@ func handle_rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: Str
 			target._hud.update_clothing_display(target.equipped)
 
 	var item: Node2D = scene.instantiate()
-	item.name        = new_node_name
 	item.position    = world.utils.tile_to_pixel(drop_tile)
 
 	var land_z = world.calculate_gravity_z(drop_tile, target.z_level)
@@ -81,6 +80,7 @@ func handle_rpc_confirm_loot_unequip_drop(target_path: NodePath, equip_slot: Str
 		target.equipped_data[equip_slot] = null
 
 	target.get_parent().add_child(item)
+	world.register_entity(item, new_entity_id)
 	world.objects.drop_item_at(item, drop_tile, spread)
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = false

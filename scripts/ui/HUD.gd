@@ -253,10 +253,11 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 				var label = active_held.get("item_type") if active_held.get("item_type") != null else active_held.name
 				Sidebar.add_message("[color=#ffaaaa]" + label + " is too large to fit in the satchel.[/color]")
 				return
+			var clicked_item_id := World.get_entity_id(clicked_item)
 			if player.multiplayer.is_server():
-				World.rpc_request_satchel_insert(clicked_item.get_path(), player.active_hand)
+				World.rpc_request_satchel_insert(clicked_item_id, player.active_hand)
 			else:
-				World.rpc_request_satchel_insert.rpc_id(1, clicked_item.get_path(), player.active_hand)
+				World.rpc_request_satchel_insert.rpc_id(1, clicked_item_id, player.active_hand)
 			return
 
 	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] != null:

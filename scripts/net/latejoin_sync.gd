@@ -30,9 +30,9 @@ func send_world_state_to_peer(peer_id: int) -> void:
 		var pid  = node.get_multiplayer_authority()
 		if pid == peer_id:
 			continue
-		var hand_names = []
+		var hand_ids = []
 		for h in node.get("hands"):
-			hand_names.append(h.name if (h != null and is_instance_valid(h)) else "")
+			hand_ids.append(World.get_entity_id(h) if (h != null and is_instance_valid(h)) else "")
 		var equipped_data = lj._reconnect.capture_equipped_state(node)
 		var eq_data_state = node.get("equipped_data").duplicate(true) if "equipped_data" in node else {}
 		player_states[pid] = {
@@ -42,7 +42,7 @@ func send_world_state_to_peer(peer_id: int) -> void:
 			"health":       node.get("health"),
 			"limb_hp":      node.get("body").limb_hp.duplicate() if node.get("body") != null else {},
 			"limb_broken":  node.get("body").limb_broken.duplicate() if node.get("body") != null else {},
-			"hands":        hand_names,
+			"hands":        hand_ids,
 			"equipped":     equipped_data,
 			"equipped_data": eq_data_state,
 			"is_lying_down": node.get("is_lying_down") == true,
@@ -61,7 +61,7 @@ func sync_objects_for_late_joiner(peer_id: int) -> void:
 		return
 
 	var objects_to_sync   = []
-	var valid_object_names = []
+	var valid_object_ids = []
 	var sync_groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 
 	for group in sync_groups:
@@ -69,9 +69,9 @@ func sync_objects_for_late_joiner(peer_id: int) -> void:
 			if obj is Node2D and obj.get_parent() == main_node:
 				if not objects_to_sync.has(obj):
 					objects_to_sync.append(obj)
-					valid_object_names.append(obj.name)
+					valid_object_ids.append(World.register_entity(obj))
 
-	lj.rpc_id(peer_id, "purge_missing_objects", valid_object_names)
+	lj.rpc_id(peer_id, "purge_missing_objects", valid_object_ids)
 
 	for obj in objects_to_sync:
 		var obj_data = get_object_sync_data(obj)
@@ -86,6 +86,7 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 		"scene_file_path": obj.scene_file_path if obj.scene_file_path != "" else "",
 		"position":        obj.position,
 		"name":            obj.name,
+		"entity_id":       World.register_entity(obj),
 		"groups":          obj.get_groups()
 	}
 
@@ -130,15 +131,17 @@ func handle_receive_object_states(object_states: Dictionary) -> void:
 
 func _retry_receive_object_states(object_states: Dictionary, retries: int) -> void:
 	var missing = {}
-	for obj_path in object_states:
-		var obj_data = object_states[obj_path]
-		var obj      = lj.get_node_or_null(obj_path)
+	for obj_ref in object_states:
+		var obj_data = object_states[obj_ref]
+		var obj = World.get_entity(str(obj_ref))
+		if obj == null:
+			obj = lj.get_node_or_null(obj_ref)
 		if obj != null:
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
 			if obj_data.has("amount")     and "amount"     in obj: obj.set("amount",     obj_data["amount"])
 			if obj_data.has("metal_type") and "metal_type" in obj: obj.set("metal_type", obj_data["metal_type"])
 		else:
-			missing[obj_path] = obj_data
+			missing[obj_ref] = obj_data
 
 	if not missing.is_empty() and retries > 0:
 		await lj.get_tree().create_timer(0.1).timeout
@@ -189,20 +192,23 @@ func _retry_receive_player_states(player_states: Dictionary, retries: int) -> vo
 		await lj.get_tree().create_timer(0.1).timeout
 		_retry_receive_player_states(missing, retries - 1)
 
-func handle_purge_missing_objects(valid_names: Array) -> void:
+func handle_purge_missing_objects(valid_ids: Array) -> void:
 	var main_node = World.main_scene
 	if main_node == null: return
 	var groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 	for group in groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
-			if obj is Node2D and obj.get_parent() == main_node and not obj.name in valid_names:
-				obj.queue_free()
+			if obj is Node2D and obj.get_parent() == main_node:
+				var obj_id := World.register_entity(obj)
+				if not valid_ids.has(obj_id):
+					obj.queue_free()
 
 func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 	var main_node = World.main_scene
 	if main_node == null: return
 	var obj_name = str(obj_data["name"])
-	var obj      = main_node.get_node_or_null(NodePath(obj_name))
+	var entity_id = str(obj_data.get("entity_id", ""))
+	var obj = World.get_entity(entity_id)
 
 	if obj != null:
 		if obj_data.has("z_level"):
@@ -232,6 +238,7 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			obj.name = obj_name
 			if obj_data.has("z_level"): obj.set("z_level", obj_data["z_level"])
 			main_node.add_child(obj)
+			World.register_entity(obj, entity_id)
 			if obj_data.has("z_level"):
 				obj.z_index = (obj.z_level - 1) * 200 + (obj.z_index % 200)
 

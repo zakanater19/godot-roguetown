@@ -30,6 +30,7 @@ func _ready() -> void:
 	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return
+	World.register_entity(self)
 	add_to_group("pickable")
 	if contents.size() != MAX_SLOTS:
 		contents.resize(MAX_SLOTS)
@@ -57,6 +58,7 @@ func _process(_delta: float) -> void:
 func _exit_tree() -> void:
 	if Engine.is_editor_hint():
 		return
+	World.unregister_entity(self)
 	_close_ui()
 
 func _input(event: InputEvent) -> void:
@@ -119,8 +121,9 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 					Sidebar.add_message("[color=#ffaaaa]" + item_label + " is too large to fit in the satchel.[/color]")
 					return
 
-				if multiplayer.is_server(): World.rpc_request_satchel_insert(get_path(), player.active_hand)
-				else: World.rpc_request_satchel_insert.rpc_id(1, get_path(), player.active_hand)
+				var satchel_id := World.get_entity_id(self)
+				if multiplayer.is_server(): World.rpc_request_satchel_insert(satchel_id, player.active_hand)
+				else: World.rpc_request_satchel_insert.rpc_id(1, satchel_id, player.active_hand)
 
 			elif in_other_hand or in_active_hand:
 				if _ui_layer != null and is_instance_valid(_ui_layer): _close_ui()
@@ -251,5 +254,6 @@ func _on_slot_pressed(slot_index: int) -> void:
 		Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
 		return
 
-	if multiplayer.is_server(): World.rpc_request_satchel_extract(get_path(), slot_index, player.active_hand)
-	else: World.rpc_request_satchel_extract.rpc_id(1, get_path(), slot_index, player.active_hand)
+	var satchel_id := World.get_entity_id(self)
+	if multiplayer.is_server(): World.rpc_request_satchel_extract(satchel_id, slot_index, player.active_hand)
+	else: World.rpc_request_satchel_extract.rpc_id(1, satchel_id, slot_index, player.active_hand)

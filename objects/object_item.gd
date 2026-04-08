@@ -22,6 +22,7 @@ func _ready() -> void:
 	add_to_group("z_entity")
 	if Engine.is_editor_hint():
 		return
+	World.register_entity(self)
 	if item_data == null:
 		push_error(name + ": item_data is not set — assign a .tres in the Inspector.")
 		return
@@ -35,6 +36,11 @@ func _ready() -> void:
 	is_smeltable_ore      = item_data.is_smeltable_ore
 	if item_data.pickable:
 		add_to_group("pickable")
+
+func _exit_tree() -> void:
+	if Engine.is_editor_hint():
+		return
+	World.unregister_entity(self)
 
 func get_description() -> String:
 	return item_data.description if item_data != null else ""

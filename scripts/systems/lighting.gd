@@ -114,10 +114,15 @@ func rebuild_roof_map() -> void:
 			for pos in World.solid_grid[z].keys():
 				if pos.x >= 0 and pos.x < 1000 and pos.y >= 0 and pos.y < 1000:
 					var is_op = false
+					var valid_objs: Array = []
 					for obj in World.solid_grid[z][pos]:
+						if not is_instance_valid(obj):
+							continue
+						valid_objs.append(obj)
 						if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
 							is_op = true
 							break
+					World.solid_grid[z][pos] = valid_objs
 					if is_op:
 						var idx = (pos.y * 1000 + pos.x) * 2
 						if z > roof_data[idx]: roof_data[idx] = z
@@ -144,10 +149,15 @@ func update_roof_map_at(pos: Vector2i) -> void:
 			if TileDefs.is_opaque(source_id, atlas_coords):
 				is_opaque = true
 		elif World.solid_grid.has(z) and World.solid_grid[z].has(pos):
+			var valid_objs: Array = []
 			for obj in World.solid_grid[z][pos]:
+				if not is_instance_valid(obj):
+					continue
+				valid_objs.append(obj)
 				if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
 					is_opaque = true
 					break
+			World.solid_grid[z][pos] = valid_objs
 
 		# Any non-stair tile acts as a floor, but only opaque tiles act as roofs
 		if source_id != -1 and highest_floor_z == 0:
@@ -224,6 +234,14 @@ func _is_line_blocked(start_px: Vector2, end_px: Vector2, check_z: int) -> bool:
 			
 	return false
 
+func invalidate_local_lighting() -> void:
+	_last_player_z = -1
+	_update_timer = UPDATE_INTERVAL
+
+func refresh_local_lighting() -> void:
+	invalidate_local_lighting()
+	_rebuild_local_light_cache()
+
 func _process(delta: float) -> void:
 	# --- TIME CYCLE LOGIC ---
 	var total_time = Lobby.round_time + time_offset
@@ -248,6 +266,12 @@ func _process(delta: float) -> void:
 	if _update_timer < UPDATE_INTERVAL:
 		return
 	_update_timer = 0.0
+
+	_rebuild_local_light_cache()
+
+func _rebuild_local_light_cache() -> void:
+	if _draw_node == null:
+		return
 
 	var local_player = World.get_local_player()
 	var current_z = 3
@@ -372,10 +396,15 @@ func _process(delta: float) -> void:
 						if src == 1:
 							if TileDefs.is_opaque(src, coords): n_is_opaque = true
 						elif World.solid_grid.has(current_z) and World.solid_grid[current_z].has(n):
+							var valid_objs: Array = []
 							for obj in World.solid_grid[current_z][n]:
+								if not is_instance_valid(obj):
+									continue
+								valid_objs.append(obj)
 								if obj.get("blocks_fov") == null or obj.get("blocks_fov") == true:
 									n_is_opaque = true
 									break
+							World.solid_grid[current_z][n] = valid_objs
 									
 						if not n_is_opaque or n_is_window:
 							queue.append(n)
