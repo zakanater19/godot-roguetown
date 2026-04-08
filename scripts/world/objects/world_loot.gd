@@ -9,10 +9,10 @@ func _init(p_world: Node) -> void:
 func handle_rpc_notify_loot_warning(target_id: String, looter_peer_id: int, item_desc: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var looter: Node2D = world.utils.find_player_by_peer(looter_peer_id) as Node2D
-	if looter == null or looter.dead: return
+	if not world.utils.can_player_interact(looter): return
 
 	var target = world.get_entity(target_id)
-	if target == null: return
+	if target == null or world.utils.is_ghost(target): return
 	var target_peer_id = target.get_multiplayer_authority() if target.is_in_group("player") and target.get("is_possessed") == true else -1
 
 	if target_peer_id == 1: world.rpc_deliver_loot_warning(looter_peer_id, item_desc)
@@ -27,7 +27,7 @@ func handle_rpc_request_loot_item(sender_id: int, target_id: String, looter_peer
 	if not world.multiplayer.is_server() or sender_id != looter_peer_id: return
 	var target: Node2D = world.get_entity(target_id) as Node2D
 	var looter: Node2D = world.utils.find_player_by_peer(looter_peer_id) as Node2D
-	if target == null or looter == null or looter.dead: return
+	if target == null or world.utils.is_ghost(target) or not world.utils.can_player_interact(looter): return
 	if not Defs.is_within_tile_reach(looter.tile_pos, target.tile_pos) or target.z_level != looter.z_level: return
 
 	var drop_tile: Vector2i = target.tile_pos

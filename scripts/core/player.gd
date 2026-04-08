@@ -375,10 +375,13 @@ func rpc_sync_z_level(new_z: int) -> void:
 func rpc_make_corpse() -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id != 1 and sender_id != 0: return
+	if dead != true:
+		dead = true
+	else:
+		_die_visuals()
 	is_possessed = false
-	if name.begins_with("Player_"):
-		name = "Corpse_" + name.trim_prefix("Player_")
-	set_multiplayer_authority(1)
+	combat_mode = false
+	intent = "help"
 	if _canvas_layer:
 		_canvas_layer.queue_free()
 		_canvas_layer = null
@@ -534,7 +537,6 @@ func _on_chat_submitted(text: String) -> void:
 	if chat: chat.on_chat_submitted(text)
 
 func _on_respawn_pressed() -> void:
-	set_multiplayer_authority(1)
 	if multiplayer.is_server(): World.rpc_request_respawn.rpc(multiplayer.get_unique_id())
 	else: World.rpc_request_respawn.rpc_id(1, multiplayer.get_unique_id())
 

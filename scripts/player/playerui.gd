@@ -76,12 +76,6 @@ func build_ui() -> void:
 	you_died_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	player._dead_container.add_child(you_died_label)
 
-	var respawn_btn := Button.new()
-	respawn_btn.text = "Respawn"
-	respawn_btn.add_theme_font_size_override("font_size", 24)
-	respawn_btn.pressed.connect(player._on_respawn_pressed)
-	player._dead_container.add_child(respawn_btn)
-
 	player._chat_input = LineEdit.new()
 	player._chat_input.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	player._chat_input.offset_left      = 12

@@ -217,6 +217,20 @@ func rpc_request_respawn(request_peer_id: int) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func rpc_return_to_lobby() -> void:
+	var local_entity: Node = get_local_player()
+	if multiplayer.has_multiplayer_peer():
+		var local_id: int = multiplayer.get_unique_id()
+		Host.peers.erase(local_id)
+	if local_entity != null and is_instance_valid(local_entity):
+		local_entity.set("is_possessed", false)
+		if local_entity.has_method("_set_fov_visibility"):
+			local_entity._set_fov_visibility(false)
+		elif "visible" in local_entity:
+			local_entity.visible = false
+	if FOV != null and FOV.has_method("refresh_local_fov"):
+		FOV.refresh_local_fov()
+	if Lighting != null and Lighting.has_method("invalidate_local_lighting"):
+		Lighting.invalidate_local_lighting()
 	Lobby.show_lobby()
 
 @rpc("any_peer", "call_local", "reliable")
@@ -477,6 +491,22 @@ func rpc_send_chat(message: String) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()
 	utils.handle_rpc_send_chat(sender_id, message)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_broadcast_deadchat(sender_peer_id: int, message: String) -> void:
+	utils.handle_rpc_broadcast_deadchat(sender_peer_id, message)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_ghost_z_change(new_z: int) -> void:
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var ghost = utils.find_player_by_peer(sender_id)
+	if ghost == null or not utils.is_ghost(ghost): return
+	var target_z: int = clampi(new_z, 1, 5)
+	ghost.rpc_sync_z_level(target_z)
+	ghost.rpc_sync_z_level.rpc(target_z)
+	LateJoin.update_player_state(sender_id, {"position": ghost.position, "z_level": target_z})
 
 @rpc("authority", "call_local", "reliable")
 func rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i, sender_z: int) -> void:

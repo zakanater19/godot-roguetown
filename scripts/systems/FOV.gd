@@ -47,6 +47,24 @@ func _process(delta: float) -> void:
 		_compute_fov()
 		_draw_node.queue_redraw()
 
+func refresh_local_fov() -> void:
+	_player_tile = Vector2i(-9999, -9999)
+	_player_z = -1
+	_view_z = -1
+	_time_since_update = 0.5
+	_visible_tiles.clear()
+	var player = World.get_local_player()
+	if player == null:
+		if _draw_node != null:
+			_draw_node.queue_redraw()
+		return
+	_player_tile = player.tile_pos
+	_player_z = player.z_level
+	_view_z = player.get("view_z_level") if "view_z_level" in player else _player_z
+	_compute_fov()
+	if _draw_node != null:
+		_draw_node.queue_redraw()
+
 func _is_turf_opaque(tile: Vector2i) -> bool:
 	if _solid_cache.has(tile):
 		return _solid_cache[tile]
@@ -171,12 +189,15 @@ func _has_los(from_tile: Vector2i, to_tile: Vector2i) -> bool:
 func _compute_fov() -> void:
 	_solid_cache.clear()
 	_visible_tiles.clear()
+	var local_player = World.get_local_player()
+	var local_is_ghost: bool = local_player != null and local_player.get("is_ghost") == true
 	var r2: int = FOV_RADIUS * FOV_RADIUS
 	for dy in range(-FOV_RADIUS, FOV_RADIUS + 1):
 		for dx in range(-FOV_RADIUS, FOV_RADIUS + 1):
 			if dx * dx + dy * dy > r2: continue
 			var tile := _player_tile + Vector2i(dx, dy)
-			if _has_los(_player_tile, tile): _visible_tiles[tile] = true
+			if local_is_ghost or _has_los(_player_tile, tile):
+				_visible_tiles[tile] = true
 	_visible_tiles[_player_tile] = true
 	
 	# Post-pass: When looking at a different Z level, hide tiles where the
@@ -184,7 +205,7 @@ func _compute_fov() -> void:
 	# the player's own Z level. This prevents seeing empty void/floor behind
 	# walls when looking up, without hiding the walls themselves or blocking
 	# vision into actual rooms on the viewed level.
-	if _view_z != _player_z:
+	if not local_is_ghost and _view_z != _player_z:
 		var view_tm = World.get_tilemap(_view_z)
 		var to_remove: Array = []
 		for tile in _visible_tiles:
@@ -204,6 +225,7 @@ func _compute_fov() -> void:
 
 func _apply_fov_hiding() -> void:
 	var local_player = World.get_local_player()
+	var local_is_ghost: bool = local_player != null and local_player.get("is_ghost") == true
 	
 	# OPTIMIZATION: Only search ONE group, and do Z-Level visibility testing here to avoid conflicts.
 	for ent in get_tree().get_nodes_in_group("z_entity"):
@@ -211,9 +233,12 @@ func _apply_fov_hiding() -> void:
 		
 		var ez = ent.get("z_level")
 		if ez == null: continue
+		var ent_is_ghost: bool = ent.get("is_ghost") == true
 		
 		var is_visible = false
-		if ez > _view_z:
+		if ent_is_ghost and not local_is_ghost:
+			is_visible = false
+		elif ez > _view_z:
 			# Entites on floors above the player's view are completely hidden
 			is_visible = false
 		else:

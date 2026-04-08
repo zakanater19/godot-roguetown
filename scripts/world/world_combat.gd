@@ -8,6 +8,8 @@ func _init(p_world: Node) -> void:
 
 func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_sword_attack: bool) -> Dictionary:
 	var result = {"damage": base_amount, "blocked": false, "block_type": ""}
+	if defender == null or world.utils.is_ghost(defender):
+		return {"damage": 0, "blocked": false, "block_type": ""}
 	if not defender.is_in_group("player"): return result
 	var d_has_sword = false
 	if "hands" in defender and defender.get("hands") != null:
@@ -47,10 +49,9 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 				var occupants = world.utils.get_entities_at_tile(check_tile, defender.get("z_level"))
 				var blocked = false
 				for ent in occupants:
-					if ent.is_in_group("player") and not ent.get("dead"):
-						if not (ent.get("is_lying_down") == true or ent.get("sleep_state") != 0):
-							blocked = true
-							break
+					if world.utils.is_tangible_player(ent):
+						blocked = true
+						break
 				if not blocked: valid_dodge_tiles.append(check_tile)
 			if valid_dodge_tiles.is_empty():
 				avoidance_chance = 0.0
@@ -93,6 +94,8 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 	var attacker = world.utils.find_player_by_peer(attacker_id)
 	var entities = world.utils.get_entities_at_tile(tile, z_level, attacker_id)
 	for entity in entities:
+		if world.utils.is_ghost(entity):
+			continue
 		var roll = calculate_combat_roll(attacker, entity, amount, is_sword_attack)
 		results[entity] = roll
 		if roll.damage > 0:
@@ -150,7 +153,7 @@ func server_try_resist(peer_id: int) -> void:
 	if world.resist_cooldown_map.has(peer_id) and now_ms < world.resist_cooldown_map[peer_id]: return
 	world.resist_cooldown_map[peer_id] = now_ms + CombatDefs.RESIST_COOLDOWN_MS
 	var grabbed: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
-	if grabbed == null or grabbed.get("dead") or grabbed.get("is_possessed") == false: return
+	if not world.utils.can_player_interact(grabbed): return
 	
 	var grabber_peer_id: int = -1
 	var grabber: Node2D = null
@@ -180,14 +183,14 @@ func server_try_resist(peer_id: int) -> void:
 func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 	if not world.multiplayer.is_server(): return
 	var attacker: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if attacker == null or not attacker.get("combat_mode") or attacker.get("dead"): return
+	if not world.utils.can_player_interact(attacker) or not attacker.get("combat_mode"): return
 	if attacker.get("body") != null and attacker.body.is_arm_broken(attacker.get("active_hand")): return
 	if (target_tile - attacker.get("tile_pos")).abs().x > 1 or (target_tile - attacker.get("tile_pos")).abs().y > 1: return
 	if not world.utils.server_check_action_cooldown(attacker, true): return
 	var occupants = world.utils.get_entities_at_tile(target_tile, attacker.get("z_level"))
 	var target_player: Node2D = null
 	for ent in occupants:
-		if ent.is_in_group("player") and not ent.get("dead"):
+		if world.utils.is_tangible_player(ent):
 			target_player = ent as Node2D
 			break
 	if target_player != null:
@@ -197,9 +200,9 @@ func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 		elif world.tiles.is_solid(shove_dest, target_player.get("z_level")): dest_blocked = true
 		else:
 			for ent in world.utils.get_entities_at_tile(shove_dest, target_player.get("z_level")):
-				if ent.is_in_group("player") and not ent.get("dead"):
-					if not (ent.get("is_lying_down") == true or ent.get("sleep_state") != 0):
-						dest_blocked = true; break
+				if world.utils.is_tangible_player(ent):
+					dest_blocked = true
+					break
 		if not dest_blocked:
 			target_player.set("tile_pos", shove_dest)
 			if target_player.get("is_possessed") == true:
@@ -210,7 +213,7 @@ func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_limb: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var attacker: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if attacker == null or attacker.get("dead"): return
+	if not world.utils.can_player_interact(attacker): return
 	if attacker.get("body") != null and attacker.body.is_arm_broken(attacker.get("active_hand")): return
 	if (tile - attacker.get("tile_pos")).abs().x > 1 or (tile - attacker.get("tile_pos")).abs().y > 1: return
 	if not world.utils.server_check_action_cooldown(attacker, true): return
@@ -221,6 +224,8 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 	var is_sword = _held_idata != null and _held_idata.can_parry
 	var entities = world.utils.get_entities_at_tile(tile, attacker.get("z_level"), sender_id)
 	for entity in entities:
+		if world.utils.is_ghost(entity):
+			continue
 		var roll = calculate_combat_roll(attacker, entity, amount, is_sword)
 		var t_name = ""
 		if entity.is_in_group("player"):
@@ -242,13 +247,14 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 func handle_rpc_request_grab(sender_id: int, target_id: String, limb: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var grabber: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if grabber == null or grabber.get("dead") or grabber.hands[grabber.get("active_hand")] != null: return
+	if not world.utils.can_player_interact(grabber) or grabber.hands[grabber.get("active_hand")] != null: return
 	if grabber.get("body") != null and grabber.body.is_arm_broken(grabber.get("active_hand")): return
 	var now_ms := Time.get_ticks_msec()
 	if world.grab_cooldown_map.has(sender_id) and now_ms < world.grab_cooldown_map[sender_id]: return
 	world.grab_cooldown_map[sender_id] = now_ms + CombatDefs.GRAB_COOLDOWN_MS
 	var target: Node = world.get_entity(target_id)
 	if target == null or not is_instance_valid(target) or target.get("z_level") != grabber.get("z_level"): return
+	if world.utils.is_ghost(target): return
 	if world.grab_map.has(sender_id): release_grab_for_peer(sender_id)
 	if not world.utils.is_within_interaction_range(grabber, target.global_position): return
 	var is_player = target.is_in_group("player")
@@ -264,7 +270,7 @@ func handle_rpc_request_release_grab(sender_id: int) -> void:
 func handle_rpc_request_resist(sender_id: int) -> void:
 	if not world.multiplayer.is_server(): return
 	var grabbed: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if grabbed == null or grabbed.get("dead") or grabbed.get("is_possessed") == false: return
+	if not world.utils.can_player_interact(grabbed): return
 	var is_grabbed = false
 	for gp_id in world.grab_map:
 		if world.grab_map[gp_id].get("is_player") and world.grab_map[gp_id].get("target_peer_id") == sender_id:

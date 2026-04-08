@@ -11,7 +11,7 @@ func _init(p_world: Node) -> void:
 func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: String) -> void:
 	if not world.multiplayer.is_server() or sender_id != looter_peer_id: return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 
 	var recipe: RecipeData = RecipeRegistry.get_recipe(recipe_id)
 	if recipe == null: return

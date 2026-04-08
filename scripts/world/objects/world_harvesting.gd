@@ -12,7 +12,7 @@ func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 	if rock == null: return
 
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(player.active_hand): return
 
 	if not world.utils.is_within_interaction_range(player, rock.global_position): return
@@ -49,7 +49,7 @@ func handle_rpc_request_hit_tree(sender_id: int, tree_path: NodePath) -> void:
 	if tree == null: return
 
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(player.active_hand): return
 
 	if not world.utils.is_within_interaction_range(player, tree.global_position): return
@@ -83,7 +83,7 @@ func handle_rpc_request_hit_breakable(sender_id: int, obj_path: NodePath) -> voi
 	if obj == null: return
 
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(player.active_hand): return
 	if not world.utils.is_within_interaction_range(player, obj.global_position): return
 	if not world.utils.server_check_action_cooldown(player): return

@@ -9,7 +9,7 @@ func _init(p_world: Node) -> void:
 func handle_rpc_request_split_coins(sender_id: int, from_hand: int, to_hand: int, split_amount: int) -> void:
 	if not world.multiplayer.is_server(): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if not Defs.is_valid_hand_index(from_hand) or not Defs.is_valid_hand_index(to_hand): return
 	if player.hands[to_hand] != null: return
 	var from_item = player.hands[from_hand]
@@ -43,7 +43,7 @@ func handle_rpc_confirm_split_coins(peer_id: int, from_hand: int, to_hand: int, 
 func handle_rpc_request_combine_hand_coins(sender_id: int, from_hand: int, to_hand: int) -> void:
 	if not world.multiplayer.is_server(): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if not Defs.is_valid_hand_index(from_hand) or not Defs.is_valid_hand_index(to_hand): return
 	var from_item = player.hands[from_hand]
 	var to_item = player.hands[to_hand]
@@ -72,7 +72,7 @@ func handle_rpc_confirm_combine_hand_coins(peer_id: int, from_hand: int, to_hand
 func handle_rpc_request_combine_ground_coin(sender_id: int, coin_id: String, hand_idx: int) -> void:
 	if not world.multiplayer.is_server(): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if not Defs.is_valid_hand_index(hand_idx): return
 	if not world.utils.server_check_action_cooldown(player): return
 	var hand_item = player.hands[hand_idx]

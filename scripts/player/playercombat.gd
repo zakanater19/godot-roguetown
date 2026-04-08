@@ -107,18 +107,13 @@ func die() -> void:
 		if diff.x * diff.x + diff.y * diff.y <= 144:
 			Sidebar.add_message("[color=purple]" + player.character_name + " Seizes up and goes limp.[/color]")
 
-func die_visuals() -> void:
-	var sprite: Sprite2D = player.get_node_or_null("Sprite2D")
-	if sprite != null:
-		sprite.rotation_degrees = 90.0
+	if player.multiplayer.is_server() and World.session != null:
+		World.session.handle_player_death(player)
 
-	for slot in["HelmetSprite", "FaceSprite", "ChestSprite", "TrousersSprite", "BootsSprite", "ClothingSprite", "WaistSprite", "GlovesSprite"]:
-		var s: Sprite2D = player.get_node_or_null(slot)
-		if s != null:
-			s.rotation_degrees = 90.0
-			if slot == "HelmetSprite" or slot == "FaceSprite":
-				# Offset (0, -10) rotated 90 degrees becomes (-(-10), 0) = (10, 0)
-				s.position = Vector2(10, 0)
+func die_visuals() -> void:
+	player._update_sprite()
+	player._update_clothing_sprites()
+	player._update_water_submerge()
 
 	if player._dead_container != null:
 		player._dead_container.visible = true

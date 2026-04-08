@@ -19,7 +19,7 @@ func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
 	return 1
 
 func apply_gravity_to_player(player: Node2D) -> void:
-	if player == null or player.dead: return
+	if player == null or player.dead or world.utils.is_ghost(player): return
 	var land_z = calculate_gravity_z(player.tile_pos, player.z_level)
 	if land_z >= player.z_level: return
 

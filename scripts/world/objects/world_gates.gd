@@ -12,7 +12,7 @@ func handle_rpc_request_hit_gate(sender_id: int, gate_path: NodePath) -> void:
 	if gate == null: return
 
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(player.active_hand): return
 	if not world.utils.is_within_interaction_range(player, gate.global_position): return
 

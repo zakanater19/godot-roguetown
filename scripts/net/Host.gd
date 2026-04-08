@@ -115,6 +115,7 @@ func _setup_spawner() -> void:
 		_spawner = MultiplayerSpawner.new()
 		_spawner.name = "PlayerSpawner"
 		_spawner.add_spawnable_scene("res://scenes/player.tscn")
+		_spawner.add_spawnable_scene("res://core/ghost.tscn")
 		_spawner.spawned.connect(_on_spawner_spawned)
 
 	if _spawner.get_parent() != main:
@@ -155,7 +156,13 @@ func _on_peer_disconnected(id: int) -> void:
 
 func _on_spawner_spawned(node: Node) -> void:
 	var auth: int = node.get_multiplayer_authority()
-	if not peers.has(auth):
+	var current = peers.get(auth, null)
+	if current == null or not is_instance_valid(current):
+		peers[auth] = node
+		return
+	var node_is_possessed: bool = node.get("is_possessed") != false
+	var current_is_possessed: bool = current.get("is_possessed") != false
+	if node_is_possessed and not current_is_possessed:
 		peers[auth] = node
 
 

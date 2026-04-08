@@ -11,6 +11,15 @@ func is_within_interaction_range(player: Node, target_pos: Vector2) -> bool:
 	var diff = (target_tile - player.tile_pos).abs()
 	return diff.x <= 1 and diff.y <= 1
 
+func is_ghost(entity: Node) -> bool:
+	return entity != null and is_instance_valid(entity) and entity.get("is_ghost") == true
+
+func can_player_interact(player: Node) -> bool:
+	return player != null and is_instance_valid(player) and player.get("dead") != true and player.get("is_possessed") != false and not is_ghost(player)
+
+func is_tangible_player(entity: Node) -> bool:
+	return entity != null and is_instance_valid(entity) and entity.is_in_group("player") and not is_ghost(entity) and entity.get("dead") != true and not (entity.get("is_lying_down") == true or entity.get("sleep_state") != 0)
+
 func server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool:
 	var current_time = Time.get_ticks_msec()
 	var peer_id = player.get_multiplayer_authority()
@@ -190,7 +199,20 @@ func handle_rpc_send_chat(sender_id: int, message: String) -> void:
 	if not world.multiplayer.is_server(): return
 	var sender := find_player_by_peer(sender_id)
 	if sender == null: return
-	world.rpc_broadcast_chat.rpc(sender_id, message, sender.get("tile_pos"), sender.get("z_level"))
+	if is_ghost(sender):
+		world.rpc_broadcast_deadchat.rpc(sender_id, message)
+	else:
+		world.rpc_broadcast_chat.rpc(sender_id, message, sender.get("tile_pos"), sender.get("z_level"))
+
+func handle_rpc_broadcast_deadchat(sender_peer_id: int, message: String) -> void:
+	var local_player := get_local_player()
+	if local_player == null or not is_ghost(local_player): return
+	var sender_node = find_player_by_peer(sender_peer_id)
+	if sender_node == null: return
+	if sender_node.has_method("show_remote_chat"):
+		sender_node.show_remote_chat(sender_node.get("character_name"), message)
+	else:
+		Sidebar.add_message("[color=#9fd7ff][b]" + sender_node.get("character_name") + "[/b] deadchat: " + message + "[/color]")
 
 func handle_rpc_broadcast_chat(sender_peer_id: int, message: String, sender_tile: Vector2i, sender_z: int) -> void:
 	var local_player := get_local_player()

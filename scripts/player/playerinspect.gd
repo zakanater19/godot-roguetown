@@ -19,8 +19,7 @@ func is_disguised() -> bool:
 	return false
 
 func get_description() -> String:
-	var peer_id: int = player.get_multiplayer_authority()
-	var is_me: bool  = (player.multiplayer.get_unique_id() == peer_id)
+	var is_me: bool = player.has_method("_is_local_authority") and player._is_local_authority()
 	var desc: String = player.character_name
 	if not is_me and is_disguised():
 		desc = "You cannot see their face"
@@ -31,8 +30,7 @@ func get_description() -> String:
 	return desc
 
 func get_detailed_description() -> String:
-	var peer_id: int = player.get_multiplayer_authority()
-	var is_me: bool  = (player.multiplayer.get_unique_id() == peer_id)
+	var is_me: bool = player.has_method("_is_local_authority") and player._is_local_authority()
 	var title_col: String = get_inspect_color().to_html(false)
 	var name_str = player.character_name
 	if not is_me and is_disguised():
@@ -89,6 +87,7 @@ func _get_limb_status(damage_taken: int) -> String:
 
 func inspect_at(world_pos: Vector2) -> void:
 	var target_tile := Vector2i(int(world_pos.x / World.TILE_SIZE), int(world_pos.y / World.TILE_SIZE))
+	var viewer_is_ghost: bool = player.get("is_ghost") == true
 
 	if target_tile == player.tile_pos:
 		show_inspect_text(get_description(), get_detailed_description())
@@ -107,6 +106,8 @@ func inspect_at(world_pos: Vector2) -> void:
 	var best_npc:  Node  = null
 	var best_dist: float = INF
 	for obj in World.get_entities_at_tile(target_tile, player.z_level, 0, true):
+		if obj.get("is_ghost") == true and not viewer_is_ghost:
+			continue
 		var d: float = (world_pos - player.global_position).length()
 		if d < best_dist:
 			best_dist = d

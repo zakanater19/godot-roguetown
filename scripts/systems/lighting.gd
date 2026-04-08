@@ -274,9 +274,11 @@ func _rebuild_local_light_cache() -> void:
 		return
 
 	var local_player = World.get_local_player()
+	var local_is_ghost: bool = local_player != null and local_player.get("is_ghost") == true
 	var current_z = 3
 	var player_pos = Vector2(-9999, -9999)
 	var player_tile = Vector2i(-9999, -9999)
+	world_light_cache = {}
 
 	if local_player != null:
 		current_z = local_player.z_level
@@ -307,6 +309,18 @@ func _rebuild_local_light_cache() -> void:
 	var roof_data := roof_map_image.get_data()
 
 	if player_tile != Vector2i(-9999, -9999):
+		if local_is_ghost:
+			var ghost_view_radius_x = 16
+			var ghost_view_radius_y = 11
+			for dy in range(-ghost_view_radius_y, ghost_view_radius_y + 1):
+				for dx in range(-ghost_view_radius_x, ghost_view_radius_x + 1):
+					var tile = player_tile + Vector2i(dx, dy)
+					new_cache[tile] = 1.0
+					world_light_cache[tile] = 1.0
+			_draw_node.light_cache = new_cache
+			_draw_node.queue_redraw()
+			return
+
 		var ambient = 0.0
 
 		var view_radius_x = 16

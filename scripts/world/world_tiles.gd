@@ -58,6 +58,14 @@ func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
+	if world.utils.is_ghost(player):
+		var ghost_next_tile: Vector2i = player.tile_pos + dir
+		if ghost_next_tile.x < 0 or ghost_next_tile.x >= world.GRID_WIDTH or ghost_next_tile.y < 0 or ghost_next_tile.y >= world.GRID_HEIGHT:
+			world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
+			return
+		player.tile_pos = ghost_next_tile
+		world.rpc_confirm_move.rpc(sender_id, ghost_next_tile, false)
+		return
 	for _gp_id in world.grab_map:
 		var _gentry = world.grab_map[_gp_id]
 		if _gentry.get("is_player", false) and _gentry.get("target_peer_id", -1) == sender_id:
@@ -129,13 +137,12 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 	var occupants = world.utils.get_entities_at_tile(next_tile, next_z)
 	var blocking_player: Node = null
 	for ent in occupants:
-		if ent.is_in_group("player") and not ent.dead:
+		if world.utils.is_tangible_player(ent):
 			if world.grab_map.has(sender_id):
 				var gentry = world.grab_map[sender_id]
 				if gentry.get("is_player", false) and gentry.get("target") == ent: continue
-			if not (ent.get("is_lying_down") == true or ent.get("sleep_state") != 0):
-				blocking_player = ent
-				break
+			blocking_player = ent
+			break
 	if blocking_player != null:
 		if not player.combat_mode and not blocking_player.combat_mode:
 			var old_z = player.z_level
@@ -159,10 +166,9 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 					var dest_occupants = world.utils.get_entities_at_tile(push_dest, next_z)
 					var dest_blocked = false
 					for ent in dest_occupants:
-						if ent.is_in_group("player") and not ent.dead:
-							if not (ent.get("is_lying_down") == true or ent.get("sleep_state") != 0):
-								dest_blocked = true
-								break
+						if world.utils.is_tangible_player(ent):
+							dest_blocked = true
+							break
 					if not dest_blocked:
 						var old_z = player.z_level
 						blocking_player.tile_pos = push_dest
@@ -206,7 +212,7 @@ func _get_held_tool_type(item: Node) -> String:
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if not world.multiplayer.is_server(): return
 	var attacker: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if attacker == null or attacker.dead: return
+	if not world.utils.can_player_interact(attacker): return
 	var tm = world.get_tilemap(attacker.z_level)
 	if tm == null or tm.get_cell_source_id(pos) != 1: return
 	var atlas_coords: Vector2i = tm.get_cell_atlas_coords(pos)

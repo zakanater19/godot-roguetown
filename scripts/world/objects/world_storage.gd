@@ -12,7 +12,7 @@ func _init(p_world: Node) -> void:
 func handle_rpc_request_satchel_insert(sender_id: int, satchel_id: String, hand_idx: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	var satchel: Node = world.get_entity(satchel_id)
 	if satchel == null or satchel.get("z_level") != player.z_level: return
 	if not world.utils.is_within_interaction_range(player, satchel.global_position): return
@@ -56,7 +56,7 @@ func handle_rpc_request_satchel_extract(sender_id: int, satchel_id: String, slot
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	if slot_index < 0 or slot_index >= Defs.SATCHEL_SLOT_COUNT: return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.hands[hand_idx] != null: return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
 	var satchel: Node = world.get_entity(satchel_id)
@@ -102,7 +102,7 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_i
 func handle_rpc_request_table_place(sender_id: int, table_id: String, hand_idx: int, place_pos: Vector2) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
 	var table = world.get_entity(table_id)
 	if table == null: return

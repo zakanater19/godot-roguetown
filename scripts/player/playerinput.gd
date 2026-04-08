@@ -148,7 +148,7 @@ func handle_input(event: InputEvent) -> void:
 				return
 			var grab_target: Node = null
 			for p in player.get_tree().get_nodes_in_group("player"):
-				if p == player or p.z_level != player.z_level: continue
+				if p == player or p.z_level != player.z_level or p.get("is_ghost") == true: continue
 				if p.global_position.distance_to(mouse_world) < float(World.TILE_SIZE) * 0.7:
 					grab_target = p; break
 			if grab_target == null:
@@ -167,7 +167,7 @@ func handle_input(event: InputEvent) -> void:
 
 		if not Input.is_key_pressed(KEY_SHIFT):
 			for p in player.get_tree().get_nodes_in_group("player"):
-				if p == player or p.z_level != player.z_level: continue
+				if p == player or p.z_level != player.z_level or p.get("is_ghost") == true: continue
 				if p.global_position.distance_to(mouse_world) < float(World.TILE_SIZE) * 0.6:
 					player._drag_candidate = p
 					player._drag_origin    = event.position

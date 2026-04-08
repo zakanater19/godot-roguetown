@@ -3,7 +3,7 @@ extends Node
 
 ## Keep this for executable/binary level compatibility only. Runtime content,
 ## scenes, scripts, and maps are synced via the server bundle hash below.
-const APP_VERSION: String = "1775649370"
+const APP_VERSION: String = "1775661626"
 
 ## Directories that still support lightweight resource diffs as a fallback when
 ## talking to older servers. Full bundle sync does not depend on this list.

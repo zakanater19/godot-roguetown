@@ -128,7 +128,7 @@ func _process(delta: float) -> void:
 		ai_timer = 0.25
 		_find_target()
 
-	if current_target != null and is_instance_valid(current_target) and not current_target.dead and current_target.z_level == z_level:
+	if current_target != null and is_instance_valid(current_target) and not current_target.dead and current_target.z_level == z_level and current_target.get("is_ghost") != true:
 		var diff:  Vector2i = current_target.tile_pos - tile_pos
 		var cheby: int      = max(abs(diff.x), abs(diff.y))
 
@@ -157,7 +157,7 @@ func _find_target() -> void:
 	current_target = null
 
 	for p in players:
-		if p.dead or p.z_level != z_level: continue
+		if p.dead or p.z_level != z_level or p.get("is_ghost") == true: continue
 		var d = (p.tile_pos - tile_pos).length_squared()
 		if d < min_dist:
 			min_dist = d
@@ -217,7 +217,7 @@ func _try_move(dir: Vector2i) -> void:
 	# Don't walk onto any player (unless they are dead)
 	var players = get_tree().get_nodes_in_group("player")
 	for p in players:
-		if next == p.tile_pos and not p.dead and p.z_level == z_level:
+		if next == p.tile_pos and not p.dead and p.z_level == z_level and p.get("is_ghost") != true:
 			return
 
 	# Execute move

@@ -170,8 +170,9 @@ func _process(delta: float) -> void:
 func _on_ready_pressed() -> void:
 	if not game_started:
 		var p_name = _name_input.text.strip_edges()
+		var local_peer_id: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else -1
 		
-		var validation_error = _get_validation_error(p_name)
+		var validation_error = _get_validation_error(p_name, local_peer_id)
 		if validation_error != "":
 			_show_error(validation_error)
 			return
@@ -194,8 +195,9 @@ func _on_ready_pressed() -> void:
 
 func _on_confirm_latejoin_pressed() -> void:
 	var p_name = _lj_name_input.text.strip_edges()
+	var local_peer_id: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else -1
 	
-	var validation_error = _get_validation_error(p_name)
+	var validation_error = _get_validation_error(p_name, local_peer_id)
 	if validation_error != "":
 		_show_error(validation_error)
 		return
@@ -238,7 +240,7 @@ func _send_latejoin_request(p_name: String, p_class: String) -> void:
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")
 
-func _get_validation_error(p_name: String) -> String:
+func _get_validation_error(p_name: String, except_peer_id: int = -1) -> String:
 	if p_name.length() > 30:
 		return "Name must be 30 characters or less."
 	if p_name.length() == 0:
@@ -247,18 +249,24 @@ func _get_validation_error(p_name: String) -> String:
 	regex.compile("^[a-zA-Z]+$")
 	if not regex.search(p_name):
 		return "Name must contain only letters."
-	if is_name_taken(p_name):
+	if is_name_taken(p_name, except_peer_id):
 		return "That name is already in use by an active or disconnected player."
 	return ""
 
-func is_name_taken(p_name: String) -> bool:
+func is_name_taken(p_name: String, _except_peer_id: int = -1) -> bool:
+	var wanted_name: String = p_name.to_lower()
 	for peer_id in Host.peers:
 		var p = Host.peers[peer_id]
-		if is_instance_valid(p) and p.character_name == p_name:
+		if is_instance_valid(p) and str(p.get("character_name")).to_lower() == wanted_name:
+			return true
+	for p in get_tree().get_nodes_in_group("player"):
+		if p == null or not is_instance_valid(p):
+			continue
+		if str(p.get("character_name")).to_lower() == wanted_name:
 			return true
 	for peer_id in LateJoin._disconnected_players:
 		var data = LateJoin._disconnected_players[peer_id]
-		if data.state.character_name == p_name:
+		if str(data.state.get("character_name", "")).to_lower() == wanted_name:
 			return true
 	return false
 
@@ -278,14 +286,13 @@ func _on_force_pressed() -> void:
 func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
 	if not multiplayer.is_server(): return
 	if game_started: return
-	
-	if _get_validation_error(p_name) != "":
-		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
-		return
-	
 	var peer_id = multiplayer.get_remote_sender_id()
 	if peer_id == 0:
 		peer_id = multiplayer.get_unique_id()
+	
+	if _get_validation_error(p_name, peer_id) != "":
+		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
+		return
 	
 	ready_players[peer_id] = {"ready": is_ready, "name": p_name, "class": p_class}
 	sync_ready_state.rpc(peer_id, is_ready, p_name, p_class)
@@ -343,8 +350,10 @@ func _start_game() -> void:
 func request_latejoin(p_name: String, p_class: String) -> void:
 	if not multiplayer.is_server(): return
 	if not game_started: return
+	var peer_id = multiplayer.get_remote_sender_id()
+	if peer_id == 0: peer_id = multiplayer.get_unique_id()
 	
-	if _get_validation_error(p_name) != "":
+	if _get_validation_error(p_name, peer_id) != "":
 		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
 		return
 		
@@ -365,9 +374,6 @@ func request_latejoin(p_name: String, p_class: String) -> void:
 		if king_exists:
 			rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "The King role is already taken.")
 			return
-	
-	var peer_id = multiplayer.get_remote_sender_id()
-	if peer_id == 0: peer_id = multiplayer.get_unique_id()
 	
 	if not Host.peers.has(peer_id):
 		# Latejoin gets true flag

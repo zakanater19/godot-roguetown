@@ -12,7 +12,7 @@ func _init(p_world: Node) -> void:
 func handle_rpc_request_interact_hand_item(sender_id: int, hand_idx: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
 	var item = player.hands[hand_idx]
 	if item == null or not is_instance_valid(item) or not item.has_method("interact_in_hand"): return
@@ -31,7 +31,7 @@ func handle_rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
 func handle_rpc_request_equip(sender_id: int, item_id: String, slot_name: String, hand_index: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
 	var item = world.get_entity(item_id)
 	if item == null or player.hands[hand_index] != item: return
@@ -46,7 +46,7 @@ func handle_rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, 
 func handle_rpc_request_unequip(sender_id: int, slot_name: String, hand_index: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
 	var new_entity_id = world._make_entity_id("unequip")
 	world.rpc_confirm_unequip.rpc(sender_id, slot_name, new_entity_id, hand_index)
@@ -63,7 +63,7 @@ func handle_rpc_request_furnace_action(sender_id: int, furnace_id: String, actio
 	var furnace = world.get_entity(furnace_id)
 	if furnace == null: return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_idx): return
 	if not world.utils.is_within_interaction_range(player, furnace.global_position): return
 
@@ -87,7 +87,7 @@ func handle_rpc_confirm_furnace_action(peer_id: int, furnace_id: String, action:
 func handle_rpc_request_pickup(sender_id: int, item_id: String, hand_index: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
 	var item = world.get_entity(item_id)
 	if item == null: return
@@ -109,7 +109,7 @@ func handle_rpc_confirm_pickup(peer_id: int, item_id: String, hand_index: int) -
 func handle_rpc_request_drop(sender_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	var item = world.get_entity(item_id)
 	if item == null or player.hands[hand_index] != item: return
 	if not Defs.is_within_tile_reach(player.tile_pos, tile): return
@@ -141,7 +141,7 @@ func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2
 func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, dir: Vector2, throw_range: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if player == null or player.dead: return
+	if not world.utils.can_player_interact(player): return
 	var item = world.get_entity(item_id)
 	if item == null or player.hands[hand_index] != item: return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
@@ -186,6 +186,8 @@ func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, la
 			var hit_results = world.combat.deal_damage_at_tile(land_tile_check, land_z, dmg, peer_id, false)
 			var throw_targets = world.utils.get_entities_at_tile(land_tile_check, land_z, peer_id)
 			for entity in throw_targets:
+				if world.utils.is_ghost(entity):
+					continue
 				var target_name: String = ""
 				if entity.is_in_group("player"): target_name = (entity as Node2D).character_name
 				elif entity.has_method("receive_damage"): target_name = entity.name.get_slice("@", 0)

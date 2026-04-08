@@ -51,7 +51,7 @@ func process_sneak_alpha(delta: float) -> void:
 	var proximity_revealed: bool = false
 	if reveal_radius > 0:
 		for p in player.get_tree().get_nodes_in_group("player"):
-			if p == player or p.get("dead") == true: continue
+			if p == player or p.get("dead") == true or p.get("is_ghost") == true: continue
 			if p.get("z_level") != player.z_level: continue
 			var dist: int = (p.get("tile_pos") - player.tile_pos).abs().x + (p.get("tile_pos") - player.tile_pos).abs().y
 			if dist <= reveal_radius:
