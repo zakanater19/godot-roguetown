@@ -21,15 +21,52 @@ const SLOT_NODE_NAMES: Dictionary = {
 const HAND_NODE_NAMES: Array[String] = ["LeftHand", "RightHand"]
 const LIMB_NODE_PREFIXES: Dictionary = {
 	"head": "Head",
+	"r_eye": "REye",
+	"l_eye": "LEye",
 	"chest": "Chest",
 	"r_arm": "RArm",
 	"l_arm": "LArm",
+	"r_hand": "RHand",
+	"l_hand": "LHand",
 	"r_leg": "RLeg",
 	"l_leg": "LLeg",
+	"r_foot": "RFoot",
+	"l_foot": "LFoot",
 }
+const LIMB_DRAW_ORDER: Array[String] = [
+	"head", "r_eye", "l_eye", "chest",
+	"r_arm", "l_arm", "r_hand", "l_hand",
+	"r_leg", "l_leg", "r_foot", "l_foot",
+]
+const LIMB_HIT_PRIORITY: Array[String] = [
+	"r_eye", "l_eye",
+	"r_hand", "l_hand",
+	"r_foot", "l_foot",
+	"head", "chest", "r_arm", "l_arm", "r_leg", "l_leg",
+]
+const LIMB_TEXTURE_PATHS: Dictionary = {
+	"head": "res://ui/m-head.png",
+	"r_eye": "res://ui/m-r_eye.png",
+	"l_eye": "res://ui/m-l_eye.png",
+	"chest": "res://ui/m-chest.png",
+	"r_arm": "res://ui/m-r_arm.png",
+	"l_arm": "res://ui/m-l_arm.png",
+	"r_hand": "res://ui/m-r_hand.png",
+	"l_hand": "res://ui/m-l_hand.png",
+	"r_leg": "res://ui/m-r_leg.png",
+	"l_leg": "res://ui/m-l_leg.png",
+	"r_foot": "res://ui/m-r_foot.png",
+	"l_foot": "res://ui/m-l_foot.png",
+}
+const FISHNET_SHADER_CODE := "shader_type canvas_item;\nvoid fragment() {\n\tvec4 tex = texture(TEXTURE, UV);\n\tfloat u = UV.x * 64.0;\n\tfloat v = UV.y * 64.0;\n\tif (tex.a > 0.1 && (mod(u + v, 5.0) < 1.0 || mod(u - v, 5.0) < 1.0)) {\n\t\tCOLOR = vec4(0.9, 0.1, 0.1, 0.9);\n\t} else {\n\t\tCOLOR = vec4(0.0, 0.0, 0.0, 0.0);\n\t}\n}\n"
+const LIMB_CLICK_ALPHA_THRESHOLD: float = 0.05
 const ALWAYS_VISIBLE_SLOTS: Array[String] = ["waist", "pocket_l", "pocket_r"]
 const HUD_ICON_TEXTURE: Texture2D = preload("res://assets/HUDicon.jpg")
 const RESIST_TEXTURE: Texture2D = preload("res://ui/resist.png")
+
+# Eyes/hands/feet are intentionally spawned into LimbPanel at runtime instead
+# of being baked into hud.tscn. That keeps the doll layer flexible for future
+# detachable/severed limb states while still showing up normally in-game.
 
 var _clothing_visible: bool = false
 @warning_ignore("unused_private_class_variable")
@@ -59,6 +96,10 @@ var _stamina_bar: ColorRect = null
 var targeted_limb: String = "chest"
 var _limb_highlights: Dictionary = {}
 var _limb_broken_overlays: Dictionary = {}
+var _limb_mask_images: Dictionary = {}
+var _limb_mask_textures: Dictionary = {}
+var _limb_click_surface: Control = null
+var _limb_fishnet_material: ShaderMaterial = null
 
 var _stance_icon: TextureRect = null
 var _sneak_icon: TextureRect = null
@@ -354,6 +395,10 @@ func _cache_scene_refs() -> void:
 	_health_bar = get_node_or_null("SafeArea/HandsPanel/BarContainer/HealthContainer/HealthBar") as ColorRect
 	_stamina_bar = get_node_or_null("SafeArea/HandsPanel/BarContainer/StaminaContainer/StaminaBar") as ColorRect
 
+	var limb_panel := get_node_or_null("SafeArea/LimbPanel") as Control
+	if limb_panel != null:
+		_ensure_limb_panel_widgets(limb_panel)
+
 	_limb_highlights.clear()
 	_limb_broken_overlays.clear()
 	for limb_name in LIMB_NODE_PREFIXES.keys():
@@ -404,19 +449,20 @@ func _connect_scene_signals() -> void:
 	if toggle_button != null:
 		toggle_button.gui_input.connect(_on_toggle_gui_input)
 
-	for limb_name in LIMB_NODE_PREFIXES.keys():
-		var limb_prefix: String = LIMB_NODE_PREFIXES[limb_name]
-		var click_ctrl := get_node_or_null("SafeArea/LimbPanel/" + limb_prefix + "Click") as Control
-		if click_ctrl != null:
-			click_ctrl.gui_input.connect(_on_limb_gui_input.bind(limb_name))
+	if _limb_click_surface != null:
+		_limb_click_surface.gui_input.connect(_on_limb_panel_gui_input)
 
 	var stance_panel := get_node_or_null("SafeArea/StancePanel") as Control
 	if stance_panel != null:
 		stance_panel.gui_input.connect(_on_stance_gui_input)
 
-	var sneak_panel := get_node_or_null("SafeArea/SneakPanel") as Control
-	if sneak_panel != null:
-		sneak_panel.gui_input.connect(_on_sneak_gui_input)
+	var sneak_click := get_node_or_null("SafeArea/SneakPanel/SneakClick") as Control
+	if sneak_click != null:
+		sneak_click.gui_input.connect(_on_sneak_gui_input)
+	else:
+		var sneak_panel := get_node_or_null("SafeArea/SneakPanel") as Control
+		if sneak_panel != null:
+			sneak_panel.gui_input.connect(_on_sneak_gui_input)
 
 	_signals_connected = true
 
@@ -445,6 +491,13 @@ func _on_limb_gui_input(event: InputEvent, limb_name: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		_select_limb(limb_name)
 
+func _on_limb_panel_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
+		return
+	var clicked_limb := _resolve_limb_at_local_position(event.position)
+	if clicked_limb != "":
+		_select_limb(clicked_limb)
+
 func update_stats(health: int, stamina: float) -> void:
 	if _health_bar:
 		var h = (clamp(health, 0, PlayerDefs.DEFAULT_HEALTH) / float(PlayerDefs.DEFAULT_HEALTH)) * UIDefs.HUD_BAR_SIZE.y
@@ -459,7 +512,7 @@ func update_stats(health: int, stamina: float) -> void:
 		for limb_name in _limb_broken_overlays.keys():
 			var broken_overlay: TextureRect = _limb_broken_overlays[limb_name]
 			if broken_overlay != null:
-				broken_overlay.visible = player.body.limb_broken.get(limb_name, false)
+				broken_overlay.visible = player.body.is_limb_disabled(limb_name)
 
 func update_combat_display(is_combat: bool) -> void:
 	if _intent_label == null:
@@ -808,3 +861,91 @@ func _on_toggle_gui_input(event: InputEvent) -> void:
 		return
 	_clothing_visible = not _clothing_visible
 	_apply_clothing_visibility()
+
+func _ensure_limb_panel_widgets(limb_panel: Control) -> void:
+	_ensure_limb_mask_resources()
+	_ensure_limb_fishnet_material()
+
+	for child in limb_panel.get_children():
+		if child is Control and child.name.ends_with("Click"):
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	for limb_name in LIMB_DRAW_ORDER:
+		var limb_prefix: String = LIMB_NODE_PREFIXES[limb_name]
+		var mask_texture: Texture2D = _limb_mask_textures.get(limb_name, null)
+		if mask_texture == null:
+			continue
+
+		var highlight := limb_panel.get_node_or_null(limb_prefix + "Highlight") as TextureRect
+		if highlight == null:
+			highlight = TextureRect.new()
+			highlight.name = limb_prefix + "Highlight"
+			_set_full_rect(highlight)
+			highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			highlight.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			highlight.stretch_mode = TextureRect.STRETCH_SCALE
+			limb_panel.add_child(highlight)
+		highlight.texture = mask_texture
+		highlight.modulate = Color(1, 0.2, 0.2, 1)
+		highlight.visible = false
+
+		var broken := limb_panel.get_node_or_null(limb_prefix + "Broken") as TextureRect
+		if broken == null:
+			broken = TextureRect.new()
+			broken.name = limb_prefix + "Broken"
+			_set_full_rect(broken)
+			broken.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			broken.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			broken.stretch_mode = TextureRect.STRETCH_SCALE
+			limb_panel.add_child(broken)
+		broken.texture = mask_texture
+		broken.material = _limb_fishnet_material
+		broken.visible = false
+
+	_limb_click_surface = limb_panel.get_node_or_null("ClickSurface") as Control
+	if _limb_click_surface == null:
+		_limb_click_surface = Control.new()
+		_limb_click_surface.name = "ClickSurface"
+		_set_full_rect(_limb_click_surface)
+		limb_panel.add_child(_limb_click_surface)
+	_limb_click_surface.mouse_filter = Control.MOUSE_FILTER_STOP
+	_limb_click_surface.focus_mode = Control.FOCUS_NONE
+	limb_panel.move_child(_limb_click_surface, limb_panel.get_child_count() - 1)
+
+func _ensure_limb_mask_resources() -> void:
+	if not _limb_mask_images.is_empty():
+		return
+
+	for limb_name in LIMB_TEXTURE_PATHS.keys():
+		var texture_path: String = LIMB_TEXTURE_PATHS[limb_name]
+		var image := Image.load_from_file(ProjectSettings.globalize_path(texture_path))
+		if image == null or image.is_empty():
+			continue
+		_limb_mask_images[limb_name] = image
+		_limb_mask_textures[limb_name] = ImageTexture.create_from_image(image)
+
+func _ensure_limb_fishnet_material() -> void:
+	if _limb_fishnet_material != null:
+		return
+	var shader := Shader.new()
+	shader.code = FISHNET_SHADER_CODE
+	_limb_fishnet_material = ShaderMaterial.new()
+	_limb_fishnet_material.shader = shader
+
+func _resolve_limb_at_local_position(local_pos: Vector2) -> String:
+	if _limb_click_surface == null or _limb_click_surface.size.x <= 0.0 or _limb_click_surface.size.y <= 0.0:
+		return ""
+
+	var x_ratio := clampf(local_pos.x / _limb_click_surface.size.x, 0.0, 0.9999)
+	var y_ratio := clampf(local_pos.y / _limb_click_surface.size.y, 0.0, 0.9999)
+
+	for limb_name in LIMB_HIT_PRIORITY:
+		var mask_image: Image = _limb_mask_images.get(limb_name, null)
+		if mask_image == null:
+			continue
+		var px := int(floor(x_ratio * mask_image.get_width()))
+		var py := int(floor(y_ratio * mask_image.get_height()))
+		if mask_image.get_pixel(px, py).a > LIMB_CLICK_ALPHA_THRESHOLD:
+			return limb_name
+
+	return ""

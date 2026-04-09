@@ -7,36 +7,45 @@ extends RefCounted
 # and triggers a gameplay effect.
 #
 # Limb names match the HUD targeted_limb strings:
-#   "head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"
+#   "head", "r_eye", "l_eye", "chest",
+#   "r_arm", "l_arm", "r_hand", "l_hand",
+#   "r_leg", "l_leg", "r_foot", "l_foot"
 #
-# hand index 0 = right hand = r_arm
-# hand index 1 = left  hand = l_arm
+# hand index 0 = right hand = r_hand / r_arm
+# hand index 1 = left  hand = l_hand / l_arm
 # ---------------------------------------------------------------------------
 
-const LIMB_MAX_HP: int = 70
-
-var player: Node2D
-
-var limb_hp: Dictionary = {
-	"head":  70,
+const LIMB_MAX_HP: Dictionary = {
+	"head": 70,
+	"r_eye": 10,
+	"l_eye": 10,
 	"chest": 70,
 	"r_arm": 70,
 	"l_arm": 70,
+	"r_hand": 70,
+	"l_hand": 70,
 	"r_leg": 70,
 	"l_leg": 70,
+	"r_foot": 70,
+	"l_foot": 70,
 }
 
-var limb_broken: Dictionary = {
-	"head":  false,
-	"chest": false,
-	"r_arm": false,
-	"l_arm": false,
-	"r_leg": false,
-	"l_leg": false,
+const LIMB_PARENT: Dictionary = {
+	"r_hand": "r_arm",
+	"l_hand": "l_arm",
+	"r_foot": "r_leg",
+	"l_foot": "l_leg",
 }
+
+var player: Node2D
+
+var limb_hp: Dictionary = LIMB_MAX_HP.duplicate(true)
+var limb_broken: Dictionary = {}
 
 func _init(p_player: Node2D) -> void:
 	player = p_player
+	for limb in LIMB_MAX_HP.keys():
+		limb_broken[limb] = false
 
 # ---------------------------------------------------------------------------
 # Called from player.receive_damage for every hit.
@@ -62,6 +71,7 @@ func receive_limb_damage(limb: String, amount: int) -> void:
 # ---------------------------------------------------------------------------
 
 func _on_limb_broken(limb: String) -> void:
+	var was_blind: bool = are_eyes_broken()
 	limb_broken[limb] = true
 
 	var is_local: bool = player._is_local_authority()
@@ -96,9 +106,22 @@ func _on_limb_broken(limb: String) -> void:
 					if player.backend:
 						player.backend.drop_item_from_hand(1)
 
-		"r_leg", "l_leg":
+		"r_hand":
 			if is_local:
-				Sidebar.add_message("[color=#ffaaaa]Your leg is broken! You can only crawl.[/color]")
+				Sidebar.add_message("[color=#ffaaaa]Your right hand is broken and can no longer be used![/color]")
+				if player.hands[0] != null and player.backend:
+					player.backend.drop_item_from_hand(0)
+
+		"l_hand":
+			if is_local:
+				Sidebar.add_message("[color=#ffaaaa]Your left hand is broken and can no longer be used![/color]")
+				if player.hands[1] != null and player.backend:
+					player.backend.drop_item_from_hand(1)
+
+		"r_leg", "l_leg", "r_foot", "l_foot":
+			if is_local:
+				var limb_label := "leg" if limb.ends_with("leg") else "foot"
+				Sidebar.add_message("[color=#ffaaaa]Your " + limb_label + " is broken! You can only crawl.[/color]")
 			# Force the player into the lying-down (crawl) state.
 			# receive_damage is already replicated to all peers so we set
 			# is_lying_down directly without an additional RPC.
@@ -107,6 +130,16 @@ func _on_limb_broken(limb: String) -> void:
 				player._update_sprite()
 				player._update_water_submerge()
 
+		"r_eye", "l_eye":
+			if is_local:
+				var which_eye := "right" if limb == "r_eye" else "left"
+				Sidebar.add_message("[color=#ffaaaa]Your " + which_eye + " eye is broken![/color]")
+
+	if limb in ["r_eye", "l_eye"]:
+		if is_local and not was_blind and are_eyes_broken():
+			Sidebar.add_message("[color=#ff0000]Both of your eyes are broken! You are blind![/color]")
+		_refresh_local_vision_penalty()
+
 # ---------------------------------------------------------------------------
 # Limb Healing (Triggered by resting when full HP)
 # ---------------------------------------------------------------------------
@@ -114,20 +147,25 @@ func _on_limb_broken(limb: String) -> void:
 func heal_limbs(amount: int) -> int:
 	var leftover = amount
 	while leftover > 0:
-		var lowest_limb = ""
-		var lowest_hp = LIMB_MAX_HP
+		var lowest_limb := ""
+		var lowest_ratio := 2.0
 		
-		# Find the most damaged limb
+		# Find the most damaged limb by percentage so low-max parts
+		# like eyes heal sensibly alongside full-size limbs.
 		for limb in limb_hp.keys():
-			if limb_hp[limb] < lowest_hp:
-				lowest_hp = limb_hp[limb]
+			var limb_max: int = int(LIMB_MAX_HP.get(limb, 70))
+			if limb_hp[limb] >= limb_max:
+				continue
+			var ratio := float(limb_hp[limb]) / float(limb_max)
+			if lowest_limb == "" or ratio < lowest_ratio:
+				lowest_ratio = ratio
 				lowest_limb = limb
 				
 		# If all limbs are at maximum, break out
 		if lowest_limb == "":
 			break
 			
-		var needed = LIMB_MAX_HP - limb_hp[lowest_limb]
+		var needed = int(LIMB_MAX_HP.get(lowest_limb, 70)) - limb_hp[lowest_limb]
 		var heal_this_time = min(leftover, needed)
 		var was_broken = limb_broken[lowest_limb]
 		
@@ -141,33 +179,67 @@ func heal_limbs(amount: int) -> int:
 	return leftover
 
 func _on_limb_healed(limb: String) -> void:
+	var was_blind: bool = are_eyes_broken()
 	limb_broken[limb] = false
 	var is_local: bool = player._is_local_authority()
 	
 	match limb:
 		"r_arm":
-			if is_local:
+			if is_local and not is_limb_disabled(limb):
 				Sidebar.add_message("[color=#aaffaa]Your right arm has healed and is usable again![/color]")
 		"l_arm":
-			if is_local:
+			if is_local and not is_limb_disabled(limb):
 				Sidebar.add_message("[color=#aaffaa]Your left arm has healed and is usable again![/color]")
-		"r_leg", "l_leg":
+		"r_hand":
+			if is_local and not is_limb_disabled(limb):
+				Sidebar.add_message("[color=#aaffaa]Your right hand has healed and is usable again![/color]")
+		"l_hand":
+			if is_local and not is_limb_disabled(limb):
+				Sidebar.add_message("[color=#aaffaa]Your left hand has healed and is usable again![/color]")
+		"r_leg", "l_leg", "r_foot", "l_foot":
 			if is_local and not are_legs_broken():
 				Sidebar.add_message("[color=#aaffaa]Your legs have healed enough to stand up![/color]")
 		"chest":
 			if is_local:
 				Sidebar.add_message("[color=#aaffaa]Your chest has healed![/color]")
+		"r_eye", "l_eye":
+			if is_local and was_blind and not are_eyes_broken():
+				Sidebar.add_message("[color=#aaffaa]You can see again![/color]")
+
+	if limb in ["r_eye", "l_eye"]:
+		_refresh_local_vision_penalty()
 
 # ---------------------------------------------------------------------------
 # Helpers queried by player.gd
 # ---------------------------------------------------------------------------
 
 func are_legs_broken() -> bool:
-	return limb_broken["r_leg"] or limb_broken["l_leg"]
+	return is_limb_disabled("r_leg") or is_limb_disabled("l_leg") or is_limb_disabled("r_foot") or is_limb_disabled("l_foot")
 
-# hand_idx: 0 = right hand (r_arm), 1 = left hand (l_arm)
+# hand_idx: 0 = right hand (r_hand / r_arm), 1 = left hand (l_hand / l_arm)
 func is_arm_broken(hand_idx: int) -> bool:
 	if hand_idx == 0:
-		return limb_broken["r_arm"]
-	return limb_broken["l_arm"]
+		return is_limb_disabled("r_hand")
+	return is_limb_disabled("l_hand")
+
+func is_limb_disabled(limb: String) -> bool:
+	if limb_broken.get(limb, false):
+		return true
+
+	var parent_limb: String = LIMB_PARENT.get(limb, "")
+	while parent_limb != "":
+		if limb_broken.get(parent_limb, false):
+			return true
+		parent_limb = LIMB_PARENT.get(parent_limb, "")
+
+	return false
+
+func are_eyes_broken() -> bool:
+	return limb_broken.get("r_eye", false) and limb_broken.get("l_eye", false)
+
+func _refresh_local_vision_penalty() -> void:
+	if not player._is_local_authority():
+		return
+	if Lighting != null and Lighting.has_method("refresh_local_lighting"):
+		Lighting.refresh_local_lighting()
 	

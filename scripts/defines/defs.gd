@@ -85,15 +85,25 @@ const INTENT_DISARM = "disarm"
 # ---------------------------------------------------------------------------
 # Limbs
 # ---------------------------------------------------------------------------
-const LIMBS: Array =["head", "chest", "r_arm", "l_arm", "r_leg", "l_leg"]
+const LIMBS: Array = [
+	"head", "r_eye", "l_eye", "chest",
+	"r_arm", "l_arm", "r_hand", "l_hand",
+	"r_leg", "l_leg", "r_foot", "l_foot"
+]
 
 const LIMB_DISPLAY: Dictionary = {
 	"head": "head",
+	"r_eye": "right eye",
+	"l_eye": "left eye",
 	"chest": "chest",
 	"r_arm": "right arm",
 	"l_arm": "left arm",
+	"r_hand": "right hand",
+	"l_hand": "left hand",
 	"r_leg": "right leg",
-	"l_leg": "left leg"
+	"l_leg": "left leg",
+	"r_foot": "right foot",
+	"l_foot": "left foot"
 }
 
 # ---------------------------------------------------------------------------

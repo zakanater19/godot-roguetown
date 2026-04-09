@@ -501,6 +501,7 @@ func _rebuild_local_light_cache() -> void:
 
 	var local_player = World.get_local_player()
 	var local_is_ghost: bool = local_player != null and local_player.get("is_ghost") == true
+	var local_is_blind: bool = false
 	var current_z = 3
 	var player_pos = Vector2(-9999, -9999)
 	var player_tile = Vector2i(-9999, -9999)
@@ -511,6 +512,8 @@ func _rebuild_local_light_cache() -> void:
 		player_pos = local_player.global_position
 		player_tile = local_player.tile_pos
 		_last_player_z = current_z
+		if local_player.body != null and local_player.body.has_method("are_eyes_broken"):
+			local_is_blind = local_player.body.are_eyes_broken()
 
 	# Gather active lamps and categorize them by Z-level
 	var valid_lamps: Array[Node] =[]
@@ -689,12 +692,15 @@ func _rebuild_local_light_cache() -> void:
 					if not _is_line_blocked(player_pos, global_px, current_z):
 						player_light = 0.30 * (1.0 - smoothstep(32.0, 192.0, pd))
 
-				var combined_light = max(sunlight, max(lamplight, player_light))
+				var display_sunlight: float = 0.0 if local_is_blind else sunlight
+				var display_lamplight: float = 0.0 if local_is_blind else lamplight
+				var combined_light = max(display_sunlight, max(display_lamplight, player_light))
 				var final_light = clamp(ambient + combined_light, 0.0, 1.0)
 
 				new_cache[tile] = final_light
 
-				# World light: same but without personal player vision light
+				# World light remains accurate even when the local player is blind
+				# so systems like sneaking still use real ambient brightness.
 				var world_combined = max(sunlight, lamplight)
 				new_cache[tile] = final_light
 				world_light_cache[tile] = clamp(ambient + world_combined, 0.0, 1.0)
