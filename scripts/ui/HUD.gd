@@ -641,6 +641,25 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 						icon.visible = true
 						amt_lbl.visible = false
 						continue
+			elif item_name == "Keyring":
+				var ring_data = equipped_data.get(slot_name, {})
+				var key_count := 0
+				if typeof(ring_data) == TYPE_DICTIONARY:
+					var ring_contents = ring_data.get("contents", [])
+					if ring_contents is Array:
+						key_count = ring_contents.size()
+
+				var ring_icon_path := Defs.get_keyring_icon_path(key_count)
+				if ring_icon_path != "":
+					var ring_tex := load(ring_icon_path) as Texture2D
+					if ring_tex != null:
+						icon.texture = ring_tex
+						icon.region_enabled = false
+						var ring_max_dim = max(ring_tex.get_width(), ring_tex.get_height())
+						icon.scale = Vector2(UIDefs.HUD_ITEM_ICON_TARGET_SIZE / ring_max_dim, UIDefs.HUD_ITEM_ICON_TARGET_SIZE / ring_max_dim) if ring_max_dim > 0 else Vector2.ONE
+						icon.visible = true
+						amt_lbl.visible = false
+						continue
 
 			var atlas: AtlasTexture = ItemRegistry.get_item_icon(item_name) as AtlasTexture
 			if atlas != null:
@@ -680,9 +699,17 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 		return
 
 	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] != null:
+		var active_held: Node = player.hands[player.active_hand]
+		if clicked_item.has_method("can_accept_key_item") and clicked_item.can_accept_key_item(active_held):
+			var clicked_item_id := World.get_entity_id(clicked_item)
+			if player.multiplayer.is_server():
+				World.rpc_request_keyring_insert(clicked_item_id, player.active_hand)
+			else:
+				World.rpc_request_keyring_insert.rpc_id(1, clicked_item_id, player.active_hand)
+			return
+
 		var itype = clicked_item.get("item_type")
 		if itype == "Satchel":
-			var active_held: Node = player.hands[player.active_hand]
 			if active_held.get("too_large_for_satchel") == true:
 				var label = active_held.get("item_type") if active_held.get("item_type") != null else active_held.name
 				Sidebar.add_message("[color=#ffaaaa]" + label + " is too large to fit in the satchel.[/color]")
@@ -705,6 +732,14 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 				return
 
 	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] == null:
+		if clicked_item.has_method("can_extract_key") and clicked_item.can_extract_key():
+			var clicked_item_id := World.get_entity_id(clicked_item)
+			if player.multiplayer.is_server():
+				World.rpc_request_keyring_extract(clicked_item_id, player.active_hand)
+			else:
+				World.rpc_request_keyring_extract.rpc_id(1, clicked_item_id, player.active_hand)
+			return
+
 		if clicked_item.get("is_coin_stack"):
 			if clicked_item.get("amount") > 1:
 				_show_coin_split_dialog(hand_idx, player.active_hand, clicked_item.get("amount"))

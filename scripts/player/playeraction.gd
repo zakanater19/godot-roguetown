@@ -150,6 +150,8 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	if not target_found and door_target != null:
 		if held_item == null:
 			target_found = true
+		elif door_target.has_method("can_accept_item_interaction") and door_target.can_accept_item_interaction(held_item):
+			target_found = true
 		elif MaterialRegistry.can_tool_affect(door_target, held_item):
 			target_found = true
 			is_exerting = true

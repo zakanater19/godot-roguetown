@@ -27,8 +27,12 @@ const LOOT_BLINK_INTERVAL: float = 0.25  # progress indicator blink rate (s)
 const HAND_COUNT:         int = 2
 const SATCHEL_SLOT_COUNT: int = 10
 const MAX_COIN_STACK:     int = 20
+const KEYRING_MAX_KEYS:   int = 5
 const COIN_STACK_ICON_THRESHOLDS: Array[int] = [20, 15, 10, 5, 4, 3, 2, 1]
 const COIN_METAL_SUFFIXES: Array[String] = ["copper", "silver", "gold"]
+const KEY_NAME_MAP: Dictionary = {
+	1: "merchant",
+}
 
 # ---------------------------------------------------------------------------
 # Node groups — used with add_to_group() and get_nodes_in_group()
@@ -174,6 +178,18 @@ static func get_coin_icon_path(amount: int, metal_type: int) -> String:
 			if ResourceLoader.exists(path):
 				return path
 	return ""
+
+static func get_keyring_icon_path(key_count: int) -> String:
+	var clamped_count := clampi(key_count, 0, KEYRING_MAX_KEYS)
+	var path := "res://objects/keys/keyring%d.png" % clamped_count
+	return path if ResourceLoader.exists(path) else ""
+
+static func get_key_name(key_id: int) -> String:
+	return str(KEY_NAME_MAP.get(key_id, ""))
+
+static func get_key_description(key_id: int) -> String:
+	var key_name := get_key_name(key_id)
+	return "a %s key" % key_name if key_name != "" else "a key"
 
 static func world_to_tile(world_pos: Vector2) -> Vector2i:
 	return Vector2i(int(world_pos.x / TILE_SIZE), int(world_pos.y / TILE_SIZE))

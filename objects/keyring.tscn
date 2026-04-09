@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=4]
+
+[ext_resource type="Script" path="res://objects/keyring.gd" id="1_keyringgd"]
+[ext_resource type="Texture2D" path="res://objects/keys/keyring0.png" id="2_keyringtex"]
+[ext_resource type="Resource" path="res://items/keyring.tres" id="3_itemdata"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(24, 24)
+
+[node name="Keyring" type="Area2D"]
+z_index = 5
+script = ExtResource("1_keyringgd")
+item_data = ExtResource("3_itemdata")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.75, 0.75)
+texture = ExtResource("2_keyringtex")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")

@@ -456,6 +456,10 @@ func rpc_confirm_toggle_door(_door_path: NodePath) -> void:
 	objects.handle_rpc_confirm_toggle_door(_door_path)
 
 @rpc("authority", "call_local", "reliable")
+func rpc_confirm_toggle_door_lock(door_path: NodePath) -> void:
+	objects.handle_rpc_confirm_toggle_door_lock(door_path)
+
+@rpc("authority", "call_local", "reliable")
 func rpc_confirm_hit_door(door_path: NodePath) -> void:
 	objects.handle_rpc_confirm_hit_door(door_path)
 
@@ -498,6 +502,28 @@ func rpc_request_interact_hand_item(hand_idx: int) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
 	objects.handle_rpc_confirm_interact_hand_item(peer_id, hand_idx)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_keyring_insert(keyring_id: String, hand_idx: int) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_keyring_insert(sender_id, keyring_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_keyring_insert(peer_id: int, keyring_id: String, hand_idx: int, key_state: Dictionary) -> void:
+	objects.handle_rpc_confirm_keyring_insert(peer_id, keyring_id, hand_idx, key_state)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_keyring_extract(keyring_id: String, hand_idx: int) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_keyring_extract(sender_id, keyring_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_keyring_extract(peer_id: int, keyring_id: String, hand_idx: int, slot_index: int, new_entity_id: String, scene_path: String, key_state: Dictionary) -> void:
+	objects.handle_rpc_confirm_keyring_extract(peer_id, keyring_id, hand_idx, slot_index, new_entity_id, scene_path, key_state)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_equip(item_id: String, slot_name: String, hand_index: int) -> void:

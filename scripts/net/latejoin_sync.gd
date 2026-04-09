@@ -106,6 +106,8 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	if "contents"      in obj: data["contents"]       = obj.get("contents").duplicate(true)
 	if "amount"        in obj: data["amount"]         = obj.get("amount")
 	if "metal_type"    in obj: data["metal_type"]     = obj.get("metal_type")
+	if "key_id"        in obj: data["key_id"]         = obj.get("key_id")
+	if "is_locked"     in obj: data["is_locked"]      = obj.get("is_locked")
 	if "tree_id"       in obj: data["tree_id"]        = obj.get("tree_id")
 	if "piece_kind"    in obj: data["piece_kind"]     = obj.get("piece_kind")
 	if "support_segment_name" in obj: data["support_segment_name"] = obj.get("support_segment_name")
@@ -175,6 +177,10 @@ func _retry_receive_object_states(object_states: Dictionary, retries: int) -> vo
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
 			if obj_data.has("amount")     and "amount"     in obj: obj.set("amount",     obj_data["amount"])
 			if obj_data.has("metal_type") and "metal_type" in obj: obj.set("metal_type", obj_data["metal_type"])
+			if obj_data.has("contents")   and "contents"   in obj: obj.set("contents",   obj_data["contents"].duplicate(true))
+			if obj_data.has("key_id")     and "key_id"     in obj: obj.set("key_id",     obj_data["key_id"])
+			if obj_data.has("is_locked")  and "is_locked"  in obj: obj.set("is_locked",  obj_data["is_locked"])
+			if obj.has_method("_update_sprite"): obj.call("_update_sprite")
 		else:
 			missing[obj_ref] = obj_data
 
@@ -297,6 +303,10 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			else: obj.set("hits", obj_data["hits"])
 		if obj_data.has("amount"):        obj.set("amount",        obj_data["amount"])
 		if obj_data.has("metal_type"):    obj.set("metal_type",    obj_data["metal_type"])
+		if obj_data.has("key_id") and "key_id" in obj:
+			obj.set("key_id", obj_data["key_id"])
+		if obj_data.has("is_locked") and "is_locked" in obj:
+			obj.set("is_locked", obj_data["is_locked"])
 		if obj_data.has("decor_configs") and "decor_configs" in obj:
 			obj.set("decor_configs", obj_data["decor_configs"].duplicate(true))
 			if obj.has_method("rebuild_decor"):
@@ -310,5 +320,8 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 		if obj_data.has("_ironore_count"): obj.set("_ironore_count", obj_data["_ironore_count"])
 		if obj_data.has("_fuel_type"):    obj.set("_fuel_type",    obj_data["_fuel_type"])
 		if obj_data.has("_smelting"):     obj.set("_smelting",     obj_data["_smelting"])
-		if obj_data.has("contents"):      obj.set("contents",      obj_data["contents"])
+		if obj_data.has("contents") and "contents" in obj:
+			obj.set("contents", obj_data["contents"].duplicate(true))
+			if obj.has_method("_update_sprite"):
+				obj.call("_update_sprite")
 		if obj.has_method("_set_sprite") and obj_data.has("is_on"): obj.call("_set_sprite", obj_data["is_on"])

@@ -11,6 +11,8 @@ func handle_rpc_request_hit_door(sender_id: int, door_path: NodePath) -> void:
 	match _structures.resolve_interaction(sender_id, door_path):
 		"toggle":
 			world.rpc_confirm_toggle_door.rpc(door_path)
+		"toggle_lock":
+			world.rpc_confirm_toggle_door_lock.rpc(door_path)
 		"hit":
 			world.rpc_confirm_hit_door.rpc(door_path)
 		"destroy":
@@ -20,6 +22,11 @@ func handle_rpc_request_hit_door(sender_id: int, door_path: NodePath) -> void:
 
 func handle_rpc_confirm_toggle_door(door_path: NodePath) -> void:
 	_structures.confirm_toggle(door_path)
+
+func handle_rpc_confirm_toggle_door_lock(door_path: NodePath) -> void:
+	var door = world.get_node_or_null(door_path)
+	if door != null and door.has_method("toggle_lock"):
+		door.toggle_lock()
 
 func handle_rpc_confirm_hit_door(door_path: NodePath) -> void:
 	_structures.confirm_hit(door_path)

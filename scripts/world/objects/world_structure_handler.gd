@@ -22,6 +22,16 @@ func resolve_interaction(sender_id: int, structure_path: NodePath) -> String:
 		return ""
 
 	var held_item = player.hands[player.active_hand]
+	if structure.has_method("resolve_player_structure_interaction"):
+		var interaction = structure.resolve_player_structure_interaction(player, held_item)
+		if interaction is Dictionary:
+			var message := str(interaction.get("message", ""))
+			if message != "":
+				world.rpc_send_direct_message.rpc_id(sender_id, message)
+			var action := str(interaction.get("action", ""))
+			if action != "":
+				return action
+
 	if held_item == null:
 		if structure.has_method("can_toggle") and structure.can_toggle():
 			return "toggle"

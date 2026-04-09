@@ -197,6 +197,7 @@ func capture_hands_state(player_node: Node2D) -> Array:
 			if "contents"   in hand_item: item_data["contents"]   = hand_item.get("contents").duplicate(true)
 			if "amount"     in hand_item: item_data["amount"]     = hand_item.get("amount")
 			if "metal_type" in hand_item: item_data["metal_type"] = hand_item.get("metal_type")
+			if "key_id"     in hand_item: item_data["key_id"]     = hand_item.get("key_id")
 			hands_state.append(item_data)
 		else:
 			hands_state.append(null)
@@ -300,7 +301,9 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 		if hand_data.has("contents") and "contents" in fallback: fallback.set("contents", hand_data["contents"].duplicate(true))
 		if hand_data.has("amount")   and "amount"   in fallback: fallback.set("amount",   hand_data["amount"])
 		if hand_data.has("metal_type") and "metal_type" in fallback: fallback.set("metal_type", hand_data["metal_type"])
+		if hand_data.has("key_id") and "key_id" in fallback: fallback.set("key_id", hand_data["key_id"])
 		main_node.add_child(fallback)
+		if fallback.has_method("_update_sprite"): fallback._update_sprite()
 		World.register_entity(fallback, entity_id)
 		return fallback
 	var scene = load(scene_path) as PackedScene
@@ -310,7 +313,9 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	if hand_data.has("contents") and "contents" in item: item.set("contents", hand_data["contents"].duplicate(true))
 	if hand_data.has("amount")   and "amount"   in item: item.set("amount",   hand_data["amount"])
 	if hand_data.has("metal_type") and "metal_type" in item: item.set("metal_type", hand_data["metal_type"])
+	if hand_data.has("key_id") and "key_id" in item: item.set("key_id", hand_data["key_id"])
 	main_node.add_child(item)
+	if item.has_method("_update_sprite"): item._update_sprite()
 	World.register_entity(item, entity_id)
 	return item
 

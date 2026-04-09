@@ -172,6 +172,8 @@ position = Vector2(31108, 11923)
 [node name="Door5" parent="." instance=ExtResource("4_ryguw")]
 z_index = 405
 position = Vector2(32226, 12320)
+key_id = 1
+starts_locked = true
 
 [node name="Coin" parent="." instance=ExtResource("31_seu75")]
 z_index = 402
@@ -269,6 +271,8 @@ position = Vector2(32739, 12127)
 [node name="Door6" parent="." instance=ExtResource("4_ryguw")]
 z_index = 405
 position = Vector2(32608, 12320)
+key_id = 1
+starts_locked = true
 
 [node name="WoodenTable" parent="." instance=ExtResource("17_yaehf")]
 z_index = 402

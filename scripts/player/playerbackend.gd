@@ -50,6 +50,10 @@ func apply_class_defaults() -> void:
 	for slot in class_data["equipment"]:
 		player.equipped[slot] = class_data["equipment"][slot]
 
+	var class_equipped_data: Dictionary = class_data.get("equipment_data", {})
+	for slot in class_equipped_data:
+		player.equipped_data[slot] = class_equipped_data[slot].duplicate(true)
+
 	player._update_clothing_sprites()
 	if player._is_local_authority() and player._hud != null:
 		player._hud.update_clothing_display(player.equipped, player.equipped_data)

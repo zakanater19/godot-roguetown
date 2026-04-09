@@ -39,6 +39,8 @@ func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:
 		data_to_save["amount"] = item.get("amount")
 	if "metal_type" in item:
 		data_to_save["metal_type"] = item.get("metal_type")
+	if "key_id" in item:
+		data_to_save["key_id"] = item.get("key_id")
 
 	if not data_to_save.is_empty():
 		player.equipped_data[slot_name] = data_to_save
@@ -94,10 +96,14 @@ func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) 
 			item.set("amount", data["amount"])
 		if "metal_type" in data and "metal_type" in item:
 			item.set("metal_type", data["metal_type"])
+		if "key_id" in data and "key_id" in item:
+			item.set("key_id", data["key_id"])
 
 	player.equipped_data[slot_name] = null
 
 	player.get_parent().add_child(item)
+	if item.has_method("_update_sprite"):
+		item._update_sprite()
 	World.register_entity(item, new_entity_id)
 
 	player.hands[hand_index] = item

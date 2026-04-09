@@ -33,7 +33,18 @@ const DATA: Dictionary = {
 			"clothing": "Undershirt",
 			"trousers": "LeatherTrousers",
 			"feet": "LeatherBoots",
-			"armor": "Merchantrobe"
+			"armor": "Merchantrobe",
+			"pocket_l": "Keyring"
+		},
+		"equipment_data": {
+			"pocket_l": {
+				"contents": [
+					{
+						"item_type": "BrownKey",
+						"key_id": 1
+					}
+				]
+			}
 		}
 	},
 	"bandit": {

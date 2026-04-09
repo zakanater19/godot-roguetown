@@ -46,6 +46,7 @@ func handle_rpc_confirm_break_breakable(obj_path: NodePath) -> void:            
 # ── Doors ─────────────────────────────────────────────────────────────────────
 func handle_rpc_request_hit_door(sender_id: int, door_path: NodePath) -> void:      doors.handle_rpc_request_hit_door(sender_id, door_path)
 func handle_rpc_confirm_toggle_door(door_path: NodePath) -> void:                    doors.handle_rpc_confirm_toggle_door(door_path)
+func handle_rpc_confirm_toggle_door_lock(door_path: NodePath) -> void:               doors.handle_rpc_confirm_toggle_door_lock(door_path)
 func handle_rpc_confirm_hit_door(door_path: NodePath) -> void:                       doors.handle_rpc_confirm_hit_door(door_path)
 func handle_rpc_confirm_destroy_door(door_path: NodePath) -> void:                   doors.handle_rpc_confirm_destroy_door(door_path)
 func handle_rpc_confirm_remove_door(door_path: NodePath) -> void:                    doors.handle_rpc_confirm_remove_door(door_path)
@@ -60,6 +61,10 @@ func handle_rpc_confirm_remove_gate(gate_path: NodePath) -> void:               
 # ── Items / Equipment / Furnace / Pickup / Drop / Throw ───────────────────────
 func handle_rpc_request_interact_hand_item(sender_id: int, hand_idx: int) -> void:                                                        items.handle_rpc_request_interact_hand_item(sender_id, hand_idx)
 func handle_rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:                                                          items.handle_rpc_confirm_interact_hand_item(peer_id, hand_idx)
+func handle_rpc_request_keyring_insert(sender_id: int, keyring_id: String, hand_idx: int) -> void:                                        items.handle_rpc_request_keyring_insert(sender_id, keyring_id, hand_idx)
+func handle_rpc_confirm_keyring_insert(peer_id: int, keyring_id: String, hand_idx: int, key_state: Dictionary) -> void:                  items.handle_rpc_confirm_keyring_insert(peer_id, keyring_id, hand_idx, key_state)
+func handle_rpc_request_keyring_extract(sender_id: int, keyring_id: String, hand_idx: int) -> void:                                       items.handle_rpc_request_keyring_extract(sender_id, keyring_id, hand_idx)
+func handle_rpc_confirm_keyring_extract(peer_id: int, keyring_id: String, hand_idx: int, slot_index: int, new_entity_id: String, scene_path: String, key_state: Dictionary) -> void: items.handle_rpc_confirm_keyring_extract(peer_id, keyring_id, hand_idx, slot_index, new_entity_id, scene_path, key_state)
 func handle_rpc_request_equip(sender_id: int, item_id: String, slot_name: String, hand_index: int) -> void:                               items.handle_rpc_request_equip(sender_id, item_id, slot_name, hand_index)
 func handle_rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, hand_index: int) -> void:                                 items.handle_rpc_confirm_equip(peer_id, item_id, slot_name, hand_index)
 func handle_rpc_request_unequip(sender_id: int, slot_name: String, hand_index: int) -> void:                                              items.handle_rpc_request_unequip(sender_id, slot_name, hand_index)

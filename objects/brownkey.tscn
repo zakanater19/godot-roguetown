@@ -1,0 +1,21 @@
+[gd_scene load_steps=5 format=4]
+
+[ext_resource type="Script" path="res://objects/key.gd" id="1_keygd"]
+[ext_resource type="Texture2D" path="res://objects/keys/brownkey.png" id="2_keytex"]
+[ext_resource type="Resource" path="res://items/brownkey.tres" id="3_itemdata"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(20, 20)
+
+[node name="BrownKey" type="Area2D"]
+z_index = 5
+script = ExtResource("1_keygd")
+item_data = ExtResource("3_itemdata")
+key_id = 1
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.75, 0.75)
+texture = ExtResource("2_keytex")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")

@@ -17,6 +17,10 @@ const STATE_TEXTURES: Dictionary = {
 
 var state: DoorState = DoorState.CLOSED
 @export var material_data: MaterialData = DEFAULT_MATERIAL
+@export var key_id: int = 0
+@export var starts_locked: bool = false
+
+var is_locked: bool = false
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -41,6 +45,7 @@ func get_solid_tile_offsets() -> Array[Vector2i]:
 
 func _ready() -> void:
 	super._ready()
+	is_locked = starts_locked if key_id > 0 else false
 	_update_sprite()
 
 func _process(delta: float) -> void:
@@ -112,16 +117,51 @@ func close_door() -> void:
 		_update_sprite()
 
 func toggle_door() -> void:
-	if state == DoorState.CLOSED:
+	if state == DoorState.CLOSED and not is_locked:
 		open_door()
 	elif state == DoorState.OPEN:
 		close_door()
 
 func can_toggle() -> bool:
-	return state != DoorState.DESTROYED
+	if state == DoorState.DESTROYED:
+		return false
+	if state == DoorState.OPEN:
+		return true
+	return state == DoorState.CLOSED and not is_locked
+
+func can_accept_item_interaction(held_item: Node) -> bool:
+	return held_item != null and held_item.has_method("has_key_id")
+
+func resolve_player_structure_interaction(_player: Node, held_item: Node) -> Dictionary:
+	if state == DoorState.DESTROYED:
+		return {}
+
+	if held_item != null and held_item.has_method("has_key_id"):
+		if key_id <= 0:
+			return {"message": "[color=#aaaaaa]This door has no lock.[/color]"}
+		if held_item.has_key_id(key_id):
+			var will_lock := not is_locked
+			return {
+				"action": "toggle_lock",
+				"message": "[color=#aaffaa]You %s the door.[/color]" % ("lock" if will_lock else "unlock")
+			}
+		return {"message": "[color=#ffaaaa]That key does not fit this lock.[/color]"}
+
+	if held_item == null:
+		if state == DoorState.CLOSED and is_locked:
+			return {"message": "[color=#ffaaaa]The door is locked.[/color]"}
+		if can_toggle():
+			return {"action": "toggle"}
+
+	return {}
 
 func toggle_structure() -> void:
 	toggle_door()
+
+func toggle_lock() -> void:
+	if state == DoorState.DESTROYED or key_id <= 0:
+		return
+	is_locked = not is_locked
 
 func apply_structure_damage(amount: float) -> String:
 	hits += amount
@@ -142,7 +182,7 @@ func remove_structure() -> void:
 
 func get_description() -> String:
 	match state:
-		DoorState.CLOSED: return "a closed wooden door"
+		DoorState.CLOSED: return "a locked wooden door" if is_locked else "a closed wooden door"
 		DoorState.OPEN: return "an open wooden door"
 		DoorState.OPENING: return "a wooden door, opening"
 		DoorState.CLOSING: return "a wooden door, closing"

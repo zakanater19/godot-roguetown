@@ -167,7 +167,11 @@ func refresh_loot_panel() -> void:
 			var amt = obj.get("amount") if "amount" in obj else 1
 			
 			var icon_tex = null
-			if item_registry != null and item_registry.has_method("get_item_icon"):
+			if item_name == "Keyring":
+				var obj_sprite: Sprite2D = obj.get_node_or_null("Sprite2D")
+				if obj_sprite != null:
+					icon_tex = obj_sprite.texture
+			elif item_registry != null and item_registry.has_method("get_item_icon"):
 				icon_tex = item_registry.get_item_icon(item_name)
 				
 			if icon_tex != null:
@@ -192,6 +196,7 @@ func refresh_loot_panel() -> void:
 		var item = loot_target.equipped.get(es, null)
 		if item != null and item is String and item != "":
 			var icon_tex = null
+			var label_text: String = str(item)
 
 			# ── Special Case: COINS (Dynamic Stack Sprites) ──────────
 			if item.ends_with("Coin"):
@@ -206,7 +211,19 @@ func refresh_loot_panel() -> void:
 				var coin_icon_path := Defs.get_coin_icon_path(amt, mtype)
 				if coin_icon_path != "":
 					icon_tex = load(coin_icon_path)
+				label_text = str(amt) if amt > 1 else item
 			# ── General Case: Standard Items ──────────────────────────
+			elif item == "Keyring":
+				var edata = loot_target.equipped_data.get(es, {})
+				var key_count := 0
+				if typeof(edata) == TYPE_DICTIONARY:
+					var ring_contents = edata.get("contents", [])
+					if ring_contents is Array:
+						key_count = ring_contents.size()
+				var ring_icon_path := Defs.get_keyring_icon_path(key_count)
+				if ring_icon_path != "":
+					icon_tex = load(ring_icon_path)
+				label_text = "Keyring (%d)" % key_count
 			elif item_registry != null and item_registry.has_method("get_item_icon"):
 				icon_tex = item_registry.get_item_icon(item)
 
@@ -214,7 +231,7 @@ func refresh_loot_panel() -> void:
 				btn.text = ""
 				btn.icon = icon_tex
 			else:
-				btn.text = item
+				btn.text = label_text
 				btn.icon = null
 
 			btn.disabled = false

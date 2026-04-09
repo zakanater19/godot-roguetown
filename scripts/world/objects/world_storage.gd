@@ -34,6 +34,7 @@ func handle_rpc_request_satchel_insert(sender_id: int, satchel_id: String, hand_
 	if "amount" in item: item_state["amount"] = item.get("amount")
 	if "metal_type" in item: item_state["metal_type"] = item.get("metal_type")
 	if "contents" in item: item_state["contents"] = item.get("contents").duplicate(true)
+	if "key_id" in item: item_state["key_id"] = item.get("key_id")
 
 	world.rpc_confirm_satchel_insert.rpc(sender_id, satchel_id, world.get_entity_id(item), hand_idx, slot_index, scene_path, itype, item_state)
 
@@ -85,8 +86,10 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_i
 	if item_state.has("amount") and "amount" in item: item.set("amount", item_state["amount"])
 	if item_state.has("metal_type") and "metal_type" in item: item.set("metal_type", item_state["metal_type"])
 	if item_state.has("contents") and "contents" in item: item.set("contents", item_state["contents"].duplicate(true))
+	if item_state.has("key_id") and "key_id" in item: item.set("key_id", item_state["key_id"])
 
 	satchel.get_parent().add_child(item)
+	if item.has_method("_update_sprite"): item._update_sprite()
 	world.register_entity(item, new_entity_id)
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = true

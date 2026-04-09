@@ -26,6 +26,111 @@ func handle_rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
 		if item != null and is_instance_valid(item) and item.has_method("interact_in_hand"):
 			item.interact_in_hand(player)
 
+func handle_rpc_request_keyring_insert(sender_id: int, keyring_id: String, hand_idx: int) -> void:
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
+	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
+	if not world.utils.can_player_interact(player): return
+	if player.body != null and player.body.is_arm_broken(hand_idx): return
+	var key_item: Node = player.hands[hand_idx]
+	if key_item == null or not is_instance_valid(key_item) or not key_item.has_method("has_key_id"): return
+
+	var keyring: Node = world.get_entity(keyring_id)
+	if keyring == null or not is_instance_valid(keyring) or keyring == key_item or not keyring.has_method("validate_key_insert"): return
+
+	var keyring_in_hand := false
+	for hand_item in player.hands:
+		if hand_item == keyring:
+			keyring_in_hand = true
+			break
+
+	if not keyring_in_hand:
+		if keyring.get("z_level") != null and keyring.get("z_level") != player.z_level: return
+		if not world.utils.is_within_interaction_range(player, keyring.global_position): return
+
+	var validation = keyring.validate_key_insert(key_item)
+	if not (validation is Dictionary): return
+	if not validation.get("ok", false):
+		var failure_message := str(validation.get("message", ""))
+		if failure_message != "":
+			world.rpc_send_direct_message.rpc_id(sender_id, failure_message)
+		return
+
+	var key_state: Dictionary = validation.get("key_state", {}).duplicate(true)
+	world.rpc_confirm_keyring_insert.rpc(sender_id, keyring_id, hand_idx, key_state)
+	world.rpc_send_direct_message.rpc_id(sender_id, "[color=#aaffaa]You add the key to the keyring.[/color]")
+
+func handle_rpc_confirm_keyring_insert(peer_id: int, keyring_id: String, hand_idx: int, key_state: Dictionary) -> void:
+	var keyring: Node = world.get_entity(keyring_id)
+	if keyring == null or not is_instance_valid(keyring) or not keyring.has_method("insert_key_state"): return
+	keyring.insert_key_state(key_state)
+
+	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
+	if player == null: return
+	var held_item: Node = player.hands[hand_idx]
+	if held_item != null and is_instance_valid(held_item):
+		world.unregister_entity(held_item)
+		held_item.queue_free()
+	player.hands[hand_idx] = null
+	if player._is_local_authority():
+		player._update_hands_ui()
+
+func handle_rpc_request_keyring_extract(sender_id: int, keyring_id: String, hand_idx: int) -> void:
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx): return
+	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
+	if not world.utils.can_player_interact(player): return
+	if player.body != null and player.body.is_arm_broken(hand_idx): return
+	if player.hands[hand_idx] != null: return
+
+	var keyring: Node = world.get_entity(keyring_id)
+	if keyring == null or not is_instance_valid(keyring) or not keyring.has_method("get_random_key_roll") or not keyring.has_method("can_extract_key"): return
+
+	var keyring_in_hand := false
+	for hand_item in player.hands:
+		if hand_item == keyring:
+			keyring_in_hand = true
+			break
+	if not keyring_in_hand: return
+	if not keyring.can_extract_key(): return
+
+	var roll = keyring.get_random_key_roll()
+	if not (roll is Dictionary) or not roll.has("index") or not roll.has("key_state"): return
+
+	var key_state: Dictionary = roll.get("key_state", {}).duplicate(true)
+	var item_type := str(key_state.get("item_type", "BrownKey"))
+	var scene_path := ItemRegistry.get_scene_path(item_type)
+	if scene_path == "": return
+
+	var new_entity_id: String = world._make_entity_id("keyring_extract")
+	world.rpc_confirm_keyring_extract.rpc(sender_id, keyring_id, hand_idx, int(roll["index"]), new_entity_id, scene_path, key_state)
+	world.rpc_send_direct_message.rpc_id(sender_id, "[color=#aaffaa]You pull a key from the keyring.[/color]")
+
+func handle_rpc_confirm_keyring_extract(peer_id: int, keyring_id: String, hand_idx: int, slot_index: int, new_entity_id: String, scene_path: String, key_state: Dictionary) -> void:
+	var keyring: Node = world.get_entity(keyring_id)
+	if keyring == null or not is_instance_valid(keyring) or not keyring.has_method("remove_key_at"): return
+	keyring.remove_key_at(slot_index)
+
+	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
+	if player == null or player.hands[hand_idx] != null: return
+
+	var scene := load(scene_path) as PackedScene
+	if scene == null: return
+
+	var item: Node2D = scene.instantiate()
+	item.position = player.pixel_pos
+	item.set("z_level", player.z_level)
+	if key_state.has("key_id") and "key_id" in item:
+		item.set("key_id", int(key_state["key_id"]))
+
+	player.get_parent().add_child(item)
+	world.register_entity(item, new_entity_id)
+	for child in item.get_children():
+		if child is CollisionShape2D:
+			child.disabled = true
+
+	player.hands[hand_idx] = item
+	if player._is_local_authority():
+		player._update_hands_ui()
+
 # ── Equip / Unequip ───────────────────────────────────────────────────────────
 
 func handle_rpc_request_equip(sender_id: int, item_id: String, slot_name: String, hand_index: int) -> void:

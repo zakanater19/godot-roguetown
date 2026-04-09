@@ -61,7 +61,7 @@ func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String,
 
 	if target._is_local_authority():
 		if target._hud != null:
-			target._hud.update_clothing_display(target.equipped)
+			target._hud.update_clothing_display(target.equipped, target.equipped_data)
 
 	var item: Node2D = scene.instantiate()
 	item.position    = world.utils.tile_to_pixel(drop_tile)
@@ -77,9 +77,13 @@ func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String,
 			item.set("amount", edata["amount"])
 		if "metal_type" in edata and "metal_type" in item:
 			item.set("metal_type", edata["metal_type"])
+		if "key_id" in edata and "key_id" in item:
+			item.set("key_id", edata["key_id"])
 		target.equipped_data[equip_slot] = null
 
 	target.get_parent().add_child(item)
+	if item.has_method("_update_sprite"):
+		item._update_sprite()
 	world.register_entity(item, new_entity_id)
 	world.objects.drop_item_at(item, drop_tile, spread)
 	for child in item.get_children():
