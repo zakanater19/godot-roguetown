@@ -79,6 +79,7 @@ func receive_damage(amount: int) -> void:
 	var spray := Node2D.new()
 	spray.set_script(player.BloodSpray)
 	spray.position = player.pixel_pos
+	spray.z_index = Defs.get_z_index(player.z_level, 50)
 	player.get_parent().add_child(spray)
 
 	player.health -= amount

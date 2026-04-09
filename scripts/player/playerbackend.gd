@@ -150,13 +150,18 @@ func get_hand_transform(item_name: String, facing_name: String, hand: String) ->
 	return res
 
 func get_clothing_transform(item_name: String, facing_name: String) -> Dictionary:
+	var default_layer := 1
+	var item_data: ItemData = ItemRegistry.get_by_type(item_name)
+	if item_data != null:
+		default_layer = PlayerVisualDefs.get_default_clothing_layer_for_slot(item_data.slot)
 	if clothing_offsets.has(item_name) and clothing_offsets[item_name].has(facing_name):
 		var entry = clothing_offsets[item_name][facing_name]
 		return {
 			"offset": Vector2(float(entry.get("offset",[0, 0])[0]), float(entry.get("offset",[0, 0])[1])),
-			"scale":  float(entry.get("scale", 1.0))
+			"scale":  float(entry.get("scale", 1.0)),
+			"layer":  int(entry.get("layer", default_layer))
 		}
-	return {"offset": Vector2.ZERO, "scale": 1.0}
+	return {"offset": Vector2.ZERO, "scale": 1.0, "layer": default_layer}
 
 # ===========================================================================
 # Equipment delegation

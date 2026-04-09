@@ -8,20 +8,14 @@ func _init(p_player: Node2D) -> void:
 	player = p_player
 
 func setup_sprites() -> void:
-	var layers = [
-		["TrousersSprite", 1], ["ClothingSprite", 2], ["ChestSprite", 3],
-		["GlovesSprite", 4],   ["BackpackSprite", 4], ["WaistSprite", 5],
-		["BootsSprite", 5],    ["HelmetSprite", 6],   ["FaceSprite", 6],
-		["CloakSprite", 7],
-	]
-	for spec in layers:
+	for spec in PlayerVisualDefs.get_clothing_sprite_specs():
 		var s := Sprite2D.new()
-		s.name           = spec[0]
+		s.name           = String(spec.get("node_name", ""))
 		s.scale          = Vector2(2.0, 2.0)
 		s.region_enabled = true
 		s.region_rect    = Rect2(0, 0, 32, 32)
 		s.visible        = false
-		s.z_index        = spec[1]
+		s.z_index        = int(spec.get("default_layer", 1))
 		player.add_child(s)
 
 func update_clothing_sprites() -> void:
@@ -34,44 +28,37 @@ func update_clothing_sprites() -> void:
 		elif player.sleep_state == player.SleepState.ASLEEP: target_rot = 90.0
 	elif player.is_lying_down: target_rot = 90.0
 
-	var slots := [
-		["HelmetSprite",  "head"],    ["CloakSprite",   "cloak"],
-		["ChestSprite",   "armor"],   ["BackpackSprite", "backpack"],
-		["WaistSprite",   "waist"],   ["BootsSprite",    "feet"],
-		["ClothingSprite","clothing"],["TrousersSprite", "trousers"],
-		["GlovesSprite",  "gloves"],
-	]
-
-	for slot in slots:
-		var sprite: Sprite2D = player.get_node_or_null(slot[0])
+	for spec in PlayerVisualDefs.get_clothing_sprite_specs():
+		var sprite: Sprite2D = player.get_node_or_null(String(spec.get("node_name", "")))
 		if sprite == null: continue
-		var item_name = player.equipped[slot[1]]
+		var slot_name := String(spec.get("slot", ""))
+		var item_name = player.equipped[slot_name]
 
-		if slot[1] == "waist":
+		if slot_name == "waist":
 			if item_name != null and item_name != "":
 				var _idata = ItemRegistry.get_by_type(item_name)
 				var _mob_tex = _idata.mob_texture_path if (_idata and _idata.mob_texture_path != "") else ""
 				sprite.texture = load(_mob_tex) if _mob_tex != "" else load("res://objects/objects.png")
 				var w_transform = player.backend.get_hand_transform(item_name, facing_name, "waist")
 				
-				var w_pos = w_transform.offset
+				var w_pos: Vector2 = w_transform["offset"]
 				if target_rot == 90.0:
 					w_pos = Vector2(-w_pos.y, w_pos.x) # Rotate offset 90 deg
 					
 				sprite.position = w_pos
 				if player.facing == 1: sprite.z_index = -1
 				else: sprite.z_index = 4
-				var flip_h = w_transform.flip_h
+				var flip_h: bool = bool(w_transform["flip_h"])
 				if player.facing == 3: flip_h = not flip_h
 				var region = Rect2(0, 0, 64, 64)
-				var final_scale = w_transform.scale
+				var final_scale: float = float(w_transform["scale"])
 				if _idata != null and _idata.sprite_col >= 0:
 					region = Rect2(_idata.sprite_col * 64, 0, 64, 64)
 					final_scale *= _idata.waist_sprite_scale
 				elif _mob_tex != "" and _mob_tex != "res://objects/objects.png":
 					if sprite.texture != null: region = Rect2(0, 0, sprite.texture.get_width(), sprite.texture.get_height())
 				sprite.region_rect = region
-				sprite.rotation_degrees = w_transform.rotation + target_rot
+				sprite.rotation_degrees = float(w_transform["rotation"]) + target_rot
 				sprite.scale = Vector2(-final_scale if flip_h else final_scale, final_scale)
 				sprite.visible = true
 			else: sprite.visible = false
@@ -82,14 +69,15 @@ func update_clothing_sprites() -> void:
 			sprite.texture = load(_idata2.mob_texture_path)
 			var cd = player.backend.get_clothing_transform(item_name, facing_name)
 			
-			var pos = cd.offset
+			var pos: Vector2 = cd["offset"]
 			if target_rot == 90.0:
 				pos = Vector2(-pos.y, pos.x) # Rotate offset 90 deg
 				
 			sprite.position           = pos
-			sprite.scale              = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
+			sprite.scale              = Vector2(2.0 * float(cd["scale"]), 2.0 * float(cd["scale"]))
 			sprite.region_rect        = Rect2(player.facing * 32, 0, 32, 32)
 			sprite.rotation_degrees   = target_rot
+			sprite.z_index            = int(cd["layer"])
 			sprite.visible            = true
 		else: sprite.visible = false
 
@@ -107,14 +95,15 @@ func update_clothing_sprites() -> void:
 				face_sprite.texture = load(hood_data.mob_texture_path)
 				var cd = player.backend.get_clothing_transform("Hood", facing_name)
 				
-				var pos = cd.offset
+				var pos: Vector2 = cd["offset"]
 				if target_rot == 90.0:
 					pos = Vector2(-pos.y, pos.x) # Rotate offset 90 deg
 					
 				face_sprite.position           = pos
-				face_sprite.scale              = Vector2(2.0 * cd.scale, 2.0 * cd.scale)
+				face_sprite.scale              = Vector2(2.0 * float(cd["scale"]), 2.0 * float(cd["scale"]))
 				face_sprite.region_rect        = Rect2(player.facing * 32, 0, 32, 32)
 				face_sprite.rotation_degrees   = target_rot
+				face_sprite.z_index            = int(cd["layer"])
 				face_sprite.visible            = true
 			else:
 				face_sprite.visible = false
@@ -147,13 +136,13 @@ func update_hand_positions() -> void:
 		var item_name = obj.get("item_type")
 		if item_name == null: item_name = obj.name.get_slice("@", 0)
 		var hand_transform = player.backend.get_hand_transform(item_name, facing_name, hand_key)
-		var flip_h: bool = hand_transform.flip_h
+		var flip_h: bool = bool(hand_transform["flip_h"])
 		if player.facing == 3: flip_h = not flip_h
-		obj.global_position = player.pixel_pos + hand_transform.offset
+		obj.global_position = player.pixel_pos + hand_transform["offset"]
 		obj.z_index = player.z_index - 1 if player.facing == 1 else player.z_index + 6
 		var sprite: Sprite2D = obj.get_node_or_null("Sprite2D")
 		if sprite != null:
-			sprite.rotation_degrees = hand_transform.rotation
+			sprite.rotation_degrees = float(hand_transform["rotation"])
 			var mag_x := absf(sprite.scale.x)
 			var mag_y := absf(sprite.scale.y)
 			sprite.scale = Vector2(-mag_x if flip_h else mag_x, mag_y)

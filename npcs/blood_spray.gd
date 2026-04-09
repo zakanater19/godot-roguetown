@@ -8,8 +8,9 @@ func _ready() -> void:
 	# Blood particles are purely visual and handled by Tweens
 	set_process(false)
 	
-	# Ensure the spray is drawn above players and floor tiles
-	z_index = 50
+	# Preserve any caller-provided z-layer; only default when spawned without one.
+	if z_index == 0:
+		z_index = 50
 	
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
