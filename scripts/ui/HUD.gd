@@ -44,19 +44,19 @@ const LIMB_HIT_PRIORITY: Array[String] = [
 	"r_foot", "l_foot",
 	"head", "chest", "r_arm", "l_arm", "r_leg", "l_leg",
 ]
-const LIMB_TEXTURE_PATHS: Dictionary = {
-	"head": "res://ui/m-head.png",
-	"r_eye": "res://ui/m-r_eye.png",
-	"l_eye": "res://ui/m-l_eye.png",
-	"chest": "res://ui/m-chest.png",
-	"r_arm": "res://ui/m-r_arm.png",
-	"l_arm": "res://ui/m-l_arm.png",
-	"r_hand": "res://ui/m-r_hand.png",
-	"l_hand": "res://ui/m-l_hand.png",
-	"r_leg": "res://ui/m-r_leg.png",
-	"l_leg": "res://ui/m-l_leg.png",
-	"r_foot": "res://ui/m-r_foot.png",
-	"l_foot": "res://ui/m-l_foot.png",
+const LIMB_TEXTURES: Dictionary = {
+	"head": preload("res://ui/m-head.png"),
+	"r_eye": preload("res://ui/m-r_eye.png"),
+	"l_eye": preload("res://ui/m-l_eye.png"),
+	"chest": preload("res://ui/m-chest.png"),
+	"r_arm": preload("res://ui/m-r_arm.png"),
+	"l_arm": preload("res://ui/m-l_arm.png"),
+	"r_hand": preload("res://ui/m-r_hand.png"),
+	"l_hand": preload("res://ui/m-l_hand.png"),
+	"r_leg": preload("res://ui/m-r_leg.png"),
+	"l_leg": preload("res://ui/m-l_leg.png"),
+	"r_foot": preload("res://ui/m-r_foot.png"),
+	"l_foot": preload("res://ui/m-l_foot.png"),
 }
 const FISHNET_SHADER_CODE := "shader_type canvas_item;\nvoid fragment() {\n\tvec4 tex = texture(TEXTURE, UV);\n\tfloat u = UV.x * 64.0;\n\tfloat v = UV.y * 64.0;\n\tif (tex.a > 0.1 && (mod(u + v, 5.0) < 1.0 || mod(u - v, 5.0) < 1.0)) {\n\t\tCOLOR = vec4(0.9, 0.1, 0.1, 0.9);\n\t} else {\n\t\tCOLOR = vec4(0.0, 0.0, 0.0, 0.0);\n\t}\n}\n"
 const LIMB_CLICK_ALPHA_THRESHOLD: float = 0.05
@@ -916,13 +916,15 @@ func _ensure_limb_mask_resources() -> void:
 	if not _limb_mask_images.is_empty():
 		return
 
-	for limb_name in LIMB_TEXTURE_PATHS.keys():
-		var texture_path: String = LIMB_TEXTURE_PATHS[limb_name]
-		var image := Image.load_from_file(ProjectSettings.globalize_path(texture_path))
+	for limb_name in LIMB_TEXTURES.keys():
+		var texture := LIMB_TEXTURES[limb_name] as Texture2D
+		if texture == null:
+			continue
+		var image := texture.get_image()
 		if image == null or image.is_empty():
 			continue
 		_limb_mask_images[limb_name] = image
-		_limb_mask_textures[limb_name] = ImageTexture.create_from_image(image)
+		_limb_mask_textures[limb_name] = texture
 
 func _ensure_limb_fishnet_material() -> void:
 	if _limb_fishnet_material != null:
