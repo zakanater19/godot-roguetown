@@ -63,9 +63,11 @@ func get_detailed_description() -> String:
 	if is_me and player.body != null:
 		for limb_key in Defs.LIMBS:
 			var limb_label: String = Defs.LIMB_DISPLAY.get(limb_key, limb_key)
-			var damage_taken: int  = CombatDefs.LIMB_HP_MAX - player.body.limb_hp[limb_key]
-			if damage_taken > 0:
-				desc += "\n[color=gray]" + limb_label + ":[/color] " + _get_limb_status(damage_taken)
+			var limb_max: int = int(player.body.LIMB_MAX_HP.get(limb_key, CombatDefs.LIMB_HP_MAX))
+			var limb_hp: int = int(player.body.limb_hp.get(limb_key, limb_max))
+			var damage_ratio: float = 1.0 - (float(limb_hp) / float(maxi(limb_max, 1)))
+			if damage_ratio > 0.0:
+				desc += "\n[color=gray]" + limb_label + ":[/color] " + _get_limb_status(damage_ratio)
 	return desc
 
 func get_inspect_color() -> Color:
@@ -74,11 +76,15 @@ func get_inspect_color() -> Color:
 func get_inspect_font_size() -> int:
 	return 11 if player.dead else 14
 
-func _get_limb_status(damage_taken: int) -> String:
-	if damage_taken >= CombatDefs.LIMB_BROKEN:   return "[color=#cc0000]broken[/color]"
-	elif damage_taken >= CombatDefs.LIMB_MANGLED: return "[color=#ff2200]mangled[/color]"
-	elif damage_taken >= CombatDefs.LIMB_SEVERE:  return "[color=#ff6600]severely injured[/color]"
-	elif damage_taken >= CombatDefs.LIMB_INJURED: return "[color=#ffaa00]injured[/color]"
+func _get_limb_status(damage_ratio: float) -> String:
+	var broken_ratio: float = float(CombatDefs.LIMB_BROKEN) / float(CombatDefs.LIMB_HP_MAX)
+	var mangled_ratio: float = float(CombatDefs.LIMB_MANGLED) / float(CombatDefs.LIMB_HP_MAX)
+	var severe_ratio: float = float(CombatDefs.LIMB_SEVERE) / float(CombatDefs.LIMB_HP_MAX)
+	var injured_ratio: float = float(CombatDefs.LIMB_INJURED) / float(CombatDefs.LIMB_HP_MAX)
+	if damage_ratio >= broken_ratio: return "[color=#cc0000]broken[/color]"
+	elif damage_ratio >= mangled_ratio: return "[color=#ff2200]mangled[/color]"
+	elif damage_ratio >= severe_ratio: return "[color=#ff6600]severely injured[/color]"
+	elif damage_ratio >= injured_ratio: return "[color=#ffaa00]injured[/color]"
 	else: return "[color=#ffdd44]a little injured[/color]"
 
 # ===========================================================================

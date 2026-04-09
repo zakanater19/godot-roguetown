@@ -37,6 +37,8 @@ const TILE_FLAG_VALID: int = 1
 const TILE_FLAG_WINDOW: int = 2
 const TILE_FLAG_OPAQUE: int = 4
 const LIGHT_REPORT_EPSILON: float = 0.02
+const LEAF_LIGHT_BLOCK_PER_PASS: float = 0.10
+const LEAF_LIGHT_GROUP: StringName = &"leaf_canopy"
 
 # Node to handle drawing the CPU-calculated light blocks
 class LightDrawNode extends Node2D:
@@ -389,6 +391,34 @@ func _report_local_world_light(local_player: Node, current_z: int) -> void:
 	else:
 		World.rpc_report_client_light_sample.rpc_id(1, tile, current_z, light_value)
 
+func _build_leaf_light_pass_map(min_tile: Vector2i, max_tile: Vector2i, current_z: int) -> Dictionary:
+	var leaf_pass_map: Dictionary = {}
+	for leaf in get_tree().get_nodes_in_group(LEAF_LIGHT_GROUP):
+		if leaf == null or not is_instance_valid(leaf):
+			continue
+		var leaf_z: int = int(leaf.get("z_level"))
+		if leaf_z <= current_z:
+			continue
+		var tile := Vector2i(
+			int(floor(leaf.global_position.x / float(Defs.TILE_SIZE))),
+			int(floor(leaf.global_position.y / float(Defs.TILE_SIZE)))
+		)
+		if tile.x < min_tile.x or tile.x > max_tile.x or tile.y < min_tile.y or tile.y > max_tile.y:
+			continue
+		var pass_mask: int = int(leaf_pass_map.get(tile, 0))
+		pass_mask |= (1 << leaf_z)
+		leaf_pass_map[tile] = pass_mask
+	return leaf_pass_map
+
+func _get_leaf_light_multiplier(leaf_pass_mask: int) -> float:
+	if leaf_pass_mask == 0:
+		return 1.0
+	var passes: int = 0
+	for z in range(1, 6):
+		if (leaf_pass_mask & (1 << z)) != 0:
+			passes += 1
+	return clampf(1.0 - LEAF_LIGHT_BLOCK_PER_PASS * float(passes), 0.0, 1.0)
+
 static func _compute_sunlight_dist_snapshot(payload: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
 	var queue: Array[Vector2i] = []
@@ -552,11 +582,14 @@ func _rebuild_local_light_cache() -> void:
 
 		var ambient = 0.0
 
-		var view_radius_x = 16
-		var view_radius_y = 11
+		var view_radius_x: int = 16
+		var view_radius_y: int = 11
+		var min_view_tile: Vector2i = player_tile - Vector2i(view_radius_x, view_radius_y)
+		var max_view_tile: Vector2i = player_tile + Vector2i(view_radius_x, view_radius_y)
 
 		var is_underground = current_z < 3
 		var valid_holes_for_lamps: Array =[]
+		var leaf_light_pass_map: Dictionary = _build_leaf_light_pass_map(min_view_tile, max_view_tile, current_z)
 		var sunlight_job_key := "%s:%s:%s:%s" % [player_tile, current_z, int(round(sun_weight * 1000.0)), _roof_map_revision]
 		var sunlight_dist: Dictionary = _sunlight_dist_cache
 
@@ -615,14 +648,15 @@ func _rebuild_local_light_cache() -> void:
 
 				var sunlight: float = 0.0
 				var global_px = Vector2(tile.x * 64 + 32, tile.y * 64 + 32)
+				var leaf_light_mult: float = _get_leaf_light_multiplier(int(leaf_light_pass_map.get(tile, 0)))
 
 				if is_underground:
 					var dist = sunlight_dist.get(tile, 9999.0)
-					sunlight = sun_weight * (1.0 - smoothstep(0.0, STAIR_BLEED_TILES, dist))
+					sunlight = sun_weight * (1.0 - smoothstep(0.0, STAIR_BLEED_TILES, dist)) * leaf_light_mult
 				else:
 					# Surface lighting
 					if not is_roofed:
-						sunlight = sun_weight
+						sunlight = sun_weight * leaf_light_mult
 					elif sun_weight < 0.001:
 						sunlight = 0.0
 					else:
@@ -665,7 +699,7 @@ func _rebuild_local_light_cache() -> void:
 						# Softly blend the shadow away based on how much light bleeds in
 						shadow = lerp(shadow, 0.0, bleed)
 						
-						sunlight = (1.0 - shadow) * sun_weight
+						sunlight = (1.0 - shadow) * sun_weight * leaf_light_mult
 
 				# Lamp light distance calculation (Same Z)
 				var lamplight = 0.0

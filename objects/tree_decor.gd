@@ -6,6 +6,7 @@ const TREE_TEXTURE: Texture2D = preload("res://assets/tree_sheet.png")
 const CELL_SIZE: int = 32
 const SHEET_COLUMNS: int = 5
 const WORLD_SCALE: float = 2.0
+const LEAF_LIGHT_GROUP: StringName = &"leaf_canopy"
 
 @export var z_level: int = 3
 @export var atlas_index: int = 0
@@ -23,6 +24,8 @@ func _ready() -> void:
 
 	if not is_in_group(Defs.GROUP_Z_ENTITY):
 		add_to_group(Defs.GROUP_Z_ENTITY)
+	if not is_in_group(LEAF_LIGHT_GROUP):
+		add_to_group(LEAF_LIGHT_GROUP)
 
 func _get_region_rect(cell_index: int) -> Rect2:
 	var x: int = (cell_index % SHEET_COLUMNS) * CELL_SIZE
