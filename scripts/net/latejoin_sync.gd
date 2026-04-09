@@ -87,7 +87,8 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 		"position":        obj.position,
 		"name":            obj.name,
 		"entity_id":       World.register_entity(obj),
-		"groups":          obj.get_groups()
+		"groups":          obj.get_groups(),
+		"child_index":     obj.get_index(),
 	}
 
 	if obj.get_script() != null:
@@ -219,7 +220,10 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 				World.unregister_solid(tile, old_z, obj)
 				World.register_solid(tile, new_z, obj)
 				obj.set("z_level", new_z)
-				obj.z_index = (new_z - 1) * 200 + (obj.z_index % 200)
+				if obj_data.has("z_index"):
+					obj.z_index = int(obj_data["z_index"])
+				else:
+					obj.z_index = (new_z - 1) * 200 + (obj.z_index % 200)
 
 	if obj == null:
 		if obj_data.has("scene_file_path") and obj_data["scene_file_path"] != "":
@@ -239,10 +243,20 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			if obj_data.has("z_level"): obj.set("z_level", obj_data["z_level"])
 			main_node.add_child(obj)
 			World.register_entity(obj, entity_id)
-			if obj_data.has("z_level"):
+			if obj_data.has("z_index"):
+				obj.z_index = int(obj_data["z_index"])
+			elif obj_data.has("z_level"):
 				obj.z_index = (obj.z_level - 1) * 200 + (obj.z_index % 200)
+			if obj_data.has("child_index"):
+				var child_index: int = clampi(int(obj_data["child_index"]), 0, max(0, main_node.get_child_count() - 1))
+				main_node.move_child(obj, child_index)
 
 	if obj != null:
+		if obj_data.has("child_index"):
+			var desired_child_index: int = clampi(int(obj_data["child_index"]), 0, max(0, main_node.get_child_count() - 1))
+			main_node.move_child(obj, desired_child_index)
+		if obj_data.has("z_index"):
+			obj.z_index = int(obj_data["z_index"])
 		if obj_data.has("position"):    obj.position = obj_data["position"]
 		if obj_data.has("hits"):
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data["hits"])

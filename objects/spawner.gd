@@ -5,15 +5,7 @@ var spawn_type: String = "peasant"
 @export var z_level: int = 3
 
 func _get_property_list() -> Array[Dictionary]:
-	var options: PackedStringArray = PackedStringArray()
-	if Classes and "DATA" in Classes:
-		for key in Classes.DATA.keys():
-			options.append(key)
-	else:
-		options.append_array(["peasant", "merchant", "bandit", "adventurer", "swordsman", "miner"])
-		
-	options.append("latejoin")
-	options.append("antag latejoin")
+	var options := Classes.get_spawn_options()
 	
 	return[{
 		"name": "spawn_type",

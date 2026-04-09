@@ -1,58 +1,31 @@
-# res://scripts/world/objects/world_gates.gd
 extends RefCounted
 
 var world: Node
+var _structures = null
 
 func _init(p_world: Node) -> void:
 	world = p_world
+	_structures = preload("res://scripts/world/objects/world_structure_handler.gd").new(world)
 
 func handle_rpc_request_hit_gate(sender_id: int, gate_path: NodePath) -> void:
-	if not world.multiplayer.is_server(): return
-	var gate = world.get_node_or_null(gate_path)
-	if gate == null: return
-
-	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if not world.utils.can_player_interact(player): return
-	if player.body != null and player.body.is_arm_broken(player.active_hand): return
-	if not world.utils.is_within_interaction_range(player, gate.global_position): return
-
-	var held_item = player.hands[player.active_hand]
-	if held_item == null:
-		if gate.state != gate.GateState.DESTROYED:
+	match _structures.resolve_interaction(sender_id, gate_path):
+		"toggle":
 			world.rpc_confirm_toggle_gate.rpc(gate_path)
-	else:
-		var hit_strength := MaterialRegistry.get_tool_efficiency(gate, held_item)
-		if hit_strength > 0.0:
-			if not world.utils.server_check_action_cooldown(player): return
-			gate.hits += hit_strength
-			if gate.hits >= gate.HITS_TO_BREAK * 2:
-				world.rpc_confirm_remove_gate.rpc(gate_path)
-			elif gate.hits >= gate.HITS_TO_BREAK:
-				world.rpc_confirm_destroy_gate.rpc(gate_path)
-			else:
-				world.rpc_confirm_hit_gate.rpc(gate_path)
+		"hit":
+			world.rpc_confirm_hit_gate.rpc(gate_path)
+		"destroy":
+			world.rpc_confirm_destroy_gate.rpc(gate_path)
+		"remove":
+			world.rpc_confirm_remove_gate.rpc(gate_path)
 
-func handle_rpc_confirm_toggle_gate(_gate_path: NodePath) -> void:
-	var gate = world.get_node_or_null(_gate_path)
-	if gate != null:
-		gate.toggle_gate()
+func handle_rpc_confirm_toggle_gate(gate_path: NodePath) -> void:
+	_structures.confirm_toggle(gate_path)
 
 func handle_rpc_confirm_hit_gate(gate_path: NodePath) -> void:
-	var gate = world.get_node_or_null(gate_path)
-	if gate != null:
-		var main = World.main_scene
-		gate.perform_hit(main)
+	_structures.confirm_hit(gate_path)
 
 func handle_rpc_confirm_destroy_gate(gate_path: NodePath) -> void:
-	var gate = world.get_node_or_null(gate_path)
-	if gate != null:
-		var main = World.main_scene
-		gate.perform_hit(main)
-		gate.destroy_gate()
+	_structures.confirm_destroy(gate_path)
 
 func handle_rpc_confirm_remove_gate(gate_path: NodePath) -> void:
-	var gate = world.get_node_or_null(gate_path)
-	if gate != null:
-		var main = World.main_scene
-		gate.perform_hit(main)
-		gate.remove_completely()
+	_structures.confirm_remove(gate_path)

@@ -1,32 +1,23 @@
 # res://objects/woodentable.gd
 @tool
-extends Area2D
+extends WorldObject
 
-const TILE_SIZE: int = 64
-
-@export var z_level: int = 3
 var blocks_fov: bool = false
 
 func get_description() -> String:
 	return "a wooden table"
 
-func _ready() -> void:
-	z_index = (z_level - 1) * 200 + 2
-	add_to_group("z_entity")
-	if Engine.is_editor_hint():
-		return
-	World.register_entity(self)
-	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
-	global_position = Vector2((tile_pos.x + 0.5) * TILE_SIZE, (tile_pos.y + 0.5) * TILE_SIZE)
-	World.register_solid(tile_pos, z_level, self)
-	add_to_group("inspectable")
+func should_snap_to_tile() -> bool:
+	return true
 
-func _exit_tree() -> void:
-	if Engine.is_editor_hint():
-		return
-	var tile_pos := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
-	World.unregister_solid(tile_pos, z_level, self)
-	World.unregister_entity(self)
+func should_register_entity() -> bool:
+	return true
+
+func get_runtime_groups() -> Array[String]:
+	return [Defs.GROUP_INSPECTABLE]
+
+func get_solid_tile_offsets() -> Array[Vector2i]:
+	return [Vector2i.ZERO]
 
 func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
 	if Engine.is_editor_hint():
@@ -37,9 +28,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		var player: Node = World.get_local_player()
 		if player == null or player.z_level != z_level:
 			return
-		var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
-		var diff: Vector2i = (my_tile - player.tile_pos).abs()
-		if diff.x > 1 or diff.y > 1:
+		if not Defs.is_within_tile_reach(player.tile_pos, get_anchor_tile()):
 			return
 		var held: Node = player.hands[player.active_hand]
 		if held == null:

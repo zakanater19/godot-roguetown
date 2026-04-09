@@ -1,58 +1,31 @@
-# res://scripts/world/objects/world_doors.gd
 extends RefCounted
 
 var world: Node
+var _structures = null
 
 func _init(p_world: Node) -> void:
 	world = p_world
+	_structures = preload("res://scripts/world/objects/world_structure_handler.gd").new(world)
 
 func handle_rpc_request_hit_door(sender_id: int, door_path: NodePath) -> void:
-	if not world.multiplayer.is_server(): return
-	var door = world.get_node_or_null(door_path)
-	if door == null: return
-
-	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
-	if not world.utils.can_player_interact(player): return
-	if player.body != null and player.body.is_arm_broken(player.active_hand): return
-	if not world.utils.is_within_interaction_range(player, door.global_position): return
-
-	var held_item = player.hands[player.active_hand]
-	if held_item == null:
-		if door.state != door.DoorState.DESTROYED:
+	match _structures.resolve_interaction(sender_id, door_path):
+		"toggle":
 			world.rpc_confirm_toggle_door.rpc(door_path)
-	else:
-		var hit_strength := MaterialRegistry.get_tool_efficiency(door, held_item)
-		if hit_strength > 0.0:
-			if not world.utils.server_check_action_cooldown(player): return
-			door.hits += hit_strength
-			if door.hits >= door.HITS_TO_BREAK * 2:
-				world.rpc_confirm_remove_door.rpc(door_path)
-			elif door.hits >= door.HITS_TO_BREAK:
-				world.rpc_confirm_destroy_door.rpc(door_path)
-			else:
-				world.rpc_confirm_hit_door.rpc(door_path)
+		"hit":
+			world.rpc_confirm_hit_door.rpc(door_path)
+		"destroy":
+			world.rpc_confirm_destroy_door.rpc(door_path)
+		"remove":
+			world.rpc_confirm_remove_door.rpc(door_path)
 
-func handle_rpc_confirm_toggle_door(_door_path: NodePath) -> void:
-	var door = world.get_node_or_null(_door_path)
-	if door != null:
-		door.toggle_door()
+func handle_rpc_confirm_toggle_door(door_path: NodePath) -> void:
+	_structures.confirm_toggle(door_path)
 
 func handle_rpc_confirm_hit_door(door_path: NodePath) -> void:
-	var door = world.get_node_or_null(door_path)
-	if door != null:
-		var main = World.main_scene
-		door.perform_hit(main)
+	_structures.confirm_hit(door_path)
 
 func handle_rpc_confirm_destroy_door(door_path: NodePath) -> void:
-	var door = world.get_node_or_null(door_path)
-	if door != null:
-		var main = World.main_scene
-		door.perform_hit(main)
-		door.destroy_door()
+	_structures.confirm_destroy(door_path)
 
 func handle_rpc_confirm_remove_door(door_path: NodePath) -> void:
-	var door = world.get_node_or_null(door_path)
-	if door != null:
-		var main = World.main_scene
-		door.perform_hit(main)
-		door.remove_completely()
+	_structures.confirm_remove(door_path)

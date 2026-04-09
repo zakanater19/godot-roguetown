@@ -1,25 +1,20 @@
 # res://objects/merchantvendor.gd
 @tool
-extends Area2D
+extends WorldObject
 
-@export var z_level: int = 3
 var blocks_fov: bool = false
 
 func get_description() -> String:
 	return "a merchant vendor, ready to trade"
 
-func _ready() -> void:
-	z_index = (z_level - 1) * 200 + 5
-	add_to_group("z_entity")
-	if Engine.is_editor_hint():
-		return
-	var tile_pos := Vector2i(int(global_position.x / World.TILE_SIZE), int(global_position.y / World.TILE_SIZE))
-	global_position = Vector2((tile_pos.x + 0.5) * World.TILE_SIZE, (tile_pos.y + 0.5) * World.TILE_SIZE)
-	World.register_solid(tile_pos, z_level, self)
-	add_to_group("inspectable")
+func get_z_offset() -> int:
+	return 5
 
-func _exit_tree() -> void:
-	if Engine.is_editor_hint():
-		return
-	var tile_pos := Vector2i(int(global_position.x / World.TILE_SIZE), int(global_position.y / World.TILE_SIZE))
-	World.unregister_solid(tile_pos, z_level, self)
+func should_snap_to_tile() -> bool:
+	return true
+
+func get_runtime_groups() -> Array[String]:
+	return [Defs.GROUP_INSPECTABLE]
+
+func get_solid_tile_offsets() -> Array[Vector2i]:
+	return [Vector2i.ZERO]

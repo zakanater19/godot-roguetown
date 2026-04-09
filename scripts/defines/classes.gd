@@ -123,3 +123,10 @@ const DATA: Dictionary = {
 		}
 	}
 }
+
+static func get_spawn_options() -> PackedStringArray:
+	var options := PackedStringArray(DATA.keys())
+	options.sort()
+	options.append("latejoin")
+	options.append("antag latejoin")
+	return options

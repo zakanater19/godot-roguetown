@@ -1,8 +1,6 @@
 # Full file: project/objects/coin.gd
 @tool
-extends Area2D
-
-const TILE_SIZE: int = 64
+extends PickableWorldObject
 
 enum MetalType { COPPER, SILVER, GOLD }
 
@@ -13,7 +11,6 @@ enum MetalType { COPPER, SILVER, GOLD }
 		_update_sprite()
 
 @export var amount: int = 1 : set = set_amount
-@export var z_level: int = 3
 
 var item_type: String = ""
 var is_coin_stack: bool = true
@@ -27,13 +24,11 @@ func set_amount(val: int) -> void:
 		_update_sprite()
 
 func _ready() -> void:
-	z_index = (z_level - 1) * 200 + 2
-	add_to_group("z_entity")
+	super._ready()
 	if Engine.is_editor_hint():
 		return
 
 	_set_item_type()
-	add_to_group("pickable")
 	_update_sprite()
 
 func _set_item_type() -> void:
@@ -52,43 +47,16 @@ func get_use_delay() -> float:
 func _update_sprite() -> void:
 	if amount <= 0:
 		return
-	var sprite = get_node_or_null("Sprite2D")
+	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite == null:
 		return
 
-	# Set scale: double scale (1.0) for > 2, default (0.5) for <= 2
 	if amount > 2:
 		sprite.scale = Vector2(1.0, 1.0)
 	else:
 		sprite.scale = Vector2(0.5, 0.5)
 
-	var suffix =["copper", "silver", "gold"][metal_type]
-	var thresholds =[20, 15, 10, 5, 4, 3, 2, 1]
-	var target_amount = 1
-	for amt in thresholds:
-		if amount >= amt:
-			var path = "res://objects/coins/" + str(amt) + suffix + ".png"
-			if ResourceLoader.exists(path):
-				target_amount = amt
-				break
-	
-	var tex_path = "res://objects/coins/" + str(target_amount) + suffix + ".png"
-	if ResourceLoader.exists(tex_path):
+	var tex_path := Defs.get_coin_icon_path(amount, metal_type)
+	if not tex_path.is_empty():
 		sprite.texture = load(tex_path)
 	sprite.region_enabled = false
-
-func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
-	if Engine.is_editor_hint():
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		if Input.is_key_pressed(KEY_SHIFT):
-			return
-		var player: Node = World.get_local_player()
-		if player == null or player.z_level != z_level:
-			return
-		var my_tile := Vector2i(int(global_position.x / TILE_SIZE), int(global_position.y / TILE_SIZE))
-		var diff: Vector2i = (my_tile - player.tile_pos).abs()
-		if diff.x <= 1 and diff.y <= 1:
-			get_viewport().set_input_as_handled()
-			if player.has_method("_on_object_picked_up"):
-				player._on_object_picked_up(self)
