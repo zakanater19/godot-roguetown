@@ -2,6 +2,8 @@
 # Builds and manages all local-player UI nodes; exposes update helpers.
 extends RefCounted
 
+const HUD_SCENE := preload("res://scenes/ui/hud.tscn")
+
 var player: Node2D
 
 func _init(p_player: Node2D) -> void:
@@ -87,8 +89,7 @@ func build_ui() -> void:
 	player._chat_input.text_submitted.connect(player._on_chat_submitted)
 	safe_area.add_child(player._chat_input)
 
-	player._hud = CanvasLayer.new()
-	player._hud.set_script(load("res://scripts/ui/HUD.gd"))
+	player._hud = HUD_SCENE.instantiate()
 	player.add_child(player._hud)
 	player._hud.setup(player)
 	player._hud.update_clothing_display(player.equipped, player.equipped_data)

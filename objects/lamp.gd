@@ -35,6 +35,10 @@ func _ready() -> void:
 	_set_sprite(is_on)
 
 func _exit_tree() -> void:
+	if Engine.is_editor_hint():
+		return
+	if Lighting == null or not Lighting.has_method("unregister_lamp"):
+		return
 	Lighting.unregister_lamp(self)
 
 func _set_fov_visibility(p_visible: bool) -> void:

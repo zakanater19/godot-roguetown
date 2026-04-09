@@ -1,0 +1,1437 @@
+[gd_scene load_steps=15 format=3 uid="uid://qpnrca4qbpim"]
+
+[ext_resource type="Script" uid="uid://cdipivl2tbsly" path="res://scripts/ui/HUD.gd" id="1_hud"]
+[ext_resource type="Texture2D" uid="uid://xywnqhpcrgu4" path="res://assets/HUDicon.jpg" id="2_hud_icon"]
+[ext_resource type="Texture2D" uid="uid://cofg5bhn8wh72" path="res://ui/resist.png" id="3_resist"]
+[ext_resource type="Texture2D" uid="uid://d64kmc6jn7y3" path="res://ui/m-zone_sel.png" id="4_limb_base"]
+[ext_resource type="Texture2D" uid="uid://b248cyt4cs3p2" path="res://ui/m-head.png" id="5_head"]
+[ext_resource type="Texture2D" uid="uid://c52c04fku6pfl" path="res://ui/m-chest.png" id="6_chest"]
+[ext_resource type="Texture2D" uid="uid://cw4iux566oy06" path="res://ui/m-r_arm.png" id="7_r_arm"]
+[ext_resource type="Texture2D" uid="uid://djhalmqbjqkiw" path="res://ui/m-l_arm.png" id="8_l_arm"]
+[ext_resource type="Texture2D" uid="uid://d3qt84jqlr5pm" path="res://ui/m-r_leg.png" id="9_r_leg"]
+[ext_resource type="Texture2D" uid="uid://cdwucxxvquk5" path="res://ui/m-l_leg.png" id="10_l_leg"]
+[ext_resource type="Texture2D" uid="uid://brlm2tblgmxuq" path="res://ui/dodge.png" id="11_dodge"]
+[ext_resource type="Texture2D" uid="uid://dolbgxgq5ut8u" path="res://ui/sneakoff.png" id="12_sneakoff"]
+
+[sub_resource type="Shader" id="1_fishnet_shader"]
+code = "shader_type canvas_item;
+void fragment() {
+	vec4 tex = texture(TEXTURE, UV);
+	float u = UV.x * 64.0;
+	float v = UV.y * 64.0;
+	if (tex.a > 0.1 && (mod(u + v, 5.0) < 1.0 || mod(u - v, 5.0) < 1.0)) {
+		COLOR = vec4(0.9, 0.1, 0.1, 0.9);
+	} else {
+		COLOR = vec4(0.0, 0.0, 0.0, 0.0);
+	}
+}
+"
+
+[sub_resource type="ShaderMaterial" id="2_fishnet_material"]
+shader = SubResource("1_fishnet_shader")
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_hud")
+
+[node name="SafeArea" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ClothingPanel" type="Control" parent="SafeArea"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -380.0
+offset_top = -276.0
+offset_right = -224.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="HeadSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_left = 52.0
+offset_right = 100.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/HeadSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/HeadSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "head"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/HeadSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/HeadSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="CloakSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_top = 52.0
+offset_right = 48.0
+offset_bottom = 100.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/CloakSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/CloakSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "cloak"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/CloakSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/CloakSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="FaceSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_left = 52.0
+offset_top = 52.0
+offset_right = 100.0
+offset_bottom = 100.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/FaceSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/FaceSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "face"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/FaceSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/FaceSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="BackpackSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_left = 104.0
+offset_top = 52.0
+offset_right = 152.0
+offset_bottom = 100.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/BackpackSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/BackpackSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "backpack"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/BackpackSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/BackpackSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="GlovesSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_top = 104.0
+offset_right = 48.0
+offset_bottom = 152.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/GlovesSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/GlovesSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "gloves"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/GlovesSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/GlovesSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="ArmorSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_left = 52.0
+offset_top = 104.0
+offset_right = 100.0
+offset_bottom = 152.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/ArmorSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/ArmorSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "armor"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/ArmorSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/ArmorSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="TrousersSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_left = 104.0
+offset_top = 104.0
+offset_right = 152.0
+offset_bottom = 152.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/TrousersSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/TrousersSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "trousers"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/TrousersSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/TrousersSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="FeetSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_top = 156.0
+offset_right = 48.0
+offset_bottom = 204.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/FeetSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/FeetSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "feet"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/FeetSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/FeetSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="ClothingSlot" type="Control" parent="SafeArea/ClothingPanel"]
+visible = false
+clip_contents = true
+anchors_preset = 0
+offset_left = 52.0
+offset_top = 156.0
+offset_right = 100.0
+offset_bottom = 204.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/ClothingSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/ClothingSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "clothing
+/torso"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/ClothingSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/ClothingSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="WaistSlot" type="Control" parent="SafeArea/ClothingPanel"]
+clip_contents = true
+anchors_preset = 0
+offset_top = 208.0
+offset_right = 48.0
+offset_bottom = 256.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/WaistSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/WaistSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "waist"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/WaistSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/WaistSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="PocketLSlot" type="Control" parent="SafeArea/ClothingPanel"]
+clip_contents = true
+anchors_preset = 0
+offset_left = 52.0
+offset_top = 208.0
+offset_right = 100.0
+offset_bottom = 256.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/PocketLSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/PocketLSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "L. Pocket"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/PocketLSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/PocketLSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="PocketRSlot" type="Control" parent="SafeArea/ClothingPanel"]
+clip_contents = true
+anchors_preset = 0
+offset_left = 104.0
+offset_top = 208.0
+offset_right = 152.0
+offset_bottom = 256.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/PocketRSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/PocketRSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
+theme_override_font_sizes/font_size = 9
+text = "R. Pocket"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/PocketRSlot"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.75, 0.75)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/PocketRSlot"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="ToggleBox" type="Control" parent="SafeArea/ClothingPanel"]
+anchors_preset = 0
+offset_left = 104.0
+offset_top = 156.0
+offset_right = 152.0
+offset_bottom = 204.0
+
+[node name="ToggleTexture" type="TextureRect" parent="SafeArea/ClothingPanel/ToggleBox"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="ToggleBackground" type="ColorRect" parent="SafeArea/ClothingPanel/ToggleBox"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.25, 0.05, 0.05, 0.85)
+
+[node name="ToggleLabel" type="Label" parent="SafeArea/ClothingPanel/ToggleBox"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.15, 0.9, 0.25, 1)
+theme_override_font_sizes/font_size = 22
+text = "^"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HandsPanel" type="Control" parent="SafeArea"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -166.0
+offset_top = -64.0
+offset_right = -166.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="LeftHand" type="Control" parent="SafeArea/HandsPanel"]
+anchors_preset = 0
+offset_left = -50.0
+offset_right = -2.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/LeftHand"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Highlight" type="ColorRect" parent="SafeArea/HandsPanel/LeftHand"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.7, 0.7, 0.7, 0.25)
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/HandsPanel/LeftHand"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.6, 0.6)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/HandsPanel/LeftHand"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="GrabLabel" type="Label" parent="SafeArea/HandsPanel/LeftHand"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.9, 0, 1)
+theme_override_font_sizes/font_size = 12
+text = "GRAB"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BrokenLabel" type="Label" parent="SafeArea/HandsPanel/LeftHand"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.9, 0.1, 0.1, 0.85)
+theme_override_font_sizes/font_size = 40
+text = "X"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightHand" type="Control" parent="SafeArea/HandsPanel"]
+anchors_preset = 0
+offset_left = 2.0
+offset_right = 50.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/RightHand"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Highlight" type="ColorRect" parent="SafeArea/HandsPanel/RightHand"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="Icon" type="Sprite2D" parent="SafeArea/HandsPanel/RightHand"]
+visible = false
+position = Vector2(24, 24)
+scale = Vector2(0.6, 0.6)
+
+[node name="AmountLabel" type="Label" parent="SafeArea/HandsPanel/RightHand"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+vertical_alignment = 2
+
+[node name="GrabLabel" type="Label" parent="SafeArea/HandsPanel/RightHand"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.9, 0, 1)
+theme_override_font_sizes/font_size = 12
+text = "GRAB"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BrokenLabel" type="Label" parent="SafeArea/HandsPanel/RightHand"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.9, 0.1, 0.1, 0.85)
+theme_override_font_sizes/font_size = 40
+text = "X"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ReleaseButton" type="Control" parent="SafeArea/HandsPanel"]
+visible = false
+anchors_preset = 0
+offset_left = -50.0
+offset_top = -52.0
+offset_right = -2.0
+offset_bottom = -4.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/ReleaseButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/HandsPanel/ReleaseButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.6, 0.1, 1)
+theme_override_font_sizes/font_size = 8
+text = "RELEASE
+[Q]"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="IntentButton" type="Control" parent="SafeArea/HandsPanel"]
+anchors_preset = 0
+offset_left = 54.0
+offset_right = 102.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/IntentButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="IntentLabel" type="Label" parent="SafeArea/HandsPanel/IntentButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 9
+text = "COMBAT
+MODE"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CraftButton" type="Control" parent="SafeArea/HandsPanel"]
+anchors_preset = 0
+offset_left = 106.0
+offset_right = 154.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/CraftButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/HandsPanel/CraftButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "CRAFT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StatsButton" type="Control" parent="SafeArea/HandsPanel"]
+anchors_preset = 0
+offset_left = 158.0
+offset_right = 206.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/StatsButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/HandsPanel/StatsButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "STATS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SleepButton" type="Control" parent="SafeArea/HandsPanel"]
+anchors_preset = 0
+offset_left = 210.0
+offset_right = 258.0
+offset_bottom = 48.0
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/SleepButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="SafeArea/HandsPanel/SleepButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "SLEEP"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResistButton" type="Control" parent="SafeArea/HandsPanel"]
+visible = false
+anchors_preset = 0
+offset_left = 2.0
+offset_top = -52.0
+offset_right = 50.0
+offset_bottom = -4.0
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="SafeArea/HandsPanel/ResistButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_hud_icon")
+expand_mode = 1
+
+[node name="ResistIcon" type="TextureRect" parent="SafeArea/HandsPanel/ResistButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_resist")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="SafeArea/HandsPanel/ResistButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 9
+text = "[Z]"
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="BarContainer" type="HBoxContainer" parent="SafeArea/HandsPanel"]
+layout_mode = 0
+offset_left = 264.0
+offset_top = -32.0
+theme_override_constants/separation = 6
+
+[node name="HealthContainer" type="Control" parent="SafeArea/HandsPanel/BarContainer"]
+custom_minimum_size = Vector2(10, 80)
+layout_mode = 2
+
+[node name="HealthBackground" type="ColorRect" parent="SafeArea/HandsPanel/BarContainer/HealthContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.2, 0.2, 1)
+
+[node name="HealthBar" type="ColorRect" parent="SafeArea/HandsPanel/BarContainer/HealthContainer"]
+layout_mode = 0
+offset_right = 10.0
+offset_bottom = 80.0
+color = Color(0.8, 0.1, 0.1, 1)
+
+[node name="StaminaContainer" type="Control" parent="SafeArea/HandsPanel/BarContainer"]
+custom_minimum_size = Vector2(10, 80)
+layout_mode = 2
+
+[node name="StaminaBackground" type="ColorRect" parent="SafeArea/HandsPanel/BarContainer/StaminaContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.2, 0.2, 1)
+
+[node name="StaminaBar" type="ColorRect" parent="SafeArea/HandsPanel/BarContainer/StaminaContainer"]
+layout_mode = 0
+offset_right = 10.0
+offset_bottom = 80.0
+color = Color(0.1, 0.8, 0.1, 1)
+
+[node name="LimbPanel" type="Control" parent="SafeArea"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -452.0
+offset_top = -80.0
+offset_right = -388.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="Base" type="TextureRect" parent="SafeArea/LimbPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("4_limb_base")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HeadHighlight" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+modulate = Color(1, 0.2, 0.2, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_head")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HeadBroken" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+material = SubResource("2_fishnet_material")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_head")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ChestHighlight" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+modulate = Color(1, 0.2, 0.2, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("6_chest")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ChestBroken" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+material = SubResource("2_fishnet_material")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("6_chest")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RArmHighlight" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+modulate = Color(1, 0.2, 0.2, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("7_r_arm")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RArmBroken" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+material = SubResource("2_fishnet_material")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("7_r_arm")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LArmHighlight" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+modulate = Color(1, 0.2, 0.2, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("8_l_arm")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LArmBroken" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+material = SubResource("2_fishnet_material")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("8_l_arm")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RLegHighlight" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+modulate = Color(1, 0.2, 0.2, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("9_r_leg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RLegBroken" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+material = SubResource("2_fishnet_material")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("9_r_leg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LLegHighlight" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+modulate = Color(1, 0.2, 0.2, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("10_l_leg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LLegBroken" type="TextureRect" parent="SafeArea/LimbPanel"]
+visible = false
+material = SubResource("2_fishnet_material")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("10_l_leg")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ChestClick" type="Control" parent="SafeArea/LimbPanel"]
+anchors_preset = 0
+offset_left = 4.0
+offset_top = 8.0
+offset_right = 61.0
+offset_bottom = 43.0
+
+[node name="RArmClick" type="Control" parent="SafeArea/LimbPanel"]
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 25.0
+offset_right = 23.0
+offset_bottom = 48.0
+
+[node name="LArmClick" type="Control" parent="SafeArea/LimbPanel"]
+anchors_preset = 0
+offset_left = 42.0
+offset_top = 25.0
+offset_right = 53.0
+offset_bottom = 48.0
+
+[node name="RLegClick" type="Control" parent="SafeArea/LimbPanel"]
+anchors_preset = 0
+offset_left = 17.0
+offset_top = 39.0
+offset_right = 31.0
+offset_bottom = 64.0
+
+[node name="LLegClick" type="Control" parent="SafeArea/LimbPanel"]
+anchors_preset = 0
+offset_left = 34.0
+offset_top = 39.0
+offset_right = 48.0
+offset_bottom = 64.0
+
+[node name="HeadClick" type="Control" parent="SafeArea/LimbPanel"]
+anchors_preset = 0
+offset_left = 23.0
+offset_top = 9.0
+offset_right = 42.0
+offset_bottom = 27.0
+
+[node name="StancePanel" type="Control" parent="SafeArea"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -524.0
+offset_top = -80.0
+offset_right = -460.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Background" type="ColorRect" parent="SafeArea/StancePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.1, 0.1, 0.1, 0.7)
+
+[node name="StanceIcon" type="TextureRect" parent="SafeArea/StancePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("11_dodge")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SneakPanel" type="Control" parent="SafeArea"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -588.0
+offset_top = -80.0
+offset_right = -524.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="SneakIcon" type="TextureRect" parent="SafeArea/SneakPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("12_sneakoff")
+expand_mode = 1
+stretch_mode = 5
