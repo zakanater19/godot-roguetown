@@ -1,7 +1,10 @@
 # res://scripts/player/playercrafting.gd
 # Client-side crafting UI and progress tracking.
-# Recipe definitions are loaded from RecipeRegistry — no recipe data lives here.
+# Recipe definitions are loaded from RecipeRegistry -- no recipe data lives here.
 extends RefCounted
+
+const CRAFTING_MENU_SCENE_PATH := "res://scenes/ui/crafting_menu.tscn"
+const CRAFTING_RECIPE_ROW_SCENE_PATH := "res://scenes/ui/crafting_recipe_row.tscn"
 
 var player: Node2D
 
@@ -66,78 +69,55 @@ func _open_crafting_menu() -> void:
 	if craft_panel != null and is_instance_valid(craft_panel):
 		craft_panel.queue_free()
 
-	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2(240, 260)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.offset_left   = 120
-	panel.offset_right  = 360
-	panel.offset_top    = -150
-	panel.offset_bottom = 150
-	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
+	var panel := _instantiate_ui_scene(CRAFTING_MENU_SCENE_PATH)
+	if panel == null:
+		return
+
 	craft_panel = panel
 	player._ui_root.add_child(panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.offset_left   = 6
-	vbox.offset_right  = -6
-	vbox.offset_top    = 6
-	vbox.offset_bottom = -6
-	vbox.add_theme_constant_override("separation", 4)
-	panel.add_child(vbox)
-
-	var title_row := HBoxContainer.new()
-	vbox.add_child(title_row)
-
-	var title := Label.new()
-	title.text = "Crafting Menu"
-	title.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0))
-	title.add_theme_font_size_override("font_size", 12)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(title)
-
-	var close_btn := Button.new()
-	close_btn.text = "X"
-	close_btn.custom_minimum_size = Vector2(24, 20)
+	var close_btn := panel.get_node("Content/TitleRow/CloseButton") as Button
+	var recipe_list := panel.get_node("Content/RecipeList") as VBoxContainer
+	var empty_lbl := panel.get_node("Content/RecipeList/EmptyLabel") as Label
 	close_btn.pressed.connect(_close_crafting_menu)
-	title_row.add_child(close_btn)
 
-	vbox.add_child(HSeparator.new())
+	for child in recipe_list.get_children():
+		if child != empty_lbl:
+			child.queue_free()
 
 	# Count available ingredients nearby.
 	var avail := _get_available_crafting_resources()
 	var counts: Dictionary = {}
 	for obj in avail:
 		var iname: String = obj.get("item_type")
-		if iname == null or iname == "": iname = obj.name.get_slice("@", 0)
+		if iname == null or iname == "":
+			iname = obj.name.get_slice("@", 0)
 		counts[iname] = counts.get(iname, 0) + 1
 
 	# Build UI rows for every recipe the player qualifies for and has materials.
 	var recipes_added: int = 0
 	for recipe in RecipeRegistry.get_available_recipes(player.skills):
 		if counts.get(recipe.req_item, 0) >= recipe.req_amount:
-			var row := HBoxContainer.new()
-			vbox.add_child(row)
+			var row := _instantiate_ui_scene(CRAFTING_RECIPE_ROW_SCENE_PATH) as HBoxContainer
+			if row == null:
+				continue
 
-			var r_lbl := Label.new()
-			r_lbl.text = recipe.display_name + " (" + str(recipe.req_amount) + " " + recipe.req_item + ")"
-			r_lbl.add_theme_font_size_override("font_size", 11)
-			r_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(r_lbl)
-
-			var btn := Button.new()
-			btn.text = "Craft"
-			btn.add_theme_font_size_override("font_size", 10)
-			btn.pressed.connect(func(): _on_craft_button_pressed(recipe.recipe_id))
-			row.add_child(btn)
+			var recipe_id: String = recipe.recipe_id
+			var recipe_label := row.get_node("RecipeLabel") as Label
+			var craft_btn := row.get_node("CraftButton") as Button
+			recipe_label.text = recipe.display_name + " (" + str(recipe.req_amount) + " " + recipe.req_item + ")"
+			craft_btn.pressed.connect(func(): _on_craft_button_pressed(recipe_id))
+			recipe_list.add_child(row)
 			recipes_added += 1
 
-	if recipes_added == 0:
-		var empty_lbl := Label.new()
-		empty_lbl.text = "No recipes available."
-		empty_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-		empty_lbl.add_theme_font_size_override("font_size", 11)
-		vbox.add_child(empty_lbl)
+	empty_lbl.visible = recipes_added == 0
+
+func _instantiate_ui_scene(scene_path: String) -> Control:
+	var scene := load(scene_path) as PackedScene
+	if scene == null:
+		push_error("PlayerCrafting: failed to load %s" % scene_path)
+		return null
+	return scene.instantiate() as Control
 
 # ===========================================================================
 # Progress tracking
@@ -153,11 +133,11 @@ func _on_craft_button_pressed(recipe_id: String) -> void:
 	prog_lbl.visible = true
 
 	active_craft_attempts.append({
-		"recipe_id":    recipe_id,
-		"elapsed":      0.0,
+		"recipe_id": recipe_id,
+		"elapsed": 0.0,
 		"blink_elapsed": 0.0,
-		"prog_label":   prog_lbl,
-		"start_tile":   player.tile_pos
+		"prog_label": prog_lbl,
+		"start_tile": player.tile_pos
 	})
 	Sidebar.add_message("[color=#aaffaa]Started crafting " + recipe_id + "...[/color]")
 
@@ -166,18 +146,18 @@ func _update_craft_attempts(delta: float) -> void:
 	var cancelled_keys: Array = []
 
 	for attempt in active_craft_attempts:
-		var recipe_id: String  = attempt["recipe_id"]
-		var prog_lbl: Label    = attempt["prog_label"]
+		var recipe_id: String = attempt["recipe_id"]
+		var prog_lbl: Label = attempt["prog_label"]
 
 		if player.tile_pos != attempt["start_tile"]:
 			cancelled_keys.append(recipe_id)
 			continue
 
-		attempt["elapsed"]       += delta
+		attempt["elapsed"] += delta
 		attempt["blink_elapsed"] += delta
 
 		var progress: float = clamp(attempt["elapsed"] / CRAFT_DURATION, 0.0, 1.0)
-		var dot_count: int  = clamp(int(progress * 5.0) + 1, 1, 5)
+		var dot_count: int = clamp(int(progress * 5.0) + 1, 1, 5)
 		var dot_str: String = ""
 		for _d in range(dot_count):
 			dot_str += "."

@@ -1,0 +1,61 @@
+[gd_scene format=3]
+
+[node name="TargetInventoryPanel" type="Panel"]
+custom_minimum_size = Vector2(230, 240)
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -115.0
+offset_top = -200.0
+offset_right = 115.0
+offset_bottom = 160.0
+mouse_filter = 0
+
+[node name="Content" type="VBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = -6.0
+offset_bottom = -6.0
+theme_override_constants/separation = 4
+
+[node name="TitleRow" type="HBoxContainer" parent="Content"]
+
+[node name="TitleLabel" type="Label" parent="Content/TitleRow"]
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.6, 0.1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Target"
+
+[node name="CloseButton" type="Button" parent="Content/TitleRow"]
+custom_minimum_size = Vector2(24, 20)
+text = "X"
+
+[node name="Separator" type="HSeparator" parent="Content"]
+
+[node name="Scroll" type="ScrollContainer" parent="Content"]
+size_flags_vertical = 3
+
+[node name="Sections" type="VBoxContainer" parent="Content/Scroll"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="HandsLabel" type="Label" parent="Content/Scroll/Sections"]
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 11
+text = "Hands"
+
+[node name="HandsRows" type="VBoxContainer" parent="Content/Scroll/Sections"]
+theme_override_constants/separation = 4
+
+[node name="MidSeparator" type="HSeparator" parent="Content/Scroll/Sections"]
+
+[node name="EquipmentLabel" type="Label" parent="Content/Scroll/Sections"]
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 11
+text = "Equipment"
+
+[node name="EquipmentRows" type="VBoxContainer" parent="Content/Scroll/Sections"]
+theme_override_constants/separation = 4

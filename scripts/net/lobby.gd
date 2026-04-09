@@ -78,13 +78,8 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ui_layer.add_child(bg)
 
-	_main_content = Control.new()
-	_main_content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_main_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg.add_child(_main_content)
-
 	var builder = preload("res://scripts/net/lobby_ui.gd").new(self)
-	builder.build(bg, _main_content)
+	builder.build(bg)
 
 	_ui_layer.visible = false
 

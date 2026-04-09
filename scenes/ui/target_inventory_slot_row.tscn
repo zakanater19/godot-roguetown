@@ -1,0 +1,18 @@
+[gd_scene format=3]
+
+[node name="TargetInventorySlotRow" type="HBoxContainer"]
+theme_override_constants/separation = 4
+
+[node name="SlotLabel" type="Label" parent="."]
+custom_minimum_size = Vector2(72, 0)
+theme_override_font_sizes/font_size = 11
+text = "Slot:"
+
+[node name="SlotButton" type="Button" parent="."]
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 26)
+theme_override_font_sizes/font_size = 10
+icon_alignment = 1
+expand_icon = true
+disabled = true
+text = "empty"

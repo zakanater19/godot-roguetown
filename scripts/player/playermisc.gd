@@ -1,5 +1,7 @@
-# res://scripts/player/playermisc.gd
 extends RefCounted
+
+const TARGET_INVENTORY_PANEL_SCENE_PATH := "res://scenes/ui/target_inventory_panel.tscn"
+const TARGET_INVENTORY_SLOT_ROW_SCENE_PATH := "res://scenes/ui/target_inventory_slot_row.tscn"
 
 var player: Node2D
 
@@ -46,106 +48,59 @@ func open_target_inventory(target: Node) -> void:
 	loot_target = target
 	loot_slot_controls.clear()
 
-	var panel := Panel.new()
-	panel.custom_minimum_size = Vector2(230, 240)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.offset_left   = -115
-	panel.offset_right  = 115
-	panel.offset_top    = -200 # Shifted higher to avoid overlapping the hotbar
-	panel.offset_bottom = 160
-	panel.mouse_filter  = Control.MOUSE_FILTER_STOP
+	var panel := _instantiate_ui_scene(TARGET_INVENTORY_PANEL_SCENE_PATH)
+	if panel == null:
+		return
+
 	loot_panel = panel
 	player._ui_root.add_child(panel)
 
-	var main_vbox := VBoxContainer.new()
-	main_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	main_vbox.offset_left   = 6
-	main_vbox.offset_right  = -6
-	main_vbox.offset_top    = 6
-	main_vbox.offset_bottom = -6
-	main_vbox.add_theme_constant_override("separation", 4)
-	panel.add_child(main_vbox)
-
-	var title_row := HBoxContainer.new()
-	main_vbox.add_child(title_row)
-
 	var target_peer: int = target.get_multiplayer_authority()
 	var target_name: String = target.character_name if "character_name" in target else "Player " + str(target_peer)
-	var title := Label.new()
+	var title := panel.get_node("Content/TitleRow/TitleLabel") as Label
+	var close_btn := panel.get_node("Content/TitleRow/CloseButton") as Button
+	var hands_rows := panel.get_node("Content/Scroll/Sections/HandsRows") as VBoxContainer
+	var equipment_rows := panel.get_node("Content/Scroll/Sections/EquipmentRows") as VBoxContainer
 	title.text = target_name + ("[DEAD]" if target.dead else "")
-	title.add_theme_color_override("font_color", Color(1, 0.6, 0.1))
-	title.add_theme_font_size_override("font_size", 12)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(title)
-
-	var close_btn := Button.new()
-	close_btn.text = "X"
-	close_btn.custom_minimum_size = Vector2(24, 20)
 	close_btn.pressed.connect(close_target_inventory)
-	title_row.add_child(close_btn)
-
-	main_vbox.add_child(HSeparator.new())
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(scroll)
-	
-	var vbox := VBoxContainer.new()
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 4)
-	scroll.add_child(vbox)
-
-	var hands_lbl := Label.new()
-	hands_lbl.text = "Hands"
-	hands_lbl.add_theme_font_size_override("font_size", 11)
-	hands_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	vbox.add_child(hands_lbl)
 
 	for i in range(Defs.HAND_COUNT):
 		var hand_label: String = "Right hand" if i == 0 else "Left hand"
-		var slot_key:   String = "hand_" + str(i)
-		var row := _build_slot_row(vbox, hand_label, slot_key)
-		loot_slot_controls[slot_key] = row
-
-	vbox.add_child(HSeparator.new())
-
-	var equip_lbl := Label.new()
-	equip_lbl.text = "Equipment"
-	equip_lbl.add_theme_font_size_override("font_size", 11)
-	equip_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	vbox.add_child(equip_lbl)
+		var slot_key: String = "hand_" + str(i)
+		var row := _build_slot_row(hands_rows, hand_label, slot_key)
+		if not row.is_empty():
+			loot_slot_controls[slot_key] = row
 
 	for es in Defs.SLOTS_ALL:
 		var slot_key: String = "equip_" + es
-		var row := _build_slot_row(vbox, Defs.SLOT_DISPLAY[es], slot_key)
-		loot_slot_controls[slot_key] = row
+		var row := _build_slot_row(equipment_rows, Defs.SLOT_DISPLAY[es], slot_key)
+		if not row.is_empty():
+			loot_slot_controls[slot_key] = row
 
 	refresh_loot_panel()
 
 func _build_slot_row(parent: Control, label_text: String, slot_key: String) -> Dictionary:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	var row := _instantiate_ui_scene(TARGET_INVENTORY_SLOT_ROW_SCENE_PATH) as HBoxContainer
+	if row == null:
+		return {}
+
 	parent.add_child(row)
 
-	var lbl := Label.new()
+	var lbl := row.get_node("SlotLabel") as Label
 	lbl.text = label_text + ":"
-	lbl.custom_minimum_size.x = 72
-	lbl.add_theme_font_size_override("font_size", 11)
-	row.add_child(lbl)
 
-	var btn := Button.new()
-	btn.text                  = "empty"
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.custom_minimum_size.y = 26 # Reduced to compress the list size
-	btn.add_theme_font_size_override("font_size", 10)
-	btn.icon_alignment        = HORIZONTAL_ALIGNMENT_CENTER
-	btn.expand_icon           = true
-	btn.disabled              = true
+	var btn := row.get_node("SlotButton") as Button
 	var sk := slot_key
 	btn.pressed.connect(func(): _on_loot_slot_pressed(sk))
-	row.add_child(btn)
 
 	return {"btn": btn}
+
+func _instantiate_ui_scene(scene_path: String) -> Control:
+	var scene := load(scene_path) as PackedScene
+	if scene == null:
+		push_error("PlayerMisc: failed to load %s" % scene_path)
+		return null
+	return scene.instantiate() as Control
 
 func refresh_loot_panel() -> void:
 	if loot_target == null or not is_instance_valid(loot_target):
@@ -160,12 +115,13 @@ func refresh_loot_panel() -> void:
 			continue
 		var ctrl = loot_slot_controls[sk]
 		var btn: Button = ctrl["btn"]
-		var obj: Node   = loot_target.hands[i]
+		var obj: Node = loot_target.hands[i]
 		if obj != null and is_instance_valid(obj):
 			var item_name = obj.get("item_type")
-			if item_name == null: item_name = obj.name.get_slice("@", 0)
+			if item_name == null:
+				item_name = obj.name.get_slice("@", 0)
 			var amt = obj.get("amount") if "amount" in obj else 1
-			
+
 			var icon_tex = null
 			if item_name == "Keyring":
 				var obj_sprite: Sprite2D = obj.get_node_or_null("Sprite2D")
@@ -173,7 +129,7 @@ func refresh_loot_panel() -> void:
 					icon_tex = obj_sprite.texture
 			elif item_registry != null and item_registry.has_method("get_item_icon"):
 				icon_tex = item_registry.get_item_icon(item_name)
-				
+
 			if icon_tex != null:
 				btn.text = str(amt) if amt > 1 else ""
 				btn.icon = icon_tex
@@ -183,8 +139,8 @@ func refresh_loot_panel() -> void:
 
 			btn.disabled = false
 		else:
-			btn.text     = "empty"
-			btn.icon     = null
+			btn.text = "empty"
+			btn.icon = null
 			btn.disabled = true
 
 	for es in Defs.SLOTS_ALL:
@@ -192,27 +148,27 @@ func refresh_loot_panel() -> void:
 		if not loot_slot_controls.has(sk):
 			continue
 		var ctrl = loot_slot_controls[sk]
-		var btn: Button  = ctrl["btn"]
+		var btn: Button = ctrl["btn"]
 		var item = loot_target.equipped.get(es, null)
 		if item != null and item is String and item != "":
 			var icon_tex = null
 			var label_text: String = str(item)
 
-			# ── Special Case: COINS (Dynamic Stack Sprites) ──────────
+			# Special Case: COINS (Dynamic Stack Sprites)
 			if item.ends_with("Coin"):
 				var edata = loot_target.equipped_data.get(es)
 				var amt = 1
 				var mtype = 0
 				if typeof(edata) == TYPE_DICTIONARY:
-					# Pockets and hands usually store flat data
+					# Pockets and hands usually store flat data.
 					amt = edata.get("amount", 1)
 					mtype = edata.get("metal_type", 0)
-				
+
 				var coin_icon_path := Defs.get_coin_icon_path(amt, mtype)
 				if coin_icon_path != "":
 					icon_tex = load(coin_icon_path)
 				label_text = str(amt) if amt > 1 else item
-			# ── General Case: Standard Items ──────────────────────────
+			# General Case: Standard Items
 			elif item == "Keyring":
 				var edata = loot_target.equipped_data.get(es, {})
 				var key_count := 0
@@ -236,8 +192,8 @@ func refresh_loot_panel() -> void:
 
 			btn.disabled = false
 		else:
-			btn.text     = "empty"
-			btn.icon     = null
+			btn.text = "empty"
+			btn.icon = null
 			btn.disabled = true
 
 func close_target_inventory() -> void:
@@ -260,7 +216,7 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 
 	var item_desc: String = ""
 	var slot_type: String = ""
-	var slot_index         = null
+	var slot_index = null
 
 	if slot_key.begins_with("hand_"):
 		var idx: int = slot_key.trim_prefix("hand_").to_int()
@@ -268,32 +224,33 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 		if obj == null or not is_instance_valid(obj):
 			return
 		var iname = obj.get("item_type")
-		if iname == null: iname = obj.name.get_slice("@", 0)
-		item_desc  = iname
-		slot_type  = "hand"
+		if iname == null:
+			iname = obj.name.get_slice("@", 0)
+		item_desc = iname
+		slot_type = "hand"
 		slot_index = idx
 	else:
 		var equip_slot: String = slot_key.trim_prefix("equip_")
 		var item = loot_target.equipped.get(equip_slot, null)
 		if item == null or not (item is String) or item == "":
 			return
-		item_desc  = item
-		slot_type  = "equip"
+		item_desc = item
+		slot_type = "equip"
 		slot_index = equip_slot
 
 	var prog_lbl: Label = _create_loot_indicator(loot_target, slot_key)
-	prog_lbl.text    = "."
+	prog_lbl.text = "."
 	prog_lbl.visible = true
 
 	var attempt := {
-		"slot_key":      slot_key,
-		"slot_type":     slot_type,
-		"slot_index":    slot_index,
-		"elapsed":       0.0,
+		"slot_key": slot_key,
+		"slot_type": slot_type,
+		"slot_index": slot_index,
+		"elapsed": 0.0,
 		"blink_elapsed": 0.0,
-		"prog_label":    prog_lbl,
-		"item_desc":     item_desc,
-		"target":        loot_target
+		"prog_label": prog_lbl,
+		"item_desc": item_desc,
+		"target": loot_target
 	}
 	active_loot_attempts.append(attempt)
 
@@ -306,14 +263,14 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 
 func _update_loot_attempts(delta: float) -> void:
 	var completed_keys: Array = []
-	var cancelled_keys: Array =[]
+	var cancelled_keys: Array = []
 
 	for attempt in active_loot_attempts:
-		var slot_key:   String = attempt["slot_key"]
-		var slot_type:  String = attempt["slot_type"]
-		var slot_index         = attempt["slot_index"]
-		var prog_lbl:   Label  = attempt["prog_label"]
-		var target:     Node   = attempt["target"]
+		var slot_key: String = attempt["slot_key"]
+		var slot_type: String = attempt["slot_type"]
+		var slot_index = attempt["slot_index"]
+		var prog_lbl: Label = attempt["prog_label"]
+		var target: Node = attempt["target"]
 
 		if not is_instance_valid(target):
 			cancelled_keys.append(slot_key)
@@ -326,16 +283,16 @@ func _update_loot_attempts(delta: float) -> void:
 		var item_still_there: bool = false
 		if slot_type == "hand":
 			var obj: Node = target.hands[int(slot_index)]
-			item_still_there = (obj != null and is_instance_valid(obj))
+			item_still_there = obj != null and is_instance_valid(obj)
 		else:
 			var item = target.equipped.get(str(slot_index), null)
-			item_still_there = (item != null and item is String and item != "")
+			item_still_there = item != null and item is String and item != ""
 
 		if not item_still_there:
 			cancelled_keys.append(slot_key)
 			continue
 
-		attempt["elapsed"]       += delta
+		attempt["elapsed"] += delta
 		attempt["blink_elapsed"] += delta
 
 		var progress: float = clamp(attempt["elapsed"] / Defs.LOOT_DURATION, 0.0, 1.0)
@@ -363,7 +320,7 @@ func _update_loot_attempts(delta: float) -> void:
 			if attempt["slot_key"] == sk:
 				_remove_loot_indicator(attempt["target"], sk)
 				break
-				
+
 	active_loot_attempts = active_loot_attempts.filter(
 		func(a): return not (a["slot_key"] in all_done)
 	)
@@ -397,16 +354,16 @@ func _complete_loot_attempt(slot_key: String) -> void:
 		return
 
 	var target_id := World.get_entity_id(target)
-	var my_peer_id:     int = player.multiplayer.get_unique_id()
+	var my_peer_id: int = player.multiplayer.get_unique_id()
 
-	var slot_type:  String = ""
-	var slot_index         = null
+	var slot_type: String = ""
+	var slot_index = null
 
 	if slot_key.begins_with("hand_"):
-		slot_type  = "hand"
+		slot_type = "hand"
 		slot_index = slot_key.trim_prefix("hand_").to_int()
 	else:
-		slot_type  = "equip"
+		slot_type = "equip"
 		slot_index = slot_key.trim_prefix("equip_")
 
 	if player.multiplayer.is_server():
