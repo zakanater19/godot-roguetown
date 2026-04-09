@@ -38,7 +38,7 @@ func handle_rpc_confirm_hit_rock(rock_path: NodePath) -> void:                  
 func handle_rpc_confirm_break_rock(rock_path: NodePath, drops_data: Array) -> void: harvesting.handle_rpc_confirm_break_rock(rock_path, drops_data)
 func handle_rpc_request_hit_tree(sender_id: int, tree_path: NodePath) -> void:      harvesting.handle_rpc_request_hit_tree(sender_id, tree_path)
 func handle_rpc_confirm_hit_tree(tree_path: NodePath) -> void:                       harvesting.handle_rpc_confirm_hit_tree(tree_path)
-func handle_rpc_confirm_break_tree(tree_path: NodePath, log_names: Array) -> void:  harvesting.handle_rpc_confirm_break_tree(tree_path, log_names)
+func handle_rpc_confirm_break_tree(tree_path: NodePath, break_payload: Dictionary) -> void: harvesting.handle_rpc_confirm_break_tree(tree_path, break_payload)
 func handle_rpc_request_hit_breakable(sender_id: int, obj_path: NodePath) -> void:  harvesting.handle_rpc_request_hit_breakable(sender_id, obj_path)
 func handle_rpc_confirm_hit_breakable(obj_path: NodePath) -> void:                   harvesting.handle_rpc_confirm_hit_breakable(obj_path)
 func handle_rpc_confirm_break_breakable(obj_path: NodePath) -> void:                 harvesting.handle_rpc_confirm_break_breakable(obj_path)

@@ -249,6 +249,9 @@ func _server_check_action_cooldown(player: Node, is_attack: bool = false) -> boo
 func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0, include_dead: bool = false) -> Array:
 	return utils.get_entities_at_tile(tile, z_level, exclude_peer, include_dead)
 
+func get_tile_movement_multiplier(tile: Vector2i, z_level: int) -> float:
+	return utils.get_tile_movement_multiplier(tile, z_level)
+
 func _find_player_by_peer(peer_id: int) -> Node:
 	return utils.find_player_by_peer(peer_id)
 
@@ -425,8 +428,8 @@ func rpc_confirm_hit_tree(tree_path: NodePath) -> void:
 	objects.handle_rpc_confirm_hit_tree(tree_path)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_break_tree(tree_path: NodePath, log_names: Array) -> void:
-	objects.handle_rpc_confirm_break_tree(tree_path, log_names)
+func rpc_confirm_break_tree(tree_path: NodePath, break_payload: Dictionary) -> void:
+	objects.handle_rpc_confirm_break_tree(tree_path, break_payload)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_breakable(obj_path: NodePath) -> void:

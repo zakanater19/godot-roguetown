@@ -106,6 +106,15 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	if "contents"      in obj: data["contents"]       = obj.get("contents").duplicate(true)
 	if "amount"        in obj: data["amount"]         = obj.get("amount")
 	if "metal_type"    in obj: data["metal_type"]     = obj.get("metal_type")
+	if "tree_id"       in obj: data["tree_id"]        = obj.get("tree_id")
+	if "piece_kind"    in obj: data["piece_kind"]     = obj.get("piece_kind")
+	if "support_segment_name" in obj: data["support_segment_name"] = obj.get("support_segment_name")
+	if "hits_to_break" in obj: data["hits_to_break"]  = obj.get("hits_to_break")
+	if "drop_count"    in obj: data["drop_count"]     = obj.get("drop_count")
+	if "atlas_index"   in obj: data["atlas_index"]    = obj.get("atlas_index")
+	if "solid_piece"   in obj: data["solid_piece"]    = obj.get("solid_piece")
+	if "blocks_fov"    in obj: data["blocks_fov"]     = obj.get("blocks_fov")
+	if "decor_configs" in obj: data["decor_configs"]  = obj.get("decor_configs").duplicate(true)
 
 	if obj is Area2D:
 		var script_str = str(obj.get_script())
@@ -114,6 +123,31 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 		elif "coin.gd" in script_str: data["type"] = "coin"
 
 	return data
+
+func _apply_pre_add_object_state(obj: Node, obj_data: Dictionary) -> void:
+	var pre_add_keys := [
+		"z_level",
+		"tree_id",
+		"piece_kind",
+		"support_segment_name",
+		"hits_to_break",
+		"drop_count",
+		"atlas_index",
+		"solid_piece",
+		"blocks_fov",
+		"decor_configs",
+	]
+
+	for key in pre_add_keys:
+		if not obj_data.has(key):
+			continue
+		if not (key in obj):
+			continue
+		var value = obj_data[key]
+		if value is Array or value is Dictionary:
+			obj.set(key, value.duplicate(true))
+		else:
+			obj.set(key, value)
 
 # ---------------------------------------------------------------------------
 # Client-side: receive and apply world state
@@ -240,7 +274,7 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 						if s: obj = Node2D.new(); obj.set_script(s)
 		if obj != null:
 			obj.name = obj_name
-			if obj_data.has("z_level"): obj.set("z_level", obj_data["z_level"])
+			_apply_pre_add_object_state(obj, obj_data)
 			main_node.add_child(obj)
 			World.register_entity(obj, entity_id)
 			if obj_data.has("z_index"):
@@ -263,6 +297,10 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			else: obj.set("hits", obj_data["hits"])
 		if obj_data.has("amount"):        obj.set("amount",        obj_data["amount"])
 		if obj_data.has("metal_type"):    obj.set("metal_type",    obj_data["metal_type"])
+		if obj_data.has("decor_configs") and "decor_configs" in obj:
+			obj.set("decor_configs", obj_data["decor_configs"].duplicate(true))
+			if obj.has_method("rebuild_decor"):
+				obj.call("rebuild_decor")
 		if obj_data.has("state"):
 			obj.set("state", obj_data["state"])
 			if obj.has_method("_update_sprite"):   obj.call("_update_sprite")

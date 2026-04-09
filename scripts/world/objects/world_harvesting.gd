@@ -9,6 +9,31 @@ func _init(p_world: Node) -> void:
 func _get_material_hit_strength(target: Node, held_item: Node) -> float:
 	return MaterialRegistry.get_tool_efficiency(target, held_item)
 
+func _get_break_threshold(target: Node) -> float:
+	if target != null and target.has_method("get_hits_to_break"):
+		return float(target.call("get_hits_to_break"))
+	if target != null and "HITS_TO_BREAK" in target:
+		return float(target.get("HITS_TO_BREAK"))
+	return 1.0
+
+func _build_tree_break_payload(tree: Node) -> Dictionary:
+	if tree != null and tree.has_method("build_break_payload"):
+		var payload = tree.call("build_break_payload")
+		if payload is Dictionary and not payload.is_empty():
+			return payload
+
+	var tree_path := str(tree.get_path())
+	var drop_names: Array[String] = []
+	for _i in range(2):
+		drop_names.append(Defs.make_runtime_name("Log"))
+
+	return {
+		"broken_paths": [tree_path],
+		"drop_names": {
+			tree_path: drop_names,
+		},
+	}
+
 func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:
 	if not world.multiplayer.is_server(): return
 	var rock = world.get_node_or_null(rock_path)
@@ -65,11 +90,8 @@ func handle_rpc_request_hit_tree(sender_id: int, tree_path: NodePath) -> void:
 	tree.hits += hit_strength
 	LateJoin.register_object_state(tree_path, {"hits": tree.hits, "type": "tree"})
 
-	if tree.hits >= tree.HITS_TO_BREAK:
-		var log_names = []
-		for i in range(3):
-			log_names.append(Defs.make_runtime_name("Log"))
-		world.rpc_confirm_break_tree.rpc(tree_path, log_names)
+	if tree.hits >= _get_break_threshold(tree):
+		world.rpc_confirm_break_tree.rpc(tree_path, _build_tree_break_payload(tree))
 	else:
 		world.rpc_confirm_hit_tree.rpc(tree_path)
 
@@ -78,11 +100,26 @@ func handle_rpc_confirm_hit_tree(tree_path: NodePath) -> void:
 	if tree != null:
 		tree.perform_hit(World.main_scene)
 
-func handle_rpc_confirm_break_tree(tree_path: NodePath, log_names: Array) -> void:
-	var tree = world.get_node_or_null(tree_path)
-	if tree != null:
-		tree.perform_break(log_names)
-		LateJoin.unregister_object(tree_path)
+func handle_rpc_confirm_break_tree(tree_path: NodePath, break_payload: Dictionary) -> void:
+	var broken_paths: Array = break_payload.get("broken_paths", [str(tree_path)])
+	var drop_names_by_path: Dictionary = break_payload.get("drop_names", {})
+
+	for raw_path in broken_paths:
+		var disable_path := NodePath(String(raw_path))
+		var blocking_piece = world.get_node_or_null(disable_path)
+		if blocking_piece != null and blocking_piece.has_method("set_solid_enabled"):
+			blocking_piece.call("set_solid_enabled", false)
+
+	for raw_path in broken_paths:
+		var piece_path := NodePath(String(raw_path))
+		var tree = world.get_node_or_null(piece_path)
+		if tree != null and tree.has_method("perform_break"):
+			var log_names: Array = []
+			var payload_names = drop_names_by_path.get(String(raw_path), [])
+			if payload_names is Array:
+				log_names = payload_names
+			tree.perform_break(log_names)
+		LateJoin.unregister_object(piece_path)
 
 func handle_rpc_request_hit_breakable(sender_id: int, obj_path: NodePath) -> void:
 	if not world.multiplayer.is_server(): return

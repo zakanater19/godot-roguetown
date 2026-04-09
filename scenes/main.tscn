@@ -10,7 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://cironore01sc" path="res://objects/ironore.tscn" id="10_efxa6"]
 [ext_resource type="PackedScene" uid="uid://ccoal001sc" path="res://objects/coal.tscn" id="11_dg77c"]
 [ext_resource type="PackedScene" uid="uid://ddm0gd70hk077" path="res://objects/woodentable.tscn" id="17_yaehf"]
-[ext_resource type="PackedScene" uid="uid://tree001sc" path="res://objects/tree.tscn" id="18_074og"]
+[ext_resource type="PackedScene" path="res://objects/tree_spawn.tscn" id="18_074og"]
 [ext_resource type="PackedScene" path="res://clothing/apothshirt.tscn" id="18_xuqvo"]
 [ext_resource type="PackedScene" path="res://clothing/blackshirt.tscn" id="19_qsp4k"]
 [ext_resource type="PackedScene" uid="uid://circhest01sc" path="res://clothing/ironchestplate.tscn" id="20_kq58d"]

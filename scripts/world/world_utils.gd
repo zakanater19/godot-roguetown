@@ -55,6 +55,26 @@ func get_entities_at_tile(tile: Vector2i, z_level: int, exclude_peer: int = 0, i
 			if visual_tile == tile: result.append(p)
 	return result
 
+func get_tile_movement_multiplier(tile: Vector2i, z_level: int) -> float:
+	var multiplier: float = 1.0
+	var main_node: Node = world.main_scene
+	for obj in world.get_tree().get_nodes_in_group(Defs.GROUP_CHOPPABLE):
+		if obj == null or not is_instance_valid(obj):
+			continue
+		if main_node != null and obj.get_parent() != main_node:
+			continue
+		if obj.get("z_level") == null or int(obj.get("z_level")) != z_level:
+			continue
+		var obj_tile := Vector2i(
+			int(obj.global_position.x / world.TILE_SIZE),
+			int(obj.global_position.y / world.TILE_SIZE)
+		)
+		if obj_tile != tile:
+			continue
+		if obj.has_method("get_movement_slow_multiplier"):
+			multiplier = maxf(multiplier, float(obj.call("get_movement_slow_multiplier")))
+	return multiplier
+
 func find_player_by_peer(peer_id: int) -> Node:
 	for p in world.get_tree().get_nodes_in_group("player"):
 		# Ignores unpossessed corpses so actions (grabbing/chatting) reliably 

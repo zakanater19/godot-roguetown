@@ -168,11 +168,14 @@ func update_water_submerge() -> void:
 	var lying_mult = 3.0 if player.is_lying_down else 1.0
 	var sneak_level: int = player.skills.get("sneaking", 0)
 	var sneak_mult = max(1.0, 2.0 - sneak_level * 0.25) if player.is_sneaking else 1.0
+	var terrain_mult: float = World.get_tile_movement_multiplier(player.tile_pos, player.z_level)
 	if player.grabbed_by != null and is_instance_valid(player.grabbed_by):
 		stamina_penalty = 1.0
 		lying_mult = 1.0
-	if on_water: player.current_move_duration = (player.MOVE_TIME * 2.0 * stamina_penalty) * sprint_mult * lying_mult * sneak_mult
-	else: player.current_move_duration = (player.MOVE_TIME * stamina_penalty) * sprint_mult * lying_mult * sneak_mult
+	var base_move_duration: float = player.MOVE_TIME * stamina_penalty
+	if on_water:
+		base_move_duration *= 2.0
+	player.current_move_duration = base_move_duration * sprint_mult * lying_mult * sneak_mult * terrain_mult
 	var h            := CLIP_H if on_water else FULL_H
 	var compensate_y := (FULL_H - h) / 2.0
 	var sprite: Sprite2D = player.get_node_or_null("Sprite2D")
