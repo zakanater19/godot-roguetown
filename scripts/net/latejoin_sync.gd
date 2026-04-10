@@ -22,38 +22,52 @@ func send_world_state_to_peer(peer_id: int) -> void:
 
 	sync_objects_for_late_joiner(peer_id)
 
-	var player_states = {}
+	var player_states = {
+		"by_peer": {},
+		"by_entity": {},
+	}
 	for p in lj.get_tree().get_nodes_in_group("player"):
 		var node = p as Node2D
-		if node == null or node.get("is_possessed") == false:
+		if node == null:
 			continue
+		var entity_id = World.get_entity_id(node)
+		if node.get("is_possessed") == false:
+			# Corpses can share a peer ID with an active ghost, so sync them by stable entity ID.
+			if entity_id != "":
+				player_states["by_entity"][entity_id] = lj._reconnect.capture_player_state(node)
+			continue
+		var sync_state = _build_player_sync_state(node)
 		var pid  = node.get_multiplayer_authority()
 		if pid == peer_id:
 			continue
-		var hand_ids = []
-		for h in node.get("hands"):
-			hand_ids.append(World.get_entity_id(h) if (h != null and is_instance_valid(h)) else "")
-		var equipped_data = lj._reconnect.capture_equipped_state(node)
-		var eq_data_state = node.get("equipped_data").duplicate(true) if "equipped_data" in node else {}
-		player_states[pid] = {
-			"position":     node.position,
-			"z_level":      node.get("z_level"),
-			"disconnected": false,
-			"health":       node.get("health"),
-			"limb_hp":      node.get("body").limb_hp.duplicate() if node.get("body") != null else {},
-			"limb_broken":  node.get("body").limb_broken.duplicate() if node.get("body") != null else {},
-			"hands":        hand_ids,
-			"equipped":     equipped_data,
-			"equipped_data": eq_data_state,
-			"is_lying_down": node.get("is_lying_down") == true,
-			"is_sneaking":  node.get("is_sneaking") == true,
-			"sneak_alpha":  node.get("sneak_alpha") if "sneak_alpha" in node else 1.0
-		}
+		player_states["by_peer"][pid] = sync_state
 
-	if not player_states.is_empty():
+	if not player_states["by_peer"].is_empty() or not player_states["by_entity"].is_empty():
 		lj.rpc_id(peer_id, "receive_player_states", player_states)
 
 	lj.rpc_id(peer_id, "receive_laws", World.current_laws)
+
+func _build_player_sync_state(node: Node2D) -> Dictionary:
+	var hand_ids = []
+	for h in node.get("hands"):
+		hand_ids.append(World.get_entity_id(h) if (h != null and is_instance_valid(h)) else "")
+	var equipped_data = lj._reconnect.capture_equipped_state(node)
+	var eq_data_state = node.get("equipped_data").duplicate(true) if "equipped_data" in node else {}
+	return {
+		"position":       node.position,
+		"z_level":        node.get("z_level"),
+		"disconnected":   false,
+		"health":         node.get("health"),
+		"dead":           node.get("dead") == true,
+		"limb_hp":        node.get("body").limb_hp.duplicate() if node.get("body") != null else {},
+		"limb_broken":    node.get("body").limb_broken.duplicate() if node.get("body") != null else {},
+		"hands":          hand_ids,
+		"equipped":       equipped_data,
+		"equipped_data":  eq_data_state,
+		"is_lying_down":  node.get("is_lying_down") == true,
+		"is_sneaking":    node.get("is_sneaking") == true,
+		"sneak_alpha":    node.get("sneak_alpha") if "sneak_alpha" in node else 1.0
+	}
 
 func sync_objects_for_late_joiner(peer_id: int) -> void:
 	var main_node = World.main_scene
@@ -193,45 +207,104 @@ func handle_receive_player_states(player_states: Dictionary) -> void:
 
 func _retry_receive_player_states(player_states: Dictionary, retries: int) -> void:
 	var missing = {}
-	for peer_id in player_states:
-		var p_data = player_states[peer_id]
-		var node   = lj._find_player_by_peer(peer_id) as Node2D
+
+	var peer_states: Dictionary = {}
+	var entity_states: Dictionary = {}
+	if player_states.has("by_peer") or player_states.has("by_entity"):
+		peer_states = player_states.get("by_peer", {})
+		entity_states = player_states.get("by_entity", {})
+	else:
+		# Backward-compatible fallback for older flat payloads.
+		for state_id in player_states:
+			if state_id is int or (state_id is String and str(state_id).is_valid_int()):
+				peer_states[state_id] = player_states[state_id]
+			else:
+				entity_states[state_id] = player_states[state_id]
+
+	for state_id in peer_states:
+		var p_data = peer_states[state_id]
+		var node := _resolve_player_sync_target(state_id)
 		if node != null:
-			var lp = World.get_local_player() as Node2D
-			if lp != null and (p_data["position"] - lp.position).length() > 1000:
-				node.position = p_data["position"]
-			if p_data.has("z_level"):      node.set("z_level", p_data["z_level"])
-			if p_data.has("limb_hp")    and node.get("body") != null: node.get("body").limb_hp    = p_data["limb_hp"].duplicate()
-			if p_data.has("limb_broken") and node.get("body") != null: node.get("body").limb_broken = p_data["limb_broken"].duplicate()
-			if p_data.has("hands")        and node.has_method("sync_hands"):          node.call("sync_hands", p_data["hands"])
-			if p_data.has("equipped_data") and "equipped_data" in node:               node.set("equipped_data", p_data["equipped_data"].duplicate(true))
-			if p_data.has("equipped"):
-				var eq = node.get("equipped")
-				for slot in p_data["equipped"]:
-					var item = p_data["equipped"][slot]
-					if item == null: eq[slot] = null
-					elif item is Dictionary and item.has("item_type"): eq[slot] = item["item_type"] if item["item_type"] != "" else null
-					elif item is String: eq[slot] = item if item != "" else null
-					else: eq[slot] = null
-				if node.has_method("_update_clothing_sprites"): node.call("_update_clothing_sprites")
-			if p_data.has("is_lying_down"):
-				node.set("is_lying_down", p_data["is_lying_down"])
-				if node.has_method("_update_sprite"):          node.call("_update_sprite")
-				if node.has_method("_update_water_submerge"):  node.call("_update_water_submerge")
-			if p_data.has("is_sneaking"):
-				node.set("is_sneaking", p_data["is_sneaking"])
-				var alpha: float = p_data.get("sneak_alpha", 1.0)
-				node.set("sneak_alpha", alpha)
-				if node.has_method("_apply_sneak_alpha"):      node.call("_apply_sneak_alpha", alpha)
-				if node.has_method("_update_water_submerge"):  node.call("_update_water_submerge")
-			if node.has_method("_update_hands_ui"): node.call("_update_hands_ui")
-			if node.get("_hud") != null: node.get("_hud").update_stats(node.get("health"), node.get("stamina"))
+			_apply_synced_player_state(node, p_data, true)
 		else:
-			missing[peer_id] = p_data
+			missing[state_id] = p_data
+
+	for state_id in entity_states:
+		var p_data = entity_states[state_id]
+		var node := _resolve_player_sync_target(state_id)
+		if node != null:
+			_apply_synced_player_state(node, p_data, false)
+		else:
+			missing[state_id] = p_data
 
 	if not missing.is_empty() and retries > 0:
 		await lj.get_tree().create_timer(0.1).timeout
 		_retry_receive_player_states(missing, retries - 1)
+
+func _resolve_player_sync_target(state_id: Variant) -> Node2D:
+	if state_id is int:
+		return lj._find_player_by_peer(int(state_id)) as Node2D
+	if state_id is String and str(state_id).is_valid_int():
+		return lj._find_player_by_peer(int(str(state_id))) as Node2D
+	return World.get_entity(str(state_id)) as Node2D
+
+func _apply_synced_player_state(node: Node2D, p_data: Dictionary, limit_far_position_fix: bool) -> void:
+	if not limit_far_position_fix:
+		lj._reconnect.restore_player_state(node, p_data)
+		return
+	if p_data.has("position"):
+		if limit_far_position_fix:
+			var lp = World.get_local_player() as Node2D
+			if lp != null and (p_data["position"] - lp.position).length() > 1000:
+				node.position = p_data["position"]
+		else:
+			node.position = p_data["position"]
+	if p_data.has("z_level"):
+		node.set("z_level", p_data["z_level"])
+	if p_data.has("health"):
+		node.set("health", p_data["health"])
+	if p_data.has("dead"):
+		node.set("dead", p_data["dead"])
+	if p_data.has("limb_hp") and node.get("body") != null:
+		node.get("body").limb_hp = p_data["limb_hp"].duplicate()
+	if p_data.has("limb_broken") and node.get("body") != null:
+		node.get("body").limb_broken = p_data["limb_broken"].duplicate()
+	if p_data.has("hands") and node.has_method("sync_hands"):
+		node.call("sync_hands", p_data["hands"])
+	if p_data.has("equipped_data") and "equipped_data" in node:
+		node.set("equipped_data", p_data["equipped_data"].duplicate(true))
+	if p_data.has("equipped"):
+		var eq = node.get("equipped")
+		for slot in p_data["equipped"]:
+			var item = p_data["equipped"][slot]
+			if item == null:
+				eq[slot] = null
+			elif item is Dictionary and item.has("item_type"):
+				eq[slot] = item["item_type"] if item["item_type"] != "" else null
+			elif item is String:
+				eq[slot] = item if item != "" else null
+			else:
+				eq[slot] = null
+		if node.has_method("_update_clothing_sprites"):
+			node.call("_update_clothing_sprites")
+	if p_data.has("is_lying_down"):
+		node.set("is_lying_down", p_data["is_lying_down"])
+		if node.has_method("_update_sprite"):
+			node.call("_update_sprite")
+		if node.has_method("_update_water_submerge"):
+			node.call("_update_water_submerge")
+	if p_data.has("is_sneaking"):
+		node.set("is_sneaking", p_data["is_sneaking"])
+		var alpha: float = p_data.get("sneak_alpha", 1.0)
+		node.set("sneak_alpha", alpha)
+		if node.has_method("_apply_sneak_alpha"):
+			node.call("_apply_sneak_alpha", alpha)
+		if node.has_method("_update_water_submerge"):
+			node.call("_update_water_submerge")
+	if node.has_method("_update_hands_ui"):
+		node.call("_update_hands_ui")
+	if node.get("_hud") != null:
+		node.get("_hud").update_stats(node.get("health"), node.get("stamina"))
 
 func handle_purge_missing_objects(valid_ids: Array) -> void:
 	var main_node = World.main_scene

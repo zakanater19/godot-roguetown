@@ -92,7 +92,10 @@ func execute_round_restart() -> void:
 	LateJoin.client_connected = false
 	LateJoin.map_loaded = false
 	LateJoin.sync_requested = false
+	LateJoin.version_checked = false
+	LateJoin._version_check_sent = false
 	LateJoin.is_manual_reconnect = false
+	BootstrapNet.reset_client_state(false)
 
 	Sidebar._messages.clear()
 	if Sidebar._rtl != null:

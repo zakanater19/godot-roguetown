@@ -1,14 +1,10 @@
 # res://scripts/net/latejoin.gd
-# AutoLoad singleton — register as "LateJoin" in project.godot
+# AutoLoad singleton - register as "LateJoin" in project.godot
 # Thin dispatcher: delegates heavy work to latejoin_sync.gd and latejoin_reconnect.gd
 
 extends Node
 
 const SYNC_INTERVAL: float = 1.0
-## Max bytes per PCK chunk sent over RPC.
-const PCK_CHUNK_SIZE: int = 32768    # 32 KB
-## Upload cap per connecting client.
-const PCK_UPLOAD_BPS: int = 1048576  # 1 MB/s
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -26,7 +22,7 @@ var _world_state: Dictionary = {
 	"players": {},
 }
 
-var _pending_joins: Array[int] =[]
+var _pending_joins: Array[int] = []
 var _state_dirty: bool = false
 var _sync_timer: float = 0.0
 
@@ -36,13 +32,6 @@ var sync_requested: bool = false
 var version_checked: bool = false
 var _version_check_sent: bool = false
 var is_manual_reconnect: bool = false
-
-# PCK download state (client-side only)
-var _pck_buffer: Dictionary = {}
-var _pck_total_chunks: int = 0
-var _pck_chunks_received: int = 0
-var _pending_pck_version: String = ""
-var _restarting_for_patch: bool = false
 
 var _disconnected_players: Dictionary = {}
 
@@ -57,10 +46,11 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
+	if not BootstrapNet.ready_to_enter_game.is_connected(_on_bootstrap_ready_to_enter_game):
+		BootstrapNet.ready_to_enter_game.connect(_on_bootstrap_ready_to_enter_game)
 
 	if not multiplayer.is_server():
 		print("LateJoin: Client mode - Press F5 to manually attempt reconnection")
-
 
 func _on_connected_to_server() -> void:
 	client_connected = true
@@ -68,12 +58,9 @@ func _on_connected_to_server() -> void:
 	if is_manual_reconnect:
 		map_loaded = true
 
-	LoadingScreen.update_status("Checking version...")
-
 	if not _version_check_sent:
 		_version_check_sent = true
-		_send_version_check_deferred()
-
+		BootstrapNet.begin_version_check(is_manual_reconnect)
 
 func _on_server_disconnected() -> void:
 	client_connected = false
@@ -82,15 +69,8 @@ func _on_server_disconnected() -> void:
 	version_checked = false
 	_version_check_sent = false
 	is_manual_reconnect = false
-	_pck_buffer.clear()
-	_pck_total_chunks = 0
-	_pck_chunks_received = 0
 	LoadingScreen.hide_loading()
-	# If we disconnected mid-reconnect (server down / refused), clean up the
-	# pending reconnect marker so the next launch doesn't loop forever.
-	if not _restarting_for_patch:
-		DirAccess.remove_absolute("user://pending_reconnect.json")
-
+	BootstrapNet.reset_client_state(true)
 
 func _process(delta: float) -> void:
 	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
@@ -100,7 +80,7 @@ func _process(delta: float) -> void:
 		_attempt_manual_reconnection()
 
 	if not multiplayer.is_server():
-		if client_connected and map_loaded and version_checked and not sync_requested:
+		if client_connected and map_loaded and BootstrapNet.version_checked and not sync_requested:
 			sync_requested = true
 			request_sync.rpc_id(1)
 
@@ -111,24 +91,14 @@ func _process(delta: float) -> void:
 			_broadcast_state_updates()
 			_state_dirty = false
 
-
-func _send_version_check_deferred() -> void:
-	await get_tree().create_timer(0.1).timeout
-	if multiplayer.multiplayer_peer == null:
-		return
-	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
-		return
-
-	request_version_check.rpc_id(1,
-		GameVersion.get_version(),
-		GameVersion.build_manifest(),
-		GameVersion.APP_VERSION,
-		is_manual_reconnect)
-
-
 func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	var key: String = str(tile_pos.x) + "_" + str(tile_pos.y) + "_" + str(z_level)
-	_world_state["tiles"][key] = {"tile_pos": tile_pos, "z_level": z_level, "source_id": source_id, "atlas_coords": atlas_coords}
+	_world_state["tiles"][key] = {
+		"tile_pos": tile_pos,
+		"z_level": z_level,
+		"source_id": source_id,
+		"atlas_coords": atlas_coords,
+	}
 	_state_dirty = true
 
 func register_object_state(object_path: NodePath, object_data: Dictionary) -> void:
@@ -173,15 +143,22 @@ func _find_player_by_peer(peer_id: int) -> Node:
 	return null
 
 func _attempt_manual_reconnection() -> void:
-	if multiplayer.is_server(): return
+	if multiplayer.is_server():
+		return
 	client_connected = false
 	sync_requested = false
 	version_checked = false
 	_version_check_sent = false
 	is_manual_reconnect = true
+	BootstrapNet.reset_client_state(false)
 	var enet: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
 	var err: Error = enet.create_client("127.0.0.1", Host.PORT, 3)
-	if err == OK: multiplayer.multiplayer_peer = enet
+	if err == OK:
+		multiplayer.multiplayer_peer = enet
+
+func _on_bootstrap_ready_to_enter_game() -> void:
+	version_checked = true
+	ready_to_enter_game.emit()
 
 func _broadcast_state_updates() -> void:
 	pass
@@ -191,7 +168,8 @@ func request_sync() -> void:
 	if not multiplayer.is_server():
 		return
 	var peer_id: int = multiplayer.get_remote_sender_id()
-	if peer_id == 0: peer_id = multiplayer.get_unique_id()
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
 
 	print("LateJoin: Peer requested sync - ", peer_id)
 
@@ -225,7 +203,8 @@ func spawn_object_for_late_join(obj_data: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func receive_laws(laws: Array) -> void:
 	World.current_laws = laws
-	if Sidebar.has_method("refresh_laws_ui"): Sidebar.refresh_laws_ui()
+	if Sidebar.has_method("refresh_laws_ui"):
+		Sidebar.refresh_laws_ui()
 
 @rpc("authority", "call_local", "reliable")
 func rpc_update_player_authority(player_path: NodePath, new_peer_id: int) -> void:
@@ -249,7 +228,7 @@ func client_reconnection_confirmed() -> void:
 		World.main_scene.call("_on_client_reconnected")
 
 # ---------------------------------------------------------------------------
-# Version check — server-side handler
+# Legacy version check compatibility wrappers
 # ---------------------------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -261,160 +240,45 @@ func request_version_check(
 	if not multiplayer.is_server():
 		return
 	var peer_id: int = multiplayer.get_remote_sender_id()
-	if peer_id == 0: peer_id = multiplayer.get_unique_id()
-
-	var server_version: String = GameVersion.get_version()
-
-	if client_version == server_version:
-		receive_version_response.rpc_id(peer_id, server_version, {}, false)
-		return
-
-	if GameVersion.server_pck_ready:
-		receive_version_response.rpc_id(peer_id, server_version, {}, true)
-		_send_pck_to_peer(peer_id, GameVersion.get_server_bundle_path())
-		return
-
-	var bundle_error: String = GameVersion.pck_generation_error
-	if bundle_error == "":
-		bundle_error = "unknown server bundle error"
-
-	var err_msg: String = (
-		"[color=red]Server update bundle unavailable:[/color] %s\n"
-		+ "This server cannot patch out-of-date clients until the bundle is regenerated."
-	) % bundle_error
-	receive_version_error.rpc_id(peer_id, err_msg)
-
-
-# ---------------------------------------------------------------------------
-# Version check — client-side handlers
-# ---------------------------------------------------------------------------
+	if peer_id == 0:
+		peer_id = multiplayer.get_unique_id()
+	BootstrapNet.handle_legacy_request_version_check(
+		peer_id,
+		client_version,
+		_client_manifest,
+		_client_app_version,
+		_is_reconnect)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_version_error(error_msg: String) -> void:
-	push_error("LateJoin version error: " + error_msg)
-	LoadingScreen.show_loading("Version error — cannot connect")
-	LoadingScreen.update_status(error_msg, -1.0, "Close this window to return to the main menu")
-
+	BootstrapNet.handle_receive_version_error(error_msg)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_version_warning(warning_msg: String) -> void:
-	push_warning("LateJoin version warning: " + warning_msg)
-	LoadingScreen.update_status(warning_msg, 0.0, "Applying partial patch...")
-
+	BootstrapNet.handle_receive_version_warning(warning_msg)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_version_response(server_version: String, diffs: Dictionary, has_pck: bool) -> void:
-	if has_pck:
-		_pending_pck_version = server_version
-		LoadingScreen.update_status("Downloading update...", 0.0)
-		return
-
-	if not diffs.is_empty():
-		LoadingScreen.update_status("Applying updates...", 0.0,
-			str(diffs.size()) + " resource(s) different")
-		GameVersion.apply_resource_diff(diffs)
-
-	version_checked = true
-	LoadingScreen.update_status("Entering game...")
-	ready_to_enter_game.emit()
-
+	BootstrapNet.handle_receive_version_response(server_version, diffs, has_pck)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_sync_complete() -> void:
 	LoadingScreen.hide_loading()
 	DirAccess.remove_absolute("user://pending_reconnect.json")
 
-
-# ---------------------------------------------------------------------------
-# PCK transfer — server-side
-# ---------------------------------------------------------------------------
-
 func _send_pck_to_peer(peer_id: int, pck_path: String) -> void:
-	var file := FileAccess.open(pck_path, FileAccess.READ)
-	if file == null:
-		var err_msg: String = (
-			"[color=red]Server error:[/color] PCK patch file could not be opened (%s).\n"
-			+ "Please report this to the server administrator."
-		) % pck_path
-		push_error("LateJoin: cannot open PCK at %s" % pck_path)
-		receive_version_error.rpc_id(peer_id, err_msg)
-		return
-
-	var total_size:   int   = file.get_length()
-	var total_chunks: int   = int(ceil(float(total_size) / float(PCK_CHUNK_SIZE)))
-	var delay_per_chunk: float = float(PCK_CHUNK_SIZE) / float(PCK_UPLOAD_BPS)
-
-	receive_pck_header.rpc_id(peer_id, total_size, total_chunks)
-
-	for i in range(total_chunks):
-		if not multiplayer.get_peers().has(peer_id):
-			file.close()
-			return
-		receive_pck_chunk.rpc_id(peer_id, i, file.get_buffer(PCK_CHUNK_SIZE))
-		await get_tree().create_timer(delay_per_chunk).timeout
-
-	file.close()
-
-
-# ---------------------------------------------------------------------------
-# PCK transfer — client-side receivers
-# ---------------------------------------------------------------------------
+	BootstrapNet._send_pck_to_peer(peer_id, pck_path, true)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_pck_header(total_size: int, total_chunks: int) -> void:
-	_pck_buffer.clear()
-	_pck_total_chunks    = total_chunks
-	_pck_chunks_received = 0
-	LoadingScreen.update_status("Downloading update...", 0.0, "0 / %d KB" % (total_size >> 10))
+	BootstrapNet.handle_receive_pck_header(total_size, total_chunks)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_pck_chunk(chunk_index: int, data: PackedByteArray) -> void:
-	_pck_buffer[chunk_index] = data
-	_pck_chunks_received    += 1
-	var progress: float = float(_pck_chunks_received) / float(_pck_total_chunks)
-	LoadingScreen.update_status("Downloading update...", progress, "%d / %d chunks" % [_pck_chunks_received, _pck_total_chunks])
-	if _pck_chunks_received == _pck_total_chunks:
-		_assemble_and_apply_pck()
+	BootstrapNet.handle_receive_pck_chunk(chunk_index, data)
 
 func _assemble_and_apply_pck() -> void:
-	LoadingScreen.update_status("Applying update...")
-	var assembled := PackedByteArray()
-	for i in range(_pck_total_chunks):
-		assembled.append_array(_pck_buffer[i])
-	_pck_buffer.clear()
-
-	var pack_path := _get_downloaded_pack_path()
-	var out: FileAccess = FileAccess.open(pack_path, FileAccess.WRITE)
-	if out != null:
-		out.store_buffer(assembled)
-		out.close()
-		out = null
-
-	var reconnect_data: Dictionary = {
-		"ip": Host.last_server_address,
-		"port": Host.last_server_port,
-		"pack_path": pack_path,
-	}
-	var rf: FileAccess = FileAccess.open("user://pending_reconnect.json", FileAccess.WRITE)
-	if rf != null:
-		rf.store_string(JSON.stringify(reconnect_data))
-		rf.close()
-		rf = null
-
-	_restarting_for_patch = true
-	LoadingScreen.update_status("Restarting...")
-	await get_tree().create_timer(1.0).timeout
-
-	var args: PackedStringArray = GameVersion.build_restart_args(pack_path)
-	var pid: int = OS.create_instance(args)
-	if pid == -1:
-		OS.create_process(OS.get_executable_path(), args)
-
-	get_tree().quit()
-
+	BootstrapNet._assemble_and_apply_pck()
 
 func _get_downloaded_pack_path() -> String:
-	var version_tag := _pending_pck_version.strip_edges().left(12)
-	if version_tag == "":
-		version_tag = str(Time.get_unix_time_from_system())
-	return "user://server_bundle_%s.pck" % version_tag
+	return BootstrapNet._get_downloaded_pack_path()
