@@ -70,6 +70,7 @@ func throw_held_object(mouse_world_pos: Vector2) -> void:
 	var dist_vec: Vector2i = (mouse_tile - player.tile_pos).abs()
 	var dist: float = float(max(dist_vec.x, dist_vec.y))
 	var throw_range: int = int(clamp(dist, 1.0, float(player.THROW_TILES)))
+	var interaction_z: int = player.get_interaction_z_level()
 
 	var dir: Vector2 = (mouse_world_pos - player.pixel_pos).normalized()
 	if dir == Vector2.ZERO:
@@ -85,9 +86,9 @@ func throw_held_object(mouse_world_pos: Vector2) -> void:
 		player._throw_label.visible = false
 
 	if player.multiplayer.is_server():
-		World.rpc_request_throw(obj_id, player.active_hand, dir, throw_range)
+		World.rpc_request_throw(obj_id, player.active_hand, dir, throw_range, interaction_z)
 	else:
-		World.rpc_request_throw.rpc_id(1, obj_id, player.active_hand, dir, throw_range)
+		World.rpc_request_throw.rpc_id(1, obj_id, player.active_hand, dir, throw_range, interaction_z)
 
 func interact_held_object() -> void:
 	if player.hands[player.active_hand] != null:
@@ -115,8 +116,10 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var held_item = player.hands[player.active_hand]
 	var is_sword := Defs.is_tool_sword(held_item)
 	var is_clothing := false
+	var is_weaponizable := false
 	if held_item != null:
 		is_clothing = held_item.get("slot") != null and held_item.get("slot") != ""
+		is_weaponizable = held_item.get("weaponizable") == true
 
 	var can_attack := false
 	if held_item == null:
@@ -124,7 +127,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	elif is_sword:
 		can_attack = true
 	else:
-		can_attack = (player.intent == Defs.INTENT_HARM and not is_clothing)
+		can_attack = (player.intent == Defs.INTENT_HARM and (is_weaponizable or not is_clothing))
 
 	var source_id = tm.get_cell_source_id(target_tile)
 	var atlas_coords = tm.get_cell_atlas_coords(target_tile)

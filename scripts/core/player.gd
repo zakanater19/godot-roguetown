@@ -184,6 +184,7 @@ func _inspect_at(world_pos: Vector2) -> void:                                  i
 func _show_inspect_text(text: String, detailed_desc: String) -> void:         if inspect: inspect.show_inspect_text(text, detailed_desc)
 func _apply_action_cooldown(item: Node, is_attack: bool = false) -> void:     if backend: backend.apply_action_cooldown(item, is_attack)
 func _face_toward(world_pos: Vector2) -> void:                                 if backend: backend.face_toward(world_pos)
+func get_interaction_z_level() -> int:                                         return clampi(view_z_level, 1, 5)
 
 func _on_object_picked_up(object_node: Node) -> void:
 	if active_hand == grab_hand_idx: return

@@ -75,8 +75,8 @@ func handle_rpc_request_pickup(sender_id: int, item_id: String, hand_index: int)
 func handle_rpc_confirm_pickup(peer_id: int, item_id: String, hand_index: int) -> void:                                                   items.handle_rpc_confirm_pickup(peer_id, item_id, hand_index)
 func handle_rpc_request_drop(sender_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:                    items.handle_rpc_request_drop(sender_id, item_id, tile, spread, hand_index)
 func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:               items.handle_rpc_drop_item_at(player_peer_id, item_id, tile, spread, hand_index)
-func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, dir: Vector2, throw_range: int) -> void:                  items.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range)
-func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, land_z: int) -> void:                  items.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_pixel, land_z)
+func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, dir: Vector2, throw_range: int, interaction_z: int) -> void: items.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range, interaction_z)
+func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, travel_z: int, land_z: int) -> void:   items.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_pixel, travel_z, land_z)
 
 # ── Coins ─────────────────────────────────────────────────────────────────────
 func handle_rpc_request_split_coins(sender_id: int, from_hand: int, to_hand: int, split_amount: int) -> void:                             coins.handle_rpc_request_split_coins(sender_id, from_hand, to_hand, split_amount)

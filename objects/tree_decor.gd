@@ -31,3 +31,9 @@ func _get_region_rect(cell_index: int) -> Rect2:
 	var x: int = (cell_index % SHEET_COLUMNS) * CELL_SIZE
 	var y: int = floori(float(cell_index) / float(SHEET_COLUMNS)) * CELL_SIZE
 	return Rect2(x, y, CELL_SIZE, CELL_SIZE)
+
+func get_description() -> String:
+	return "tree leafs"
+
+func get_detailed_description() -> String:
+	return "tree leafs"

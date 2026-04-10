@@ -606,14 +606,14 @@ func rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spre
 	objects.handle_rpc_drop_item_at(player_peer_id, item_id, tile, spread, hand_index)
 
 @rpc("any_peer", "call_remote", "reliable")
-func rpc_request_throw(item_id: String, hand_index: int, dir: Vector2, throw_range: int) -> void:
+func rpc_request_throw(item_id: String, hand_index: int, dir: Vector2, throw_range: int, interaction_z: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()
-	objects.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range)
+	objects.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range, interaction_z)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, land_z: int) -> void:
-	objects.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_pixel, land_z)
+func rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, travel_z: int, land_z: int) -> void:
+	objects.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_pixel, travel_z, land_z)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_send_chat(message: String) -> void:

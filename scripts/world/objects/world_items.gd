@@ -243,7 +243,7 @@ func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2
 
 # ── Throw ─────────────────────────────────────────────────────────────────────
 
-func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, dir: Vector2, throw_range: int) -> void:
+func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, dir: Vector2, throw_range: int, interaction_z: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if not world.utils.can_player_interact(player): return
@@ -252,12 +252,14 @@ func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, 
 	if player.body != null and player.body.is_arm_broken(hand_index): return
 	if not world.utils.server_check_action_cooldown(player, true): return
 	var safe_range = int(clamp(throw_range, 1, player.THROW_TILES))
-	var land_tile = world.utils.cast_throw(player.tile_pos, player.pixel_pos, player.z_level, dir, safe_range)
-	var land_z = world.calculate_gravity_z(land_tile, player.z_level)
+	var requested_z := clampi(interaction_z, player.z_level, min(player.z_level + 1, 5))
+	var land_tile = world.utils.cast_throw(player.tile_pos, player.pixel_pos, requested_z, dir, safe_range)
+	var travel_z = requested_z
+	var land_z = world.calculate_gravity_z(land_tile, travel_z)
 	var land_pixel = world.utils.tile_to_pixel(land_tile)
-	world.rpc_confirm_throw.rpc(sender_id, item_id, hand_index, land_pixel, land_z)
+	world.rpc_confirm_throw.rpc(sender_id, item_id, hand_index, land_pixel, travel_z, land_z)
 
-func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, land_z: int) -> void:
+func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, travel_z: int, land_z: int) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 	var obj    = world.get_entity(item_id)
 	if player == null or obj == null: return
@@ -265,8 +267,8 @@ func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, la
 	if player._is_local_authority():
 		player._is_throwing = true
 		player._update_hands_ui()
-	var z_lvl = player.z_level
-	obj.z_index = Defs.get_z_index(z_lvl, 7)
+	obj.set("z_level", travel_z)
+	obj.z_index = Defs.get_z_index(travel_z, 7)
 	var sprite: Node = obj.get_node_or_null("Sprite2D")
 	if sprite != null:
 		sprite.rotation_degrees = 0.0
@@ -288,8 +290,8 @@ func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, la
 			var dmg = player._get_weapon_damage(obj) if player else 0
 			var attacker_p    := world.utils.find_player_by_peer(peer_id) as Node2D
 			var src_tile: Vector2i = attacker_p.tile_pos if attacker_p != null else land_tile_check
-			var hit_results = world.combat.deal_damage_at_tile(land_tile_check, land_z, dmg, peer_id, false)
-			var throw_targets = world.utils.get_entities_at_tile(land_tile_check, land_z, peer_id)
+			var hit_results = world.combat.deal_damage_at_tile(land_tile_check, travel_z, dmg, peer_id, false)
+			var throw_targets = world.utils.get_entities_at_tile(land_tile_check, travel_z, peer_id)
 			for entity in throw_targets:
 				if world.utils.is_ghost(entity):
 					continue
@@ -298,5 +300,5 @@ func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, la
 				elif entity.has_method("receive_damage"): target_name = entity.name.get_slice("@", 0)
 				if target_name != "":
 					var roll = hit_results.get(entity, {"damage": dmg, "blocked": false})
-					world.rpc_broadcast_damage_log.rpc(attacker_p.character_name if attacker_p else "Unknown", target_name, roll.damage, src_tile, land_z, roll.blocked, false, "", roll.get("block_type", ""))
+					world.rpc_broadcast_damage_log.rpc(attacker_p.character_name if attacker_p else "Unknown", target_name, roll.damage, src_tile, travel_z, roll.blocked, false, "", roll.get("block_type", ""))
 	)

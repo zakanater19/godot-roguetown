@@ -94,24 +94,26 @@ func _get_limb_status(damage_ratio: float) -> String:
 func inspect_at(world_pos: Vector2) -> void:
 	var target_tile := Vector2i(int(world_pos.x / World.TILE_SIZE), int(world_pos.y / World.TILE_SIZE))
 	var viewer_is_ghost: bool = player.get("is_ghost") == true
+	var interaction_z: int = _get_interaction_z_level()
 
-	if target_tile == player.tile_pos:
+	if interaction_z == player.z_level and target_tile == player.tile_pos:
 		show_inspect_text(get_description(), get_detailed_description())
 		return
 
-	for i in range(2):
-		var held = player.hands[i]
-		if held == null or not is_instance_valid(held): continue
-		var hand_tile := Vector2i(int(held.global_position.x / World.TILE_SIZE), int(held.global_position.y / World.TILE_SIZE))
-		if hand_tile == target_tile:
-			var hand_label := " (in right hand)" if i == 0 else " (in left hand)"
-			var desc = held.get_description() if held.has_method("get_description") else (held.get("item_type") if held.get("item_type") != null else held.name.get_slice("@", 0))
-			show_inspect_text(desc + hand_label, "")
-			return
+	if interaction_z == player.z_level:
+		for i in range(2):
+			var held = player.hands[i]
+			if held == null or not is_instance_valid(held): continue
+			var hand_tile := Vector2i(int(held.global_position.x / World.TILE_SIZE), int(held.global_position.y / World.TILE_SIZE))
+			if hand_tile == target_tile:
+				var hand_label := " (in right hand)" if i == 0 else " (in left hand)"
+				var desc = held.get_description() if held.has_method("get_description") else (held.get("item_type") if held.get("item_type") != null else held.name.get_slice("@", 0))
+				show_inspect_text(desc + hand_label, "")
+				return
 
 	var best_npc:  Node  = null
 	var best_dist: float = INF
-	for obj in World.get_entities_at_tile(target_tile, player.z_level, 0, true):
+	for obj in World.get_entities_at_tile(target_tile, interaction_z, 0, true):
 		if obj.get("is_ghost") == true and not viewer_is_ghost:
 			continue
 		var d: float = (world_pos - player.global_position).length()
@@ -150,7 +152,7 @@ func inspect_at(world_pos: Vector2) -> void:
 		var best: Node = null
 		best_dist = INF
 		for obj in player.get_tree().get_nodes_in_group(group):
-			if obj.get("z_level") != null and obj.z_level != player.z_level: continue
+			if obj.get("z_level") != null and obj.z_level != interaction_z: continue
 			if group == "pickable" and (player.hands[0] == obj or player.hands[1] == obj): continue
 			var col := obj.get_node_or_null("CollisionShape2D")
 			if col != null and col.shape is RectangleShape2D:
@@ -171,9 +173,16 @@ func inspect_at(world_pos: Vector2) -> void:
 				show_inspect_text(short_desc, detailed_desc)
 			return
 
+	var leaf_decor: Node = _find_leaf_decor_at(target_tile, interaction_z)
+	if leaf_decor != null and leaf_decor.has_method("get_description"):
+		var short_desc: String = leaf_decor.get_description()
+		var detailed_desc: String = leaf_decor.get_detailed_description() if leaf_decor.has_method("get_detailed_description") else ""
+		show_inspect_text(short_desc, detailed_desc)
+		return
+
 	var source_id:    int      = -1
 	var atlas_coords: Vector2i = Vector2i(-1, -1)
-	var tm = World.get_tilemap(player.z_level)
+	var tm = World.get_tilemap(interaction_z)
 	if tm != null:
 		source_id    = tm.get_cell_source_id(target_tile)
 		atlas_coords = tm.get_cell_atlas_coords(target_tile)
@@ -182,3 +191,22 @@ func inspect_at(world_pos: Vector2) -> void:
 func show_inspect_text(text: String, detailed_desc: String) -> void:
 	var log_msg = detailed_desc if detailed_desc != "" else text
 	Sidebar.add_message(log_msg)
+
+func _find_leaf_decor_at(target_tile: Vector2i, interaction_z: int) -> Node:
+	for leaf in player.get_tree().get_nodes_in_group("leaf_canopy"):
+		if leaf == null or not is_instance_valid(leaf):
+			continue
+		if leaf.get("z_level") != null and int(leaf.get("z_level")) != interaction_z:
+			continue
+		var leaf_tile := Vector2i(int(leaf.global_position.x / World.TILE_SIZE), int(leaf.global_position.y / World.TILE_SIZE))
+		if leaf_tile == target_tile:
+			return leaf
+	return null
+
+func _get_interaction_z_level() -> int:
+	if player.has_method("get_interaction_z_level"):
+		return int(player.get_interaction_z_level())
+	var view_z: int = player.z_level
+	if "view_z_level" in player:
+		view_z = int(player.get("view_z_level"))
+	return clampi(view_z, 1, 5)
