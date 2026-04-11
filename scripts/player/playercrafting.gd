@@ -96,8 +96,14 @@ func _open_crafting_menu() -> void:
 
 	# Build UI rows for every recipe the player qualifies for and has materials.
 	var recipes_added: int = 0
-	for recipe in RecipeRegistry.get_available_recipes(player.skills):
-		if counts.get(recipe.req_item, 0) >= recipe.req_amount:
+	for recipe_value in RecipeRegistry.get_available_recipes(player.skills):
+		var recipe := recipe_value as RecipeData
+		if recipe == null:
+			continue
+		var required_item_type: String = recipe.get_required_item_type()
+		if required_item_type == "":
+			continue
+		if counts.get(required_item_type, 0) >= recipe.req_amount:
 			var row := _instantiate_ui_scene(CRAFTING_RECIPE_ROW_SCENE_PATH) as HBoxContainer
 			if row == null:
 				continue
@@ -105,7 +111,7 @@ func _open_crafting_menu() -> void:
 			var recipe_id: String = recipe.recipe_id
 			var recipe_label := row.get_node("RecipeLabel") as Label
 			var craft_btn := row.get_node("CraftButton") as Button
-			recipe_label.text = recipe.display_name + " (" + str(recipe.req_amount) + " " + recipe.req_item + ")"
+			recipe_label.text = recipe.display_name + " (" + str(recipe.req_amount) + " " + required_item_type + ")"
 			craft_btn.pressed.connect(func(): _on_craft_button_pressed(recipe_id))
 			recipe_list.add_child(row)
 			recipes_added += 1

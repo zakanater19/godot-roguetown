@@ -1,13 +1,15 @@
-[gd_resource type="Resource" script_class="RecipeData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RecipeData" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/defines/recipe_data.gd" id="1_recipe_sword"]
+[ext_resource type="Resource" path="res://items/ironingot.tres" id="2_req_item"]
+[ext_resource type="Resource" path="res://items/sword.tres" id="3_result_item"]
 
 [resource]
 script = ExtResource("1_recipe_sword")
 recipe_id = "sword"
 display_name = "Sword"
-req_item = "IronIngot"
+req_item_data = ExtResource("2_req_item")
 req_amount = 1
 skill_requirements = {"blacksmithing": 3}
 result_type = "item"
-result_scene_path = "res://objects/sword.tscn"
+result_item_data = ExtResource("3_result_item")

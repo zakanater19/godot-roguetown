@@ -1,12 +1,13 @@
-[gd_resource type="Resource" script_class="RecipeData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RecipeData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/defines/recipe_data.gd" id="1_recipe_swall"]
+[ext_resource type="Resource" path="res://items/pebble.tres" id="2_req_item"]
 
 [resource]
 script = ExtResource("1_recipe_swall")
 recipe_id = "stone_wall"
 display_name = "Stone Wall"
-req_item = "Pebble"
+req_item_data = ExtResource("2_req_item")
 req_amount = 2
 skill_requirements = {}
 result_type = "tile"

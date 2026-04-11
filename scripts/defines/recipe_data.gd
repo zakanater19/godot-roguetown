@@ -11,10 +11,10 @@ extends Resource
 ## Name shown in the crafting menu UI.
 @export var display_name: String = ""
 
-## item_type of the required ingredient (must match an ItemData.item_type).
-@export var req_item: String = ""
+## ItemData resource required as the ingredient for this recipe.
+@export var req_item_data: ItemData = null
 
-## How many of req_item are consumed per craft.
+## How many of the required ingredient are consumed per craft.
 @export var req_amount: int = 1
 
 ## Minimum skill levels required: { "skill_name": level }.
@@ -26,11 +26,17 @@ extends Resource
 @export var result_type: String = "item"
 
 # --- item result fields ---
-## Path to the PackedScene instantiated when result_type == "item".
-@export var result_scene_path: String = ""
+## ItemData resource produced when result_type == "item".
+@export var result_item_data: ItemData = null
 
 # --- tile result fields ---
 ## TileMapLayer source_id when result_type == "tile".
 @export var result_tile_source: int = 0
 ## Atlas coordinates in the tileset when result_type == "tile".
 @export var result_tile_coords: Vector2i = Vector2i.ZERO
+
+func get_required_item_type() -> String:
+	return req_item_data.item_type if req_item_data != null else ""
+
+func get_result_item_type() -> String:
+	return result_item_data.item_type if result_item_data != null else ""

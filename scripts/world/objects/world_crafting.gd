@@ -29,10 +29,13 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 
 	# Collect the required ingredients.
 	var matched_nodes: Array = []
+	var required_item_type: String = recipe.get_required_item_type()
+	if required_item_type == "":
+		return
 	for obj in avail:
 		if matched_nodes.size() >= recipe.req_amount: break
 		var itype: String = obj.get("item_type") if obj.get("item_type") != null else obj.name.get_slice("@", 0)
-		if itype == recipe.req_item:
+		if itype == required_item_type:
 			matched_nodes.append(obj)
 	if matched_nodes.size() < recipe.req_amount: return
 
@@ -42,7 +45,13 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 		consumed_paths.append(n.get_path())
 
 	if recipe.result_type == Defs.RECIPE_RESULT_ITEM:
-		world.rpc_confirm_craft_item.rpc(sender_id, consumed_paths, recipe.result_scene_path, result_name, player.tile_pos)
+		var result_item_type: String = recipe.get_result_item_type()
+		if result_item_type == "":
+			return
+		var scene_path: String = ItemRegistry.get_scene_path(result_item_type)
+		if scene_path == "":
+			return
+		world.rpc_confirm_craft_item.rpc(sender_id, consumed_paths, scene_path, result_name, player.tile_pos)
 	elif recipe.result_type == Defs.RECIPE_RESULT_TILE:
 		world.rpc_confirm_craft_tile.rpc(sender_id, consumed_paths, player.tile_pos, player.z_level, recipe.result_tile_source, recipe.result_tile_coords)
 

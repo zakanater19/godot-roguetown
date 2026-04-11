@@ -33,6 +33,7 @@ Lobby="*res://scripts/net/lobby.gd"
 Trade="*res://scripts/ui/trade.gd"
 ServerBrowser="*res://scripts/net/serverbrowser.gd"
 Lighting="*res://scripts/systems/lighting.gd"
+ImportSmokeRunner="*res://scripts/tools/import_smoke_runner.gd"
 
 [display]
 
