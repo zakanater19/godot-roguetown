@@ -1,3 +1,19 @@
-Import smoke test started.
-User args: []
-PASSED
+============================================================
+  ROGUETOWN SMOKE TEST
+============================================================
+[ PASS ]  autoloads
+[ PASS ]  scripts
+[ PASS ]  scenes
+[ PASS ]  items
+[ PASS ]  materials
+[ PASS ]  recipes
+[ PASS ]  classes
+[ PASS ]  clothing offsets
+[ PASS ]  coin icons
+[ PASS ]  keyring icons
+[ PASS ]  net: spawnable scenes
+[ PASS ]  net: replication configs
+[ PASS ]  net: resource diff dirs
+------------------------------------------------------------
+PASSED  —  13/13 checks passed,  0 error(s)
+============================================================

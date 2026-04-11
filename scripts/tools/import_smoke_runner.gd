@@ -4,6 +4,9 @@ const LOG_PATH := "res://import_smoke_test.log"
 const FLAG_PATH := "res://run_import_smoke_test.flag"
 const VALIDATOR_SCRIPT := "res://scripts/tools/import_smoke_test.gd"
 
+const DIVIDER := "============================================================"
+const THIN    := "------------------------------------------------------------"
+
 func _ready() -> void:
 	var should_run := OS.get_cmdline_user_args().has("--validate-imports") or OS.get_environment("CODEX_VALIDATE_IMPORTS") == "1" or FileAccess.file_exists(ProjectSettings.globalize_path(FLAG_PATH))
 	if not should_run:
@@ -18,36 +21,67 @@ func _ready() -> void:
 
 	var validator = validator_script.new()
 	var result: Dictionary = validator.run()
-	var warnings: Array = result.get("warnings", [])
-	var errors: Array = result.get("errors", [])
+	var warnings: Array  = result.get("warnings", [])
+	var errors: Array    = result.get("errors", [])
+	var sections: Array  = result.get("sections", [])
+
+	var passed_count := 0
+	var failed_count := 0
+	for section in sections:
+		if int(section.get("errors", 1)) == 0:
+			passed_count += 1
+		else:
+			failed_count += 1
+
 	var log_lines: PackedStringArray = []
 
-	log_lines.append("Import smoke test started.")
-	log_lines.append("User args: %s" % str(OS.get_cmdline_user_args()))
+	# Header
+	log_lines.append(DIVIDER)
+	log_lines.append("  ROGUETOWN SMOKE TEST")
+	log_lines.append(DIVIDER)
 
+	# Per-section results
+	for section in sections:
+		var name: String  = section.get("name", "?")
+		var errs: int     = int(section.get("errors", 0))
+		if errs == 0:
+			log_lines.append("[ PASS ]  %s" % name)
+		else:
+			log_lines.append("[ FAIL ]  %s  —  %d error(s)" % [name, errs])
+
+	log_lines.append(THIN)
+
+	# Warnings
 	if warnings.size() > 0:
-		print("Import smoke test warnings:")
-		log_lines.append("Warnings:")
 		for warning in warnings:
-			print("  WARN: %s" % str(warning))
 			log_lines.append("WARN: %s" % str(warning))
+		log_lines.append(THIN)
 
+	# Errors
 	if errors.size() > 0:
-		push_error("Import smoke test failed with %d error(s)." % errors.size())
-		log_lines.append("FAILED with %d error(s)." % errors.size())
 		for err in errors:
-			push_error("  %s" % str(err))
 			log_lines.append("ERROR: %s" % str(err))
-		_write_log(log_lines)
-		_clear_flag()
-		get_tree().quit(1)
-		return
+		log_lines.append(THIN)
 
-	print("Import smoke test passed.")
-	log_lines.append("PASSED")
+	# Final verdict
+	var verdict: String
+	if errors.size() == 0:
+		verdict = "PASSED  —  %d/%d checks passed,  0 error(s)" % [passed_count, sections.size()]
+	else:
+		verdict = "FAILED  —  %d/%d checks passed,  %d error(s)" % [passed_count, sections.size(), errors.size()]
+	log_lines.append(verdict)
+	log_lines.append(DIVIDER)
+
+	# Print everything to stdout (visible in PowerShell in real-time via Godot)
+	for line in log_lines:
+		if line.begins_with("ERROR:") or line.begins_with("[ FAIL ]"):
+			push_error(line)
+		else:
+			print(line)
+
 	_write_log(log_lines)
 	_clear_flag()
-	get_tree().quit(0)
+	get_tree().quit(1 if errors.size() > 0 else 0)
 
 func _write_log(lines: PackedStringArray) -> void:
 	var file := FileAccess.open(ProjectSettings.globalize_path(LOG_PATH), FileAccess.WRITE)
