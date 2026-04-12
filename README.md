@@ -31,7 +31,7 @@ Shift+F to look up
 rest are UI buttons
 
 Very out of date video, ill get around to recording a new one when the game actually looks good.
-VVVV
+
 
 https://github.com/user-attachments/assets/d6851a3a-b7ba-45de-92e8-2eecb7c273d8
 
