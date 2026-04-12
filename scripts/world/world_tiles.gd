@@ -39,7 +39,28 @@ func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	if is_solid(next, z_level): return from
 	return next
 
-func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0)) -> void:
+func _build_break_drop_payload(def: Dictionary) -> Array:
+	var payload: Array = []
+	var drop_specs = def.get("break_drops", [])
+	if not (drop_specs is Array):
+		return payload
+
+	for raw_spec in drop_specs:
+		if not (raw_spec is Dictionary):
+			continue
+		var spec: Dictionary = raw_spec
+		var drop_type := String(spec.get("type", ""))
+		var chance := clampf(float(spec.get("chance", 0.0)), 0.0, 1.0)
+		if drop_type.is_empty() or chance <= 0.0:
+			continue
+		if randf() <= chance:
+			payload.append({
+				"type": drop_type,
+				"name": Defs.make_runtime_name("Drop"),
+			})
+	return payload
+
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0), drops_data: Array = []) -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, 0, break_floor)
@@ -51,6 +72,19 @@ func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "
 		if rock_name != "": rock.name = rock_name
 		rock.position = world.utils.tile_to_pixel(pos)
 		parent.add_child(rock)
+	var center: Vector2 = world.utils.tile_to_pixel(pos)
+	for raw_data in drops_data:
+		if not (raw_data is Dictionary):
+			continue
+		var data: Dictionary = raw_data
+		ObjectSpawnUtils.spawn_drop_with_seed(
+			parent,
+			String(data.get("type", "")),
+			String(data.get("name", "")),
+			z_level,
+			center,
+			Defs.DROP_SPREAD
+		)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return TileDefs.get_description(source_id, atlas_coords)
@@ -223,7 +257,13 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if world.tile_hit_counts[attacker.z_level][pos] >= hits_needed:
 		world.tile_hit_counts[attacker.z_level].erase(pos)
 		if def.get("break_type") == TileDefs.BREAK_DEBRIS:
-			world.rpc_confirm_break_wall.rpc(pos, attacker.z_level, "WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000), def["break_floor"])
+			world.rpc_confirm_break_wall.rpc(
+				pos,
+				attacker.z_level,
+				"WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000),
+				def["break_floor"],
+				_build_break_drop_payload(def)
+			)
 		else:
 			world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, def["break_floor"])
 	else: world.rpc_confirm_hit_wall.rpc(pos, attacker.z_level)
@@ -231,9 +271,9 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 func handle_rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
 	if World.main_scene != null and World.main_scene.has_method("shake_tile"): World.main_scene.shake_tile(pos, z_level)
 
-func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i) -> void:
+func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i, drops_data: Array) -> void:
 	if World.main_scene != null:
-		break_wall(pos, z_level, World.main_scene, rock_name, break_floor)
+		break_wall(pos, z_level, World.main_scene, rock_name, break_floor, drops_data)
 		LateJoin.register_tile_change(pos, z_level, 0, break_floor)
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:

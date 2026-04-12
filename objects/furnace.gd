@@ -3,11 +3,20 @@
 extends WorldObject
 
 const SMELT_TIME: float = 20.0
+const SMELT_OUTPUTS: Dictionary = {
+	"IronOre": "IronIngot",
+	"GoldOre": "GoldIngot",
+}
+const ORE_LABELS: Dictionary = {
+	"IronOre": "iron ore",
+	"GoldOre": "gold ore",
+}
 
 var is_on: bool = false
 var light_intensity: float = 0.7
 var _coal_count: int = 0
 var _ironore_count: int = 0
+var _ore_item_type: String = ""
 var _fuel_type: String = ""
 var _smelting: bool = false
 
@@ -32,7 +41,7 @@ func get_description() -> String:
 	if _coal_count > 0:
 		parts.append("fuel loaded")
 	if _ironore_count > 0:
-		parts.append("iron ore loaded")
+		parts.append(_get_loaded_ore_label() + " loaded")
 	if parts.is_empty():
 		return "a furnace, cold and empty"
 	return "a furnace containing: " + ", ".join(parts)
@@ -77,9 +86,9 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 					player._show_inspect_text("already has ore", "")
 				else:
 					if multiplayer.is_server():
-						World.rpc_request_furnace_action(furnace_id, "insert_ore", player.active_hand)
+						World.rpc_request_furnace_action(furnace_id, "insert_ore:" + item_type, player.active_hand)
 					else:
-						World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_ore", player.active_hand)
+						World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_ore:" + item_type, player.active_hand)
 			else:
 				player._show_inspect_text("that can't be added to the furnace", "")
 		else:
@@ -90,7 +99,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 				else:
 					World.rpc_request_furnace_action.rpc_id(1, furnace_id, "start_smelt", player.active_hand)
 			else:
-				player._show_inspect_text("needs fuel and iron ore to start", "")
+				player._show_inspect_text("needs fuel and ore to start", "")
 
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		get_viewport().set_input_as_handled()
@@ -114,12 +123,14 @@ func _perform_action(action: String, player: Node, hand_idx: int, generated_name
 			_consume_held(player, hand_idx)
 			if player != null and player._is_local_authority():
 				player._show_inspect_text("fuel added to furnace", "")
-	elif action == "insert_ore":
-		if _ironore_count < 1:
+	elif action.begins_with("insert_ore:"):
+		var ore_item_type := action.get_slice(":", 1)
+		if _ironore_count < 1 and SMELT_OUTPUTS.has(ore_item_type):
 			_ironore_count += 1
+			_ore_item_type = ore_item_type
 			_consume_held(player, hand_idx)
 			if player != null and player._is_local_authority():
-				player._show_inspect_text("iron ore added to furnace", "")
+				player._show_inspect_text(_get_ore_label(ore_item_type) + " added to furnace", "")
 	elif action == "start_smelt":
 		_start_smelting()
 	elif action == "eject":
@@ -159,9 +170,10 @@ func _eject_contents(player: Node, generated_ids: Array) -> void:
 		slot += 1
 		name_idx += 1
 	if _ironore_count > 0 and name_idx < generated_ids.size():
+		var ore_item_type := _get_loaded_ore_type()
 		ObjectSpawnUtils.spawn_item_type(
 			get_parent(),
-			"IronOre",
+			ore_item_type,
 			generated_ids[name_idx],
 			z_level,
 			global_position + drop_offsets[slot % drop_offsets.size()],
@@ -171,6 +183,7 @@ func _eject_contents(player: Node, generated_ids: Array) -> void:
 		name_idx += 1
 	_coal_count = 0
 	_ironore_count = 0
+	_ore_item_type = ""
 	_fuel_type = ""
 	if player != null and player._is_local_authority():
 		player._show_inspect_text("furnace emptied", "")
@@ -187,24 +200,41 @@ func _on_server_smelt_finished() -> void:
 	World.rpc_confirm_furnace_action.rpc(1, World.get_entity_id(self), "finish_smelt", -1, [ingot_id])
 
 func _finish_smelting(generated_names: Array) -> void:
+	var output_item_type := _get_smelt_output_type()
 	_smelting = false
 	is_on = false
 	if _coal_count > 0:
 		_coal_count -= 1
 	if _ironore_count > 0:
 		_ironore_count -= 1
+	if _ironore_count <= 0:
+		_ore_item_type = ""
 	if _coal_count == 0:
 		_fuel_type = ""
 	_set_sprite(false)
-	if generated_names.size() > 0:
+	if generated_names.size() > 0 and not output_item_type.is_empty():
 		ObjectSpawnUtils.spawn_item_type(
 			get_parent(),
-			"IronIngot",
+			output_item_type,
 			generated_names[0],
 			z_level,
 			global_position + Vector2(0, Defs.TILE_SIZE),
 			generated_names[0]
 		)
+
+func _get_loaded_ore_type() -> String:
+	if not _ore_item_type.is_empty():
+		return _ore_item_type
+	return "IronOre" if _ironore_count > 0 else ""
+
+func _get_smelt_output_type() -> String:
+	return String(SMELT_OUTPUTS.get(_get_loaded_ore_type(), ""))
+
+func _get_ore_label(item_type: String) -> String:
+	return String(ORE_LABELS.get(item_type, "ore"))
+
+func _get_loaded_ore_label() -> String:
+	return _get_ore_label(_get_loaded_ore_type())
 
 func _set_sprite(on: bool) -> void:
 	var sprite: Sprite2D = get_node_or_null("Sprite2D")

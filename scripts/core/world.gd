@@ -292,8 +292,8 @@ func is_opaque(pos: Vector2i, z_level: int) -> bool:
 func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	return tiles.try_move(from, z_level, dir)
 
-func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0)) -> void:
-	tiles.break_wall(pos, z_level, parent, rock_name, break_floor)
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0), drops_data: Array = []) -> void:
+	tiles.break_wall(pos, z_level, parent, rock_name, break_floor, drops_data)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return tiles.get_tile_description(source_id, atlas_coords)
@@ -397,8 +397,8 @@ func rpc_confirm_hit_wall(pos: Vector2i, z_level: int) -> void:
 	tiles.handle_rpc_confirm_hit_wall(pos, z_level)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i) -> void:
-	tiles.handle_rpc_confirm_break_wall(pos, z_level, rock_name, break_floor)
+func rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, break_floor: Vector2i, drops_data: Array) -> void:
+	tiles.handle_rpc_confirm_break_wall(pos, z_level, rock_name, break_floor, drops_data)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:

@@ -26,6 +26,7 @@ const BREAK_REPLACE = "replace"  # places a floor tile only
 #   "break_type"        : String   — BREAK_DEBRIS or BREAK_REPLACE
 #   "break_floor"       : Vector2i — floor tile (source_id 0) placed after breaking
 #   "break_debris"      : String   — scene path for debris object (BREAK_DEBRIS only)
+#   "break_drops"       : Array    — optional probabilistic item drops on break
 #   "material_id"       : String   — MaterialRegistry key that governs tool efficiency
 # }
 #
@@ -56,6 +57,9 @@ const DEFS: Dictionary = {
 			"break_type"        : "debris",
 			"break_floor"       : Vector2i(9, 0),
 			"break_debris"      : "res://objects/rock.tscn",
+			"break_drops"       : [
+				{"type": "goldore", "chance": 0.025},
+			],
 			"material_id"       : "coarse_rock",
 		},
 		Vector2i(6, 0): {

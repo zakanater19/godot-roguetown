@@ -4,7 +4,9 @@ extends RefCounted
 const DROP_ITEM_TYPES: Dictionary = {
 	"pebble": "Pebble",
 	"coal": "Coal",
+	"goldore": "GoldOre",
 	"ironore": "IronOre",
+	"goldingot": "GoldIngot",
 	"log": "Log",
 	"ironingot": "IronIngot",
 }

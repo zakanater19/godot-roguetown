@@ -262,7 +262,179 @@
 			"waist_scale": 1.0
 		}
 	},
+	"GoldIngot": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
 	"IronOre": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"GoldOre": {
 		"east": {
 			"left": [
 				-16.0,

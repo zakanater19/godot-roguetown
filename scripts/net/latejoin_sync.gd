@@ -135,6 +135,7 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	if "is_on"         in obj: data["is_on"]          = obj.get("is_on")
 	if "_coal_count"   in obj: data["_coal_count"]    = obj.get("_coal_count")
 	if "_ironore_count" in obj: data["_ironore_count"] = obj.get("_ironore_count")
+	if "_ore_item_type" in obj: data["_ore_item_type"] = obj.get("_ore_item_type")
 	if "_fuel_type"    in obj: data["_fuel_type"]     = obj.get("_fuel_type")
 	if "_smelting"     in obj: data["_smelting"]      = obj.get("_smelting")
 	if "contents"      in obj: data["contents"]       = obj.get("contents").duplicate(true)
@@ -210,12 +211,19 @@ func _retry_receive_object_states(object_states: Dictionary, retries: int) -> vo
 			obj = lj.get_node_or_null(obj_ref)
 		if obj != null:
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
+			if obj_data.has("is_on")       and "is_on"         in obj: obj.set("is_on",         obj_data["is_on"])
+			if obj_data.has("_coal_count") and "_coal_count"   in obj: obj.set("_coal_count",   obj_data["_coal_count"])
+			if obj_data.has("_ironore_count") and "_ironore_count" in obj: obj.set("_ironore_count", obj_data["_ironore_count"])
+			if obj_data.has("_ore_item_type") and "_ore_item_type" in obj: obj.set("_ore_item_type", obj_data["_ore_item_type"])
+			if obj_data.has("_fuel_type")  and "_fuel_type"    in obj: obj.set("_fuel_type",    obj_data["_fuel_type"])
+			if obj_data.has("_smelting")   and "_smelting"     in obj: obj.set("_smelting",     obj_data["_smelting"])
 			if obj_data.has("amount")     and "amount"     in obj: obj.set("amount",     obj_data["amount"])
 			if obj_data.has("metal_type") and "metal_type" in obj: obj.set("metal_type", obj_data["metal_type"])
 			if obj_data.has("stored_balance") and obj.has_method("_update_merchant_balance"): obj.call("_update_merchant_balance", int(obj_data["stored_balance"]))
 			if obj_data.has("contents")   and "contents"   in obj: obj.set("contents",   obj_data["contents"].duplicate(true))
 			if obj_data.has("key_id")     and "key_id"     in obj: obj.set("key_id",     obj_data["key_id"])
 			if obj_data.has("is_locked")  and "is_locked"  in obj: obj.set("is_locked",  obj_data["is_locked"])
+			if obj.has_method("_set_sprite") and obj_data.has("is_on"): obj.call("_set_sprite", obj_data["is_on"])
 			if obj.has_method("_update_sprite"): obj.call("_update_sprite")
 		else:
 			missing[obj_ref] = obj_data
@@ -436,6 +444,7 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 		if obj_data.has("is_on"):         obj.set("is_on",         obj_data["is_on"])
 		if obj_data.has("_coal_count"):   obj.set("_coal_count",   obj_data["_coal_count"])
 		if obj_data.has("_ironore_count"): obj.set("_ironore_count", obj_data["_ironore_count"])
+		if obj_data.has("_ore_item_type"): obj.set("_ore_item_type", obj_data["_ore_item_type"])
 		if obj_data.has("_fuel_type"):    obj.set("_fuel_type",    obj_data["_fuel_type"])
 		if obj_data.has("_smelting"):     obj.set("_smelting",     obj_data["_smelting"])
 		if obj_data.has("contents") and "contents" in obj:
