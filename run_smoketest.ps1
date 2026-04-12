@@ -16,11 +16,37 @@ Write-Host ""
 
 $env:CODEX_VALIDATE_IMPORTS = "1"
 $exitCode = 1
+$proc = $null
+
+function Stop-ProcessTree {
+	param(
+		[int]$RootId
+	)
+
+	if ($RootId -le 0) {
+		return
+	}
+
+	$childIds = Get-CimInstance Win32_Process -Filter "ParentProcessId = $RootId" -ErrorAction SilentlyContinue |
+		Select-Object -ExpandProperty ProcessId
+
+	foreach ($childId in $childIds) {
+		Stop-ProcessTree -RootId $childId
+	}
+
+	Stop-Process -Id $RootId -Force -ErrorAction SilentlyContinue
+}
+
 try {
-	$proc = Start-Process -FilePath $godotExe -ArgumentList @("--headless", "--path", $projectRoot) -Wait -NoNewWindow -PassThru
+	$proc = Start-Process -FilePath $godotExe -ArgumentList @("--headless", "--path", $projectRoot) -NoNewWindow -PassThru
+	$proc.WaitForExit()
 	$exitCode = $proc.ExitCode
 }
 finally {
+	if ($proc -ne $null -and -not $proc.HasExited) {
+		Stop-ProcessTree -RootId $proc.Id
+		$proc.WaitForExit()
+	}
 	Remove-Item Env:CODEX_VALIDATE_IMPORTS -ErrorAction SilentlyContinue
 }
 
