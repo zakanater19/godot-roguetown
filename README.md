@@ -5,7 +5,7 @@ godot 4.5
 
 roguetown in godot, sprites/mechanics from here [https://github.com/Rotwood-Vale/Ratwood-Keep] (https://github.com/SS13-Special-Codebases-Archive/RogueTown)
 
-just download godot 4.5 and open project.godot inside godot, no external tools needed.
+just download godot 4.5 and open project.godot inside godot, no external tools needed. (for the smoke test you need to put the project files into a new folder, and in the folder above the project place the godot 4.5.exe
 
 
 
