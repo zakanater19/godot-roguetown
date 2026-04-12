@@ -49,6 +49,7 @@ func send_world_state_to_peer(peer_id: int) -> void:
 
 func _build_player_sync_state(node: Node2D) -> Dictionary:
 	var hand_ids = []
+	var hand_states = lj._reconnect.capture_hands_state(node)
 	for h in node.get("hands"):
 		hand_ids.append(World.get_entity_id(h) if (h != null and is_instance_valid(h)) else "")
 	var equipped_data = lj._reconnect.capture_equipped_state(node)
@@ -62,6 +63,7 @@ func _build_player_sync_state(node: Node2D) -> Dictionary:
 		"limb_hp":        node.get("body").limb_hp.duplicate() if node.get("body") != null else {},
 		"limb_broken":    node.get("body").limb_broken.duplicate() if node.get("body") != null else {},
 		"hands":          hand_ids,
+		"hand_states":    hand_states,
 		"equipped":       equipped_data,
 		"equipped_data":  eq_data_state,
 		"is_lying_down":  node.get("is_lying_down") == true,
@@ -76,14 +78,18 @@ func sync_objects_for_late_joiner(peer_id: int) -> void:
 
 	var objects_to_sync   = []
 	var valid_object_ids = []
+	var held_object_ids := _collect_held_object_ids()
 	var sync_groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 
 	for group in sync_groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
 			if obj is Node2D and obj.get_parent() == main_node:
+				var obj_id := World.register_entity(obj)
+				if held_object_ids.has(obj_id):
+					continue
 				if not objects_to_sync.has(obj):
 					objects_to_sync.append(obj)
-					valid_object_ids.append(World.register_entity(obj))
+					valid_object_ids.append(obj_id)
 
 	lj.rpc_id(peer_id, "purge_missing_objects", valid_object_ids)
 
@@ -91,6 +97,20 @@ func sync_objects_for_late_joiner(peer_id: int) -> void:
 		var obj_data = get_object_sync_data(obj)
 		if obj_data != null:
 			lj.rpc_id(peer_id, "spawn_object_for_late_join", obj_data)
+
+func _collect_held_object_ids() -> Dictionary:
+	var held_object_ids := {}
+	for player_node in lj.get_tree().get_nodes_in_group("player"):
+		var hands: Variant = player_node.get("hands")
+		if not (hands is Array):
+			continue
+		for hand_item in hands:
+			if hand_item == null or not is_instance_valid(hand_item):
+				continue
+			var entity_id := World.get_entity_id(hand_item)
+			if entity_id != "":
+				held_object_ids[entity_id] = true
+	return held_object_ids
 
 func get_object_sync_data(obj: Node) -> Dictionary:
 	if not obj is Node2D:
@@ -120,6 +140,7 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	if "contents"      in obj: data["contents"]       = obj.get("contents").duplicate(true)
 	if "amount"        in obj: data["amount"]         = obj.get("amount")
 	if "metal_type"    in obj: data["metal_type"]     = obj.get("metal_type")
+	if "stored_balance" in obj: data["stored_balance"] = obj.get("stored_balance")
 	if "key_id"        in obj: data["key_id"]         = obj.get("key_id")
 	if "is_locked"     in obj: data["is_locked"]      = obj.get("is_locked")
 	if "tree_id"       in obj: data["tree_id"]        = obj.get("tree_id")
@@ -191,6 +212,7 @@ func _retry_receive_object_states(object_states: Dictionary, retries: int) -> vo
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
 			if obj_data.has("amount")     and "amount"     in obj: obj.set("amount",     obj_data["amount"])
 			if obj_data.has("metal_type") and "metal_type" in obj: obj.set("metal_type", obj_data["metal_type"])
+			if obj_data.has("stored_balance") and obj.has_method("_update_merchant_balance"): obj.call("_update_merchant_balance", int(obj_data["stored_balance"]))
 			if obj_data.has("contents")   and "contents"   in obj: obj.set("contents",   obj_data["contents"].duplicate(true))
 			if obj_data.has("key_id")     and "key_id"     in obj: obj.set("key_id",     obj_data["key_id"])
 			if obj_data.has("is_locked")  and "is_locked"  in obj: obj.set("is_locked",  obj_data["is_locked"])
@@ -270,7 +292,7 @@ func _apply_synced_player_state(node: Node2D, p_data: Dictionary, limit_far_posi
 	if p_data.has("limb_broken") and node.get("body") != null:
 		node.get("body").limb_broken = p_data["limb_broken"].duplicate()
 	if p_data.has("hands") and node.has_method("sync_hands"):
-		node.call("sync_hands", p_data["hands"])
+		_sync_player_hands(node, p_data["hands"], p_data.get("hand_states", []))
 	if p_data.has("equipped_data") and "equipped_data" in node:
 		node.set("equipped_data", p_data["equipped_data"].duplicate(true))
 	if p_data.has("equipped"):
@@ -305,6 +327,27 @@ func _apply_synced_player_state(node: Node2D, p_data: Dictionary, limit_far_posi
 		node.call("_update_hands_ui")
 	if node.get("_hud") != null:
 		node.get("_hud").update_stats(node.get("health"), node.get("stamina"))
+
+func _sync_player_hands(node: Node2D, hand_ids: Array, hand_states: Array) -> void:
+	var resolved_ids: Array = []
+	for i in range(2):
+		var entity_id := str(hand_ids[i]) if i < hand_ids.size() else ""
+		if entity_id == "":
+			resolved_ids.append("")
+			continue
+
+		var hand_item = World.get_entity(entity_id)
+		if hand_item == null and i < hand_states.size():
+			var hand_state = hand_states[i]
+			if hand_state is Dictionary and not hand_state.is_empty():
+				hand_item = lj._reconnect._recreate_hand_item(hand_state)
+
+		if hand_item != null and is_instance_valid(hand_item):
+			resolved_ids.append(World.get_entity_id(hand_item))
+		else:
+			resolved_ids.append("")
+
+	node.call("sync_hands", resolved_ids)
 
 func handle_purge_missing_objects(valid_ids: Array) -> void:
 	var main_node = World.main_scene
@@ -376,6 +419,8 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			else: obj.set("hits", obj_data["hits"])
 		if obj_data.has("amount"):        obj.set("amount",        obj_data["amount"])
 		if obj_data.has("metal_type"):    obj.set("metal_type",    obj_data["metal_type"])
+		if obj_data.has("stored_balance") and obj.has_method("_update_merchant_balance"):
+			obj.call("_update_merchant_balance", int(obj_data["stored_balance"]))
 		if obj_data.has("key_id") and "key_id" in obj:
 			obj.set("key_id", obj_data["key_id"])
 		if obj_data.has("is_locked") and "is_locked" in obj:

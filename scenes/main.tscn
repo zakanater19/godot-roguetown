@@ -267,7 +267,7 @@ spawn_type = "adventurer"
 
 [node name="MerchantVendor" parent="." instance=ExtResource("29_qsp4k")]
 z_index = 405
-position = Vector2(32739, 12127)
+position = Vector2(32736, 12128)
 
 [node name="ATM" parent="." instance=ExtResource("32_atm")]
 z_index = 405

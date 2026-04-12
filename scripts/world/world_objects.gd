@@ -12,6 +12,7 @@ var coins      = null
 var loot       = null
 var crafting   = null
 var storage    = null
+var merchant   = null
 
 func _init(p_world: Node) -> void:
 	world      = p_world
@@ -23,6 +24,7 @@ func _init(p_world: Node) -> void:
 	loot       = preload("res://scripts/world/objects/world_loot.gd").new(world)
 	crafting   = preload("res://scripts/world/objects/world_crafting.gd").new(world)
 	storage    = preload("res://scripts/world/objects/world_storage.gd").new(world)
+	merchant   = preload("res://scripts/world/objects/world_merchant.gd").new(world)
 
 # Shared utility used by items, loot, crafting, storage sub-modules.
 func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
@@ -104,3 +106,15 @@ func handle_rpc_request_satchel_extract(sender_id: int, satchel_id: String, slot
 func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_index: int, hand_idx: int, new_entity_id: String, scene_path: String, item_state: Dictionary) -> void: storage.handle_rpc_confirm_satchel_extract(peer_id, satchel_id, slot_index, hand_idx, new_entity_id, scene_path, item_state)
 func handle_rpc_request_table_place(sender_id: int, table_id: String, hand_idx: int, place_pos: Vector2) -> void:                         storage.handle_rpc_request_table_place(sender_id, table_id, hand_idx, place_pos)
 func handle_rpc_confirm_table_place(peer_id: int, table_id: String, hand_idx: int, place_pos: Vector2) -> void:                           storage.handle_rpc_confirm_table_place(peer_id, table_id, hand_idx, place_pos)
+
+# Merchant Vendor
+func handle_rpc_request_merchant_open(sender_id: int, vendor_id: String) -> void:                                                         merchant.handle_rpc_request_merchant_open(sender_id, vendor_id)
+func handle_rpc_show_merchant_menu(vendor_id: String, balance: int) -> void:                                                               merchant.handle_rpc_show_merchant_menu(vendor_id, balance)
+func handle_rpc_request_merchant_hand_interaction(sender_id: int, vendor_id: String, hand_idx: int) -> void:                              merchant.handle_rpc_request_merchant_hand_interaction(sender_id, vendor_id, hand_idx)
+func handle_rpc_confirm_merchant_coin_deposit(peer_id: int, hand_idx: int, removed_amount: int) -> void:                                  merchant.handle_rpc_confirm_merchant_coin_deposit(peer_id, hand_idx, removed_amount)
+func handle_rpc_confirm_merchant_sale(peer_id: int, hand_idx: int, payout_payload: Array) -> void:                                        merchant.handle_rpc_confirm_merchant_sale(peer_id, hand_idx, payout_payload)
+func handle_rpc_request_merchant_purchase(sender_id: int, vendor_id: String, item_type: String) -> void:                                  merchant.handle_rpc_request_merchant_purchase(sender_id, vendor_id, item_type)
+func handle_rpc_confirm_merchant_purchase(item_type: String, node_name: String, entity_id: String, z_level: int, spawn_position: Vector2) -> void: merchant.handle_rpc_confirm_merchant_purchase(item_type, node_name, entity_id, z_level, spawn_position)
+func handle_rpc_request_merchant_withdraw(sender_id: int, vendor_id: String) -> void:                                                      merchant.handle_rpc_request_merchant_withdraw(sender_id, vendor_id)
+func handle_rpc_confirm_merchant_withdraw(payout_payload: Array) -> void:                                                                  merchant.handle_rpc_confirm_merchant_withdraw(payout_payload)
+func handle_rpc_update_merchant_balance(vendor_id: String, balance: int) -> void:                                                          merchant.handle_rpc_update_merchant_balance(vendor_id, balance)

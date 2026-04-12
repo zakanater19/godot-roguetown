@@ -644,6 +644,58 @@ func rpc_update_atm_balance(atm_id: String, balance: int) -> void:
 	bank.handle_rpc_update_atm_balance(atm_id, balance)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_merchant_open(vendor_id: String) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_merchant_open(sender_id, vendor_id)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_show_merchant_menu(vendor_id: String, balance: int) -> void:
+	objects.handle_rpc_show_merchant_menu(vendor_id, balance)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_merchant_hand_interaction(vendor_id: String, hand_idx: int) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_merchant_hand_interaction(sender_id, vendor_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_merchant_coin_deposit(peer_id: int, hand_idx: int, removed_amount: int) -> void:
+	objects.handle_rpc_confirm_merchant_coin_deposit(peer_id, hand_idx, removed_amount)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_merchant_sale(peer_id: int, hand_idx: int, payout_payload: Array) -> void:
+	objects.handle_rpc_confirm_merchant_sale(peer_id, hand_idx, payout_payload)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_merchant_purchase(vendor_id: String, item_type: String) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_merchant_purchase(sender_id, vendor_id, item_type)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_merchant_purchase(item_type: String, node_name: String, entity_id: String, z_level: int, spawn_position: Vector2) -> void:
+	objects.handle_rpc_confirm_merchant_purchase(item_type, node_name, entity_id, z_level, spawn_position)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_merchant_withdraw(vendor_id: String) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_merchant_withdraw(sender_id, vendor_id)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_merchant_withdraw(payout_payload: Array) -> void:
+	objects.handle_rpc_confirm_merchant_withdraw(payout_payload)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_update_merchant_balance(vendor_id: String, balance: int) -> void:
+	objects.handle_rpc_update_merchant_balance(vendor_id, balance)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_pickup(item_id: String, hand_index: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()
