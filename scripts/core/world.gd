@@ -33,6 +33,7 @@ var combat  = null
 var objects = null
 var physics = null
 var session = null
+var bank    = null
 
 var main_scene: Node = null
 
@@ -126,6 +127,7 @@ func _ready() -> void:
 	objects = preload("res://scripts/world/world_objects.gd").new(self)
 	physics = preload("res://scripts/world/world_physics.gd").new(self)
 	session = preload("res://scripts/world/world_session.gd").new(self)
+	bank    = preload("res://scripts/world/world_bank.gd").new(self)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 func _process(delta: float) -> void:
@@ -584,6 +586,62 @@ func rpc_request_combine_ground_coin(coin_id: String, hand_idx: int) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_combine_ground_coin(peer_id: int, coin_id: String, hand_idx: int, amount: int) -> void:
 	objects.handle_rpc_confirm_combine_ground_coin(peer_id, coin_id, hand_idx, amount)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_atm_open(atm_id: String) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	bank.handle_rpc_request_atm_open(sender_id, atm_id)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_show_atm_menu(atm_id: String, balance: int) -> void:
+	bank.handle_rpc_show_atm_menu(atm_id, balance)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_atm_deposit(atm_id: String, metal_type: int, coin_amount: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	bank.handle_rpc_request_atm_deposit(sender_id, atm_id, metal_type, coin_amount)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_atm_deposit(peer_id: int, metal_type: int, coin_amount: int) -> void:
+	bank.handle_rpc_confirm_atm_deposit(peer_id, metal_type, coin_amount)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_atm_hand_deposit(atm_id: String, hand_idx: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	bank.handle_rpc_request_atm_hand_deposit(sender_id, atm_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_atm_hand_deposit(peer_id: int, hand_idx: int, coin_amount: int) -> void:
+	bank.handle_rpc_confirm_atm_hand_deposit(peer_id, hand_idx, coin_amount)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_atm_withdraw(atm_id: String, metal_type: int, coin_amount: int, preferred_hand: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	bank.handle_rpc_request_atm_withdraw(sender_id, atm_id, metal_type, coin_amount, preferred_hand)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_atm_withdraw(peer_id: int, metal_type: int, payload: Array) -> void:
+	bank.handle_rpc_confirm_atm_withdraw(peer_id, metal_type, payload)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_update_atm_balance(atm_id: String, balance: int) -> void:
+	bank.handle_rpc_update_atm_balance(atm_id, balance)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_pickup(item_id: String, hand_index: int) -> void:

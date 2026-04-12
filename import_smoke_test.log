@@ -15,5 +15,5 @@
 [ PASS ]  net: replication configs
 [ PASS ]  net: resource diff dirs
 ------------------------------------------------------------
-PASSED  —  13/13 checks passed,  0 error(s)
+PASSED  -  13/13 checks passed,  0 error(s)
 ============================================================

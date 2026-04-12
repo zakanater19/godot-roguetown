@@ -42,6 +42,8 @@ func start_host(custom_max_clients: int = 200, bind_ip: String = "*", custom_nam
 		multiplayer.multiplayer_peer = enet
 		print("Host: server listening on %s:%d with max players %d" %[bind_ip, PORT, max_clients])
 		session_ids[1] = 1.0
+		if World.bank != null:
+			World.bank.clear_accounts()
 		ServerBrowser.start_broadcasting(server_name)
 		_setup_spawner()
 		print("Host: generating server bundle...")
@@ -82,6 +84,8 @@ func execute_round_restart() -> void:
 	multiplayer.multiplayer_peer = null
 	peers.clear()
 	_spawner = null
+	if World.bank != null:
+		World.bank.clear_accounts()
 
 	Lobby.reset_lobby_state()
 

@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=4]
+
+[ext_resource type="Script" path="res://objects/atm.gd" id="1_atmgd"]
+[ext_resource type="Texture2D" path="res://objects/atm.png" id="2_atmtex"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(44, 18)
+
+[node name="ATM" type="Area2D"]
+z_index = 5
+script = ExtResource("1_atmgd")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -40)
+scale = Vector2(2, 2)
+texture = ExtResource("2_atmtex")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -40)
+shape = SubResource("RectangleShape2D_1")

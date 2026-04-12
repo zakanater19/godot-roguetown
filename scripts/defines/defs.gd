@@ -30,6 +30,8 @@ const MAX_COIN_STACK:     int = 20
 const KEYRING_MAX_KEYS:   int = 5
 const COIN_STACK_ICON_THRESHOLDS: Array[int] = [20, 15, 10, 5, 4, 3, 2, 1]
 const COIN_METAL_SUFFIXES: Array[String] = ["copper", "silver", "gold"]
+const COIN_VALUES: Array[int] = [1, 5, 10]
+const COIN_ITEM_TYPES: Array[String] = ["CopperCoin", "SilverCoin", "GoldCoin"]
 const KEY_NAME_MAP: Dictionary = {
 	1: "merchant",
 }
@@ -178,6 +180,16 @@ static func get_coin_icon_path(amount: int, metal_type: int) -> String:
 			if ResourceLoader.exists(path):
 				return path
 	return ""
+
+static func get_coin_value(metal_type: int) -> int:
+	if metal_type < 0 or metal_type >= COIN_VALUES.size():
+		return 0
+	return COIN_VALUES[metal_type]
+
+static func get_coin_item_type(metal_type: int) -> String:
+	if metal_type < 0 or metal_type >= COIN_ITEM_TYPES.size():
+		return ""
+	return COIN_ITEM_TYPES[metal_type]
 
 static func get_keyring_icon_path(key_count: int) -> String:
 	var clamped_count := clampi(key_count, 0, KEYRING_MAX_KEYS)
