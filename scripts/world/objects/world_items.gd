@@ -135,6 +135,7 @@ func handle_rpc_confirm_keyring_extract(peer_id: int, keyring_id: String, hand_i
 	if key_state.has("key_id") and "key_id" in item:
 		item.set("key_id", int(key_state["key_id"]))
 
+	item.set_meta("entity_id", new_entity_id)
 	player.get_parent().add_child(item)
 	world.register_entity(item, new_entity_id)
 	for child in item.get_children():

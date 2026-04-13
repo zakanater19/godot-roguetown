@@ -15,6 +15,7 @@ var _slot_btns: Array       =[]
 
 var _drag_started:      bool    = false
 var _drag_press_screen: Vector2 = Vector2.ZERO
+var _press_received:    bool    = false
 
 @export var z_level: int = 3
 
@@ -40,10 +41,6 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
-	var col := get_node_or_null("CollisionShape2D")
-	if col != null and col.disabled:
-		col.disabled = false
-
 	if _ui_layer != null and is_instance_valid(_ui_layer):
 		var player: Node = World.get_local_player()
 		if player != null:
@@ -94,15 +91,19 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if Input.is_key_pressed(KEY_SHIFT): return
-		get_viewport().set_input_as_handled()
 
 		if event.pressed:
+			get_viewport().set_input_as_handled()
+			_press_received    = true
 			_drag_started      = true
 			_drag_press_screen = event.position
 			return
 
 		if not event.pressed:
 			_drag_started = false
+			if not _press_received: return
+			_press_received = false
+			get_viewport().set_input_as_handled()
 			var player: Node = World.get_local_player()
 			if player == null or player.z_level != z_level: return
 

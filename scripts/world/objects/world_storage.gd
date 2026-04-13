@@ -88,6 +88,7 @@ func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_i
 	if item_state.has("contents") and "contents" in item: item.set("contents", item_state["contents"].duplicate(true))
 	if item_state.has("key_id") and "key_id" in item: item.set("key_id", item_state["key_id"])
 
+	item.set_meta("entity_id", new_entity_id)
 	satchel.get_parent().add_child(item)
 	if item.has_method("_update_sprite"): item._update_sprite()
 	world.register_entity(item, new_entity_id)

@@ -16,7 +16,7 @@ const CYCLE_DURATION: float = 2400.0
 const TRANSITION_DURATION: float = 300.0
 
 var _update_timer: float = 0.0
-const UPDATE_INTERVAL: float = 0.25
+const UPDATE_INTERVAL: float = 0.5
 
 var _last_sun_weight: float = -1.0
 var _last_player_z: int = -1
@@ -625,6 +625,9 @@ func _rebuild_local_light_cache() -> void:
 										"intensity": l_info.intensity
 									})
 
+		# Cache tilemap reference once — used for window checks in the inner loops below
+		var tm = World.get_tilemap(current_z)
+
 		# Main rendering loop
 		for dy in range(-view_radius_y, view_radius_y + 1):
 			for dx in range(-view_radius_x, view_radius_x + 1):
@@ -640,9 +643,8 @@ func _rebuild_local_light_cache() -> void:
 				var floor_z = roof_data[idx + 1]
 
 				var is_roofed = (wall_z > current_z) or (floor_z > current_z)
-				
+
 				# Check for window transparency directly
-				var tm = World.get_tilemap(current_z)
 				var is_window = (tm != null and tm.get_cell_source_id(tile) == 1 and tm.get_cell_atlas_coords(tile) == Vector2i(10, 0))
 				if is_window: is_roofed = false
 
@@ -679,8 +681,7 @@ func _rebuild_local_light_cache() -> void:
 							var is_c_roofed = (c_wall_z >= current_z or c_floor_z > current_z)
 							
 							# Override for transparent windows
-							var c_tm = World.get_tilemap(current_z)
-							var is_c_window = (c_tm != null and c_tm.get_cell_source_id(Vector2i(cx, cy)) == 1 and c_tm.get_cell_atlas_coords(Vector2i(cx, cy)) == Vector2i(10, 0))
+							var is_c_window = (tm != null and tm.get_cell_source_id(Vector2i(cx, cy)) == 1 and tm.get_cell_atlas_coords(Vector2i(cx, cy)) == Vector2i(10, 0))
 							if is_c_window: is_c_roofed = false
 							
 							var block = 1.0 if is_c_roofed else 0.0

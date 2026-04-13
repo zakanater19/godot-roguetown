@@ -101,6 +101,7 @@ func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) 
 
 	player.equipped_data[slot_name] = null
 
+	item.set_meta("entity_id", new_entity_id)
 	player.get_parent().add_child(item)
 	if item.has_method("_update_sprite"):
 		item._update_sprite()

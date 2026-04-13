@@ -412,6 +412,8 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 		if obj != null:
 			obj.name = obj_name
 			_apply_pre_add_object_state(obj, obj_data)
+			if entity_id != "":
+				obj.set_meta("entity_id", entity_id)
 			main_node.add_child(obj)
 			World.register_entity(obj, entity_id)
 			if obj_data.has("z_index"):
