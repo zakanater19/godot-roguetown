@@ -415,7 +415,7 @@ position = Vector2(32160, 12384)
 direction_rotation = 4
 
 [node name="TorchWall8" parent="." instance=ExtResource("33_dgi5k")]
-z_index = 405
+z_index = 605
 position = Vector2(31712, 11168)
 direction_rotation = 4
 z_level = 4

@@ -1,5 +1,521 @@
 {
+	"Apothshirt": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Blackshirt": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"BrownKey": {
+		"east": {
+			"left": [
+				-16.0,
+				8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				6.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-12.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				6.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				6.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"ChainGloves": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
 	"Coal": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"CopperCoin": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Crown": {
 		"east": {
 			"left": [
 				-16.0,
@@ -176,7 +692,7 @@
 			"waist_scale": 1.0
 		}
 	},
-	"IronIngot": {
+	"GoldCoin": {
 		"east": {
 			"left": [
 				-16.0,
@@ -348,6 +864,436 @@
 			"waist_scale": 1.0
 		}
 	},
+	"GoldOre": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Hood": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"IronChestplate": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"IronHelmet": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"IronIngot": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
 	"IronOre": {
 		"east": {
 			"left": [
@@ -434,7 +1380,93 @@
 			"waist_scale": 1.0
 		}
 	},
-	"GoldOre": {
+	"Keyring": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"KingCloak": {
 		"east": {
 			"left": [
 				-16.0,
@@ -605,6 +1637,350 @@
 			"right_flipped": false,
 			"right_rotation": 0.0,
 			"right_scale": 1.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"LeatherBoots": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"LeatherTrousers": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Log": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Merchantrobe": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
 			"waist": [
 				0.0,
 				4.0
@@ -787,6 +2163,264 @@
 			"waist_scale": 0.75
 		}
 	},
+	"Plate": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Satchel": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"SilverCoin": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
 	"Sword": {
 		"east": {
 			"left": [
@@ -871,6 +2505,178 @@
 			"waist_flipped": false,
 			"waist_rotation": -184.0,
 			"waist_scale": 0.75
+		}
+	},
+	"Torch": {
+		"east": {
+			"left": [
+				12.0,
+				-12.0
+			],
+			"left_flipped": false,
+			"left_rotation": 14.0,
+			"right": [
+				9.0,
+				-11.0
+			],
+			"right_flipped": false,
+			"right_rotation": 14.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-21.0,
+				-13.0
+			],
+			"left_flipped": false,
+			"left_rotation": -55.0,
+			"right": [
+				20.0,
+				-16.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				18.0,
+				-14.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-22.0,
+				-12.0
+			],
+			"right_flipped": false,
+			"right_rotation": -48.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				-9.0,
+				-11.0
+			],
+			"left_flipped": false,
+			"left_rotation": 14.0,
+			"right": [
+				-8.0,
+				-11.0
+			],
+			"right_flipped": false,
+			"right_rotation": 19.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		}
+	},
+	"Undershirt": {
+		"east": {
+			"left": [
+				-16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"north": {
+			"left": [
+				-20.0,
+				-8.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				-10.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				-12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"south": {
+			"left": [
+				-20.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				20.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				12.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
+		},
+		"west": {
+			"left": [
+				16.0,
+				10.0
+			],
+			"left_flipped": false,
+			"left_rotation": 0.0,
+			"right": [
+				-16.0,
+				8.0
+			],
+			"right_flipped": false,
+			"right_rotation": 0.0,
+			"waist": [
+				0.0,
+				4.0
+			],
+			"waist_flipped": false,
+			"waist_rotation": 0.0,
+			"waist_scale": 1.0
 		}
 	}
 }
