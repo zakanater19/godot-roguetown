@@ -133,6 +133,8 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	if "hits"          in obj: data["hits"]           = obj.get("hits")
 	if "state"         in obj: data["state"]          = obj.get("state")
 	if "is_on"         in obj: data["is_on"]          = obj.get("is_on")
+	if "has_torch"     in obj: data["has_torch"]      = obj.get("has_torch")
+	if "direction_rotation" in obj: data["direction_rotation"] = obj.get("direction_rotation")
 	if "_coal_count"   in obj: data["_coal_count"]    = obj.get("_coal_count")
 	if "_ironore_count" in obj: data["_ironore_count"] = obj.get("_ironore_count")
 	if "_ore_item_type" in obj: data["_ore_item_type"] = obj.get("_ore_item_type")
@@ -165,6 +167,9 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 func _apply_pre_add_object_state(obj: Node, obj_data: Dictionary) -> void:
 	var pre_add_keys := [
 		"z_level",
+		"direction_rotation",
+		"has_torch",
+		"is_on",
 		"tree_id",
 		"piece_kind",
 		"support_segment_name",
@@ -212,6 +217,8 @@ func _retry_receive_object_states(object_states: Dictionary, retries: int) -> vo
 		if obj != null:
 			if obj.has_method("set_hits"): obj.call("set_hits", obj_data.get("hits", 0))
 			if obj_data.has("is_on")       and "is_on"         in obj: obj.set("is_on",         obj_data["is_on"])
+			if obj_data.has("has_torch")   and "has_torch"     in obj: obj.set("has_torch",     obj_data["has_torch"])
+			if obj_data.has("direction_rotation") and "direction_rotation" in obj: obj.set("direction_rotation", obj_data["direction_rotation"])
 			if obj_data.has("_coal_count") and "_coal_count"   in obj: obj.set("_coal_count",   obj_data["_coal_count"])
 			if obj_data.has("_ironore_count") and "_ironore_count" in obj: obj.set("_ironore_count", obj_data["_ironore_count"])
 			if obj_data.has("_ore_item_type") and "_ore_item_type" in obj: obj.set("_ore_item_type", obj_data["_ore_item_type"])
@@ -441,6 +448,10 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			obj.set("state", obj_data["state"])
 			if obj.has_method("_update_sprite"):   obj.call("_update_sprite")
 			if obj.has_method("_update_solidity"): obj.call("_update_solidity")
+		if obj_data.has("direction_rotation") and "direction_rotation" in obj:
+			obj.set("direction_rotation", obj_data["direction_rotation"])
+		if obj_data.has("has_torch") and "has_torch" in obj:
+			obj.set("has_torch", obj_data["has_torch"])
 		if obj_data.has("is_on"):         obj.set("is_on",         obj_data["is_on"])
 		if obj_data.has("_coal_count"):   obj.set("_coal_count",   obj_data["_coal_count"])
 		if obj_data.has("_ironore_count"): obj.set("_ironore_count", obj_data["_ironore_count"])

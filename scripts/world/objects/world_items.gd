@@ -3,9 +3,23 @@
 extends RefCounted
 
 var world: Node
+const TORCH_SCENE_PATH: String = "res://objects/torch.tscn"
+const TORCH_SCRIPT_PATH: String = "res://objects/torch.gd"
 
 func _init(p_world: Node) -> void:
 	world = p_world
+
+func _is_torch_item(item: Node) -> bool:
+	if item == null or not is_instance_valid(item):
+		return false
+	if item.has_method("is_torch_item") and item.is_torch_item():
+		return true
+	if str(item.get("item_type")) == "Torch":
+		return true
+	if item.scene_file_path == TORCH_SCENE_PATH:
+		return true
+	var script := item.get_script() as Script
+	return script != null and script.resource_path == TORCH_SCRIPT_PATH
 
 # ── Hand item interaction ─────────────────────────────────────────────────────
 
@@ -186,6 +200,44 @@ func handle_rpc_confirm_furnace_action(peer_id: int, furnace_id: String, action:
 	var furnace = world.get_entity(furnace_id)
 	if furnace != null:
 		furnace._perform_action(action, player, hand_idx, generated_ids)
+
+func handle_rpc_request_torchwall_action(sender_id: int, torchwall_id: String, action: String, hand_idx: int) -> void:
+	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_idx):
+		return
+
+	var torchwall = world.get_entity(torchwall_id)
+	if torchwall == null:
+		return
+
+	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
+	if not world.utils.can_player_interact(player):
+		return
+	if player.body != null and player.body.is_arm_broken(hand_idx):
+		return
+	if not world.utils.is_within_interaction_range(player, torchwall.global_position):
+		return
+
+	match action:
+		"insert":
+			var held_item: Node = player.hands[hand_idx]
+			if not _is_torch_item(held_item):
+				return
+			if torchwall.get("has_torch") == true:
+				return
+			world.rpc_confirm_torchwall_action.rpc(sender_id, torchwall_id, action, hand_idx, [])
+		"extract":
+			if player.hands[hand_idx] != null:
+				return
+			if torchwall.get("has_torch") != true:
+				return
+			var new_entity_id: String = world._make_entity_id("torchwall_extract")
+			world.rpc_confirm_torchwall_action.rpc(sender_id, torchwall_id, action, hand_idx, [new_entity_id])
+
+func handle_rpc_confirm_torchwall_action(peer_id: int, torchwall_id: String, action: String, hand_idx: int, generated_ids: Array) -> void:
+	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
+	var torchwall = world.get_entity(torchwall_id)
+	if torchwall != null and torchwall.has_method("_perform_action"):
+		torchwall._perform_action(action, player, hand_idx, generated_ids)
 
 # ── Pickup ────────────────────────────────────────────────────────────────────
 

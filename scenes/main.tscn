@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=4 uid="uid://buhminxyg50to"]
+[gd_scene load_steps=34 format=4 uid="uid://buhminxyg50to"]
 
 [ext_resource type="Script" uid="uid://dckm0lo1jb3lq" path="res://scripts/core/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://dgxtei6u3o7r" path="res://scripts/ui/overlay.gd" id="2_overlay"]
@@ -30,7 +30,9 @@
 [ext_resource type="PackedScene" uid="uid://chood001sc" path="res://clothing/hood.tscn" id="30_seu75"]
 [ext_resource type="PackedScene" uid="uid://bkvmhw7qt51ly" path="res://objects/coin.tscn" id="31_seu75"]
 [ext_resource type="PackedScene" path="res://objects/goldore.tscn" id="31_tel4y"]
+[ext_resource type="PackedScene" path="res://objects/torch.tscn" id="32_5q0nq"]
 [ext_resource type="PackedScene" path="res://objects/atm.tscn" id="32_atm"]
+[ext_resource type="PackedScene" path="res://objects/torchwall.tscn" id="33_dgi5k"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -372,3 +374,58 @@ position = Vector2(31648, 11043)
 [node name="GoldOre" parent="." instance=ExtResource("31_tel4y")]
 z_index = 402
 position = Vector2(31468, 11835)
+
+[node name="Torch" parent="." instance=ExtResource("32_5q0nq")]
+z_index = 402
+position = Vector2(31584, 11746)
+
+[node name="TorchWall" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(31584, 11232)
+direction_rotation = 3
+
+[node name="TorchWall2" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(30944, 11808)
+direction_rotation = 3
+
+[node name="TorchWall3" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(30944, 12064)
+direction_rotation = 3
+
+[node name="TorchWall4" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(31392, 11808)
+direction_rotation = 3
+
+[node name="TorchWall5" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(31392, 11936)
+direction_rotation = 3
+
+[node name="TorchWall6" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(32160, 12000)
+direction_rotation = 4
+
+[node name="TorchWall7" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(32160, 12384)
+direction_rotation = 4
+
+[node name="TorchWall8" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(31712, 11168)
+direction_rotation = 4
+z_level = 4
+
+[node name="TorchWall9" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(31776, 11936)
+direction_rotation = 4
+
+[node name="TorchWall10" parent="." instance=ExtResource("33_dgi5k")]
+z_index = 405
+position = Vector2(31904, 11936)
+direction_rotation = 3

@@ -558,6 +558,17 @@ func rpc_confirm_furnace_action(peer_id: int, furnace_id: String, action: String
 	objects.handle_rpc_confirm_furnace_action(peer_id, furnace_id, action, hand_idx, generated_ids)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_torchwall_action(torchwall_id: String, action: String, hand_idx: int) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_torchwall_action(sender_id, torchwall_id, action, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_torchwall_action(peer_id: int, torchwall_id: String, action: String, hand_idx: int, generated_ids: Array) -> void:
+	objects.handle_rpc_confirm_torchwall_action(peer_id, torchwall_id, action, hand_idx, generated_ids)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_split_coins(from_hand: int, to_hand: int, split_amount: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()

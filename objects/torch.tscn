@@ -1,0 +1,18 @@
+[gd_scene load_steps=5 format=4]
+
+[ext_resource type="Script" path="res://objects/torch.gd" id="1_torchgd"]
+[ext_resource type="Texture2D" path="res://objects/torch.png" id="2_torchtex"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(20, 36)
+
+[node name="Torch" type="Area2D"]
+z_index = 5
+script = ExtResource("1_torchgd")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(1.5, 1.5)
+texture = ExtResource("2_torchtex")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
