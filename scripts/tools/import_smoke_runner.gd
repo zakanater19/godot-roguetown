@@ -20,10 +20,15 @@ func _ready() -> void:
 		return
 
 	var validator = validator_script.new()
-	var result: Dictionary = validator.run()
+	# Inject the SceneTree so the validator can run asynchronous integrations
+	validator.scene_tree = get_tree()
+	
+	# Await the run so async integration tests can process frames
+	var result: Dictionary = await validator.run()
+	
 	var warnings: Array = result.get("warnings", [])
-	var errors: Array = result.get("errors", [])
-	var sections: Array = result.get("sections", [])
+	var errors: Array = result.get("errors",[])
+	var sections: Array = result.get("sections",[])
 
 	var passed_count := 0
 	var _failed_count := 0
@@ -33,7 +38,7 @@ func _ready() -> void:
 		else:
 			_failed_count += 1
 
-	var log_lines: PackedStringArray = []
+	var log_lines: PackedStringArray =[]
 
 	log_lines.append(DIVIDER)
 	log_lines.append("  ROGUETOWN SMOKE TEST")
@@ -63,7 +68,7 @@ func _ready() -> void:
 	if errors.size() == 0:
 		verdict = "PASSED  -  %d/%d checks passed,  0 error(s)" % [passed_count, sections.size()]
 	else:
-		verdict = "FAILED  -  %d/%d checks passed,  %d error(s)" % [passed_count, sections.size(), errors.size()]
+		verdict = "FAILED  -  %d/%d checks passed,  %d error(s)" %[passed_count, sections.size(), errors.size()]
 	log_lines.append(verdict)
 	log_lines.append(DIVIDER)
 

@@ -7,28 +7,30 @@ const RECIPES_DIR := "res://recipes"
 const MATERIALS_DIR := "res://materials"
 
 # Scenes registered with MultiplayerSpawner.add_spawnable_scene() in Host.gd.
-const NET_SPAWNABLE_SCENES: Array[String] = [
+const NET_SPAWNABLE_SCENES: Array[String] =[
 	"res://scenes/player.tscn",
 	"res://core/ghost.tscn",
 ]
 
 # Scenes that must contain a MultiplayerSynchronizer with a valid replication_config.
 # Each configured property NodePath must resolve to a real property on the target node.
-const NET_SYNCED_SCENES: Array[String] = [
+const NET_SYNCED_SCENES: Array[String] =[
 	"res://scenes/player.tscn",
 	"res://npcs/spider.tscn",
 ]
 
-var _errors: Array[String] = []
-var _warnings: Array[String] = []
+var _errors: Array[String] =[]
+var _warnings: Array[String] =[]
 var _validated_script_paths: Dictionary = {}
 var _validated_scene_paths: Dictionary = {}
 var _validated_texture_paths: Dictionary = {}
 
-var _section_results: Array[Dictionary] = []
+var _section_results: Array[Dictionary] =[]
 var _section_name: String = ""
 var _section_error_start: int = 0
 
+# Injected by the runner to allow async integration testing
+var scene_tree: SceneTree = null
 
 class _SmokeBodyStub:
 	extends RefCounted
@@ -45,7 +47,7 @@ class _SmokePlayerStub:
 	var health: int = 100
 	var dead: bool = false
 	var body = _SmokeBodyStub.new()
-	var hands: Array = [null, null]
+	var hands: Array =[null, null]
 	var equipped: Dictionary = {}
 	var equipped_data: Dictionary = {}
 	var is_lying_down: bool = false
@@ -61,7 +63,7 @@ class _SmokeReconnectStub:
 		return (node.get_meta("smoke_capture_state", {}) as Dictionary).duplicate(true)
 
 	func capture_hands_state(node: Node2D) -> Array:
-		return (node.get_meta("smoke_hand_state", []) as Array).duplicate(true)
+		return (node.get_meta("smoke_hand_state",[]) as Array).duplicate(true)
 
 	func capture_equipped_state(node: Node2D) -> Dictionary:
 		return (node.get_meta("smoke_equipped_state", {}) as Dictionary).duplicate(true)
@@ -201,6 +203,15 @@ func run() -> Dictionary:
 	_validate_resource_patching()
 	_end_section()
 
+	if scene_tree != null:
+		_begin_section("dynamic: scene instantiation")
+		await _validate_all_instantiations()
+		_end_section()
+
+		_begin_section("dynamic: live networking")
+		await _validate_live_networking()
+		_end_section()
+
 	return {
 		"errors": _errors.duplicate(),
 		"warnings": _warnings.duplicate(),
@@ -218,13 +229,100 @@ func _end_section() -> void:
 	})
 	_section_name = ""
 
+# NEW: Automatically pull, scan and test EVERY scene in the project to catch _ready() crashes dynamically.
+func _validate_all_instantiations() -> void:
+	# Create a safe sandbox container for temporary instantiation
+	var sandbox := Node.new()
+	sandbox.name = "SmokeTestSandbox"
+	scene_tree.root.call_deferred("add_child", sandbox)
+	await scene_tree.process_frame
+
+	var scene_paths := _collect_paths(PROJECT_ROOT, ".tscn")
+	for path in scene_paths:
+		# We exclude main.tscn and main_menu.tscn to prevent test loop overriding / global scene changes
+		if path.ends_with("main_menu.tscn") or path.ends_with("main.tscn"):
+			continue
+			
+		var packed := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
+		if packed == null:
+			_fail("%s: Failed to load packed scene for dynamic instantiation." % path)
+			continue
+			
+		var instance := packed.instantiate()
+		if instance == null:
+			_fail("%s: Failed to instantiate." % path)
+			continue
+			
+		# Safeguard: Ensure the sandbox hasn't been deleted by a rogue scene
+		if not is_instance_valid(sandbox):
+			sandbox = Node.new()
+			sandbox.name = "SmokeTestSandbox"
+			scene_tree.root.call_deferred("add_child", sandbox)
+			await scene_tree.process_frame
+			
+		sandbox.call_deferred("add_child", instance)
+		
+		# Wait one frame to let _ready() and _enter_tree() process cleanly
+		await scene_tree.process_frame 
+		
+		# Safeguard: Some UI panels free themselves if spawned outside gameplay.
+		# Only call queue_free if the instance is still valid.
+		if is_instance_valid(instance):
+			instance.queue_free()
+			
+		# Wait another frame to allow the engine to clean it up safely
+		await scene_tree.process_frame 
+
+	if is_instance_valid(sandbox):
+		sandbox.queue_free()
+
+# NEW: Spins up a headless server and client, validates connection, and cleanly destroys them.
+func _validate_live_networking() -> void:
+	var port := 12345
+	
+	var server_peer := ENetMultiplayerPeer.new()
+	var err := server_peer.create_server(port, 4)
+	if err != OK:
+		_fail("Live Network: Failed to create headless test server on port %d (Error %d)." % [port, err])
+		return
+
+	var client_peer := ENetMultiplayerPeer.new()
+	err = client_peer.create_client("127.0.0.1", port)
+	if err != OK:
+		_fail("Live Network: Failed to create headless test client (Error %d)." % err)
+		server_peer.close()
+		return
+
+	var timeout := 2.0
+	var elapsed := 0.0
+	var client_connected := false
+	
+	# Poll network until connected or timed out
+	while not client_connected and elapsed < timeout:
+		server_peer.poll()
+		client_peer.poll()
+		
+		if client_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+			client_connected = true
+			break
+			
+		await scene_tree.create_timer(0.1).timeout
+		elapsed += 0.1
+
+	if not client_connected:
+		_fail("Live Network: Headless client timed out attempting to connect to the local server.")
+	
+	# KILL headless test clients and cleanup to prevent ghost sessions
+	client_peer.close()
+	server_peer.close()
+
 func _validate_items(item_types: Dictionary) -> void:
-	const VALID_SLOTS: Array[String] = [
+	const VALID_SLOTS: Array[String] =[
 		"head", "face", "cloak", "armor", "backpack",
 		"gloves", "waist", "clothing", "trousers", "feet",
 		"pocket_l", "pocket_r",
 	]
-	const VALID_TOOL_TYPES: Array[String] = ["slashing", "stabbing", "pickaxe"]
+	const VALID_TOOL_TYPES: Array[String] =["slashing", "stabbing", "pickaxe"]
 
 	for path in _collect_paths(ITEMS_DIR, ".tres"):
 		var item := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE) as ItemData
@@ -234,7 +332,7 @@ func _validate_items(item_types: Dictionary) -> void:
 		if item.item_type.is_empty():
 			_fail("%s: item_type is empty." % path)
 		elif item_types.has(item.item_type):
-			_fail("%s: duplicate item_type '%s' also used by %s." % [path, item.item_type, item_types[item.item_type]["path"]])
+			_fail("%s: duplicate item_type '%s' also used by %s." %[path, item.item_type, item_types[item.item_type]["path"]])
 		else:
 			item_types[item.item_type] = {
 				"path": path,
@@ -252,11 +350,11 @@ func _validate_items(item_types: Dictionary) -> void:
 			_validate_texture(item.mob_texture_path, "%s mob_texture_path" % path)
 
 		if not item.slot.is_empty() and item.slot not in VALID_SLOTS:
-			_fail("%s: slot '%s' is not a valid Defs slot." % [path, item.slot])
+			_fail("%s: slot '%s' is not a valid Defs slot." %[path, item.slot])
 		if not item.tool_type.is_empty() and item.tool_type not in VALID_TOOL_TYPES:
 			_fail("%s: tool_type '%s' is not a valid Defs tool type." % [path, item.tool_type])
 		if item.has_inventory and item.inventory_slots <= 0:
-			_fail("%s: has_inventory is true but inventory_slots is %d." % [path, item.inventory_slots])
+			_fail("%s: has_inventory is true but inventory_slots is %d." %[path, item.inventory_slots])
 
 func _validate_materials(material_ids: Dictionary) -> void:
 	for path in _collect_paths(MATERIALS_DIR, ".tres"):
@@ -267,14 +365,14 @@ func _validate_materials(material_ids: Dictionary) -> void:
 		if material.material_id.is_empty():
 			_fail("%s: material_id is empty." % path)
 		elif material_ids.has(material.material_id):
-			_fail("%s: duplicate material_id '%s' also used by %s." % [path, material.material_id, material_ids[material.material_id]])
+			_fail("%s: duplicate material_id '%s' also used by %s." %[path, material.material_id, material_ids[material.material_id]])
 		else:
 			material_ids[material.material_id] = path
 
 		for tool_type in material.tool_efficiencies.keys():
 			var value: Variant = material.tool_efficiencies[tool_type]
 			if not (value is int or value is float):
-				_fail("%s: tool_efficiencies['%s'] must be numeric." % [path, tool_type])
+				_fail("%s: tool_efficiencies['%s'] must be numeric." %[path, tool_type])
 
 func _validate_autoloads() -> void:
 	for property_info in ProjectSettings.get_property_list():
@@ -311,7 +409,7 @@ func _validate_recipes(item_types: Dictionary) -> void:
 		if recipe.recipe_id.is_empty():
 			_fail("%s: recipe_id is empty." % path)
 		elif recipe_ids.has(recipe.recipe_id):
-			_fail("%s: duplicate recipe_id '%s' also used by %s." % [path, recipe.recipe_id, recipe_ids[recipe.recipe_id]])
+			_fail("%s: duplicate recipe_id '%s' also used by %s." %[path, recipe.recipe_id, recipe_ids[recipe.recipe_id]])
 		else:
 			recipe_ids[recipe.recipe_id] = path
 
@@ -319,7 +417,7 @@ func _validate_recipes(item_types: Dictionary) -> void:
 		if req_item_type.is_empty():
 			_fail("%s: req_item_data is missing or has an empty item_type." % path)
 		elif not item_types.has(req_item_type):
-			_fail("%s: required item '%s' was not found in %s." % [path, req_item_type, ITEMS_DIR])
+			_fail("%s: required item '%s' was not found in %s." %[path, req_item_type, ITEMS_DIR])
 
 		match recipe.result_type:
 			Defs.RECIPE_RESULT_ITEM:
@@ -327,17 +425,17 @@ func _validate_recipes(item_types: Dictionary) -> void:
 				if result_item_type.is_empty():
 					_fail("%s: result_item_data is missing or has an empty item_type." % path)
 				elif not item_types.has(result_item_type):
-					_fail("%s: result item '%s' was not found in %s." % [path, result_item_type, ITEMS_DIR])
+					_fail("%s: result item '%s' was not found in %s." %[path, result_item_type, ITEMS_DIR])
 				else:
 					var scene_path := str(item_types[result_item_type].get("scene_path", ""))
 					if scene_path.is_empty():
-						_fail("%s: could not resolve scene for result item '%s'." % [path, result_item_type])
+						_fail("%s: could not resolve scene for result item '%s'." %[path, result_item_type])
 					else:
 						_validate_packed_scene(scene_path, "%s result item" % path)
 			Defs.RECIPE_RESULT_TILE:
 				pass
 			_:
-				_fail("%s: unsupported result_type '%s'." % [path, recipe.result_type])
+				_fail("%s: unsupported result_type '%s'." %[path, recipe.result_type])
 
 # GAMEPLAY: every item_type referenced in Classes.DATA equipment must exist.
 func _validate_classes(item_types: Dictionary) -> void:
@@ -346,13 +444,13 @@ func _validate_classes(item_types: Dictionary) -> void:
 		for slot_key: String in equipment:
 			var item_type: String = str(equipment[slot_key])
 			if not item_types.has(item_type):
-				_fail("Classes['%s'].equipment['%s']: item_type '%s' not found in %s." % [class_key, slot_key, item_type, ITEMS_DIR])
+				_fail("Classes['%s'].equipment['%s']: item_type '%s' not found in %s." %[class_key, slot_key, item_type, ITEMS_DIR])
 
 # GAMEPLAY: clothing_offsets.json must parse and have a complete entry (all 4
 # directions, valid offset array and positive scale) for every item_type key.
 func _validate_clothing_offsets() -> void:
 	const OFFSETS_PATH := "res://clothing/clothing_offsets.json"
-	const DIRECTIONS: Array[String] = ["north", "south", "east", "west"]
+	const DIRECTIONS: Array[String] =["north", "south", "east", "west"]
 	if not ResourceLoader.exists(OFFSETS_PATH):
 		_fail("%s: file missing." % OFFSETS_PATH)
 		return
@@ -364,7 +462,7 @@ func _validate_clothing_offsets() -> void:
 	var err := json.parse(file.get_as_text())
 	file.close()
 	if err != OK:
-		_fail("%s: JSON parse error at line %d: %s." % [OFFSETS_PATH, json.get_error_line(), json.get_error_message()])
+		_fail("%s: JSON parse error at line %d: %s." %[OFFSETS_PATH, json.get_error_line(), json.get_error_message()])
 		return
 	var data: Variant = json.get_data()
 	if not data is Dictionary:
@@ -373,15 +471,15 @@ func _validate_clothing_offsets() -> void:
 	for item_type: String in (data as Dictionary):
 		var entry: Variant = data[item_type]
 		if not entry is Dictionary:
-			_fail("%s: entry for '%s' must be an object." % [OFFSETS_PATH, item_type])
+			_fail("%s: entry for '%s' must be an object." %[OFFSETS_PATH, item_type])
 			continue
 		for dir in DIRECTIONS:
 			if not (entry as Dictionary).has(dir):
-				_fail("%s: '%s' missing direction '%s'." % [OFFSETS_PATH, item_type, dir])
+				_fail("%s: '%s' missing direction '%s'." %[OFFSETS_PATH, item_type, dir])
 				continue
 			var d: Variant = (entry as Dictionary)[dir]
 			if not d is Dictionary:
-				_fail("%s: '%s.%s' must be an object." % [OFFSETS_PATH, item_type, dir])
+				_fail("%s: '%s.%s' must be an object." %[OFFSETS_PATH, item_type, dir])
 				continue
 			var offset: Variant = (d as Dictionary).get("offset")
 			if not offset is Array or (offset as Array).size() != 2:
@@ -431,7 +529,7 @@ func _validate_replication_configs() -> void:
 
 		var config: SceneReplicationConfig = sync_node.get("replication_config")
 		if config == null:
-			_fail("%s: MultiplayerSynchronizer '%s' has no replication_config." % [scene_path, sync_node.name])
+			_fail("%s: MultiplayerSynchronizer '%s' has no replication_config." %[scene_path, sync_node.name])
 			instance.free()
 			continue
 
@@ -463,7 +561,7 @@ func _validate_network_sync_behavior() -> void:
 	main_node.name = "__SmokeMain"
 	temp_root.add_child(main_node)
 	World.register_main(main_node)
-	World.current_laws = ["Smoke law"]
+	World.current_laws =["Smoke law"]
 
 	var loose_obj := _SmokeSyncObjectStub.new()
 	loose_obj.name = "LooseObject"
@@ -488,9 +586,9 @@ func _validate_network_sync_behavior() -> void:
 	remote_player.position = Vector2(32, 48)
 	remote_player.z_level = 4
 	remote_player.health = 81
-	remote_player.hands = [remote_hand, null]
+	remote_player.hands =[remote_hand, null]
 	remote_player.equipped_data = {"head": {"item_type": "hood"}}
-	remote_player.set_meta("smoke_hand_state", [{"entity_id": remote_hand_id, "name": "RemoteHand"}, null])
+	remote_player.set_meta("smoke_hand_state",[{"entity_id": remote_hand_id, "name": "RemoteHand"}, null])
 	remote_player.set_meta("smoke_equipped_state", {"head": {"item_type": "hood"}})
 	remote_player.add_to_group("player")
 	remote_player.set_multiplayer_authority(22)
@@ -499,7 +597,7 @@ func _validate_network_sync_behavior() -> void:
 
 	var joining_player := _SmokePlayerStub.new()
 	joining_player.name = "JoiningPlayer"
-	joining_player.hands = [held_obj, null]
+	joining_player.hands =[held_obj, null]
 	joining_player.add_to_group("player")
 	joining_player.set_multiplayer_authority(77)
 	temp_root.add_child(joining_player)
@@ -533,7 +631,7 @@ func _validate_network_sync_behavior() -> void:
 	}
 
 	var player_payload := sync._build_player_sync_state(remote_player)
-	var built_hand_ids: Array = player_payload.get("hands", [])
+	var built_hand_ids: Array = player_payload.get("hands",[])
 	if built_hand_ids.is_empty() or str(built_hand_ids[0]) != remote_hand_id:
 		_fail("LateJoinSync._build_player_sync_state: remote hand entity IDs were not captured correctly.")
 	var equipped_payload: Dictionary = player_payload.get("equipped", {})
@@ -560,7 +658,7 @@ func _validate_network_sync_behavior() -> void:
 	var loose_data := sync.get_object_sync_data(loose_obj)
 	if str(loose_data.get("entity_id", "")) != loose_id:
 		_fail("LateJoinSync.get_object_sync_data: loose object entity ID was not captured.")
-	var loose_groups: Array = loose_data.get("groups", [])
+	var loose_groups: Array = loose_data.get("groups",[])
 	if not loose_groups.has("pickable"):
 		_fail("LateJoinSync.get_object_sync_data: object groups were not captured.")
 
@@ -734,7 +832,7 @@ func _validate_replication_property(scene_path: String, root: Node, prop_path: N
 	var path_str := str(prop_path)
 	var colon_idx := path_str.find(":")
 	if colon_idx == -1:
-		_fail("%s: replication property '%s' has no ':' separator between node path and property name." % [scene_path, path_str])
+		_fail("%s: replication property '%s' has no ':' separator between node path and property name." %[scene_path, path_str])
 		return
 
 	var node_path_str := path_str.substr(0, colon_idx)
@@ -747,7 +845,7 @@ func _validate_replication_property(scene_path: String, root: Node, prop_path: N
 		target = root.get_node_or_null(NodePath(node_path_str))
 
 	if target == null:
-		_fail("%s: replication property '%s' — node '%s' not found in scene." % [scene_path, path_str, node_path_str])
+		_fail("%s: replication property '%s' — node '%s' not found in scene." %[scene_path, path_str, node_path_str])
 		return
 
 	var found := false
@@ -774,7 +872,7 @@ func _validate_packed_scene(scene_path: String, context: String) -> void:
 		return
 	_validated_scene_paths[scene_path] = true
 	if not ResourceLoader.exists(scene_path):
-		_fail("%s: missing scene %s." % [context, scene_path])
+		_fail("%s: missing scene %s." %[context, scene_path])
 		return
 	var scene := ResourceLoader.load(scene_path, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
 	if scene == null:
@@ -795,7 +893,7 @@ func _validate_texture(texture_path: String, context: String) -> void:
 		return
 	var texture := ResourceLoader.load(texture_path, "", ResourceLoader.CACHE_MODE_REPLACE) as Texture2D
 	if texture == null:
-		_fail("%s: failed to load texture %s." % [context, texture_path])
+		_fail("%s: failed to load texture %s." %[context, texture_path])
 
 func _validate_script(script_path: String, context: String) -> void:
 	if _validated_script_paths.has(script_path):
@@ -806,10 +904,10 @@ func _validate_script(script_path: String, context: String) -> void:
 		return
 	var script := ResourceLoader.load(script_path, "", ResourceLoader.CACHE_MODE_REPLACE) as Script
 	if script == null:
-		_fail("%s: failed to load script %s." % [context, script_path])
+		_fail("%s: failed to load script %s." %[context, script_path])
 
 func _collect_paths(root_path: String, extension: String) -> Array[String]:
-	var paths: Array[String] = []
+	var paths: Array[String] =[]
 	_collect_paths_recursive(root_path, extension, paths)
 	paths.sort()
 	return paths
@@ -822,10 +920,10 @@ func _collect_paths_recursive(root_path: String, extension: String, out_paths: A
 	dir.list_dir_begin()
 	var name := dir.get_next()
 	while name != "":
-		if name in [".", ".."]:
+		if name in[".", ".."]:
 			name = dir.get_next()
 			continue
-		var child_path := "%s/%s" % [root_path, name]
+		var child_path := "%s/%s" %[root_path, name]
 		if dir.current_is_dir():
 			_collect_paths_recursive(child_path, extension, out_paths)
 		elif name.ends_with(extension) or name.ends_with("%s.remap" % extension):

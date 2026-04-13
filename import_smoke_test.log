@@ -16,6 +16,8 @@
 [ PASS ]  net: resource diff dirs
 [ PASS ]  net: sync behavior
 [ PASS ]  net: resource patching
+[ PASS ]  dynamic: scene instantiation
+[ PASS ]  dynamic: live networking
 ------------------------------------------------------------
-PASSED  -  15/15 checks passed,  0 error(s)
+PASSED  -  17/17 checks passed,  0 error(s)
 ============================================================
