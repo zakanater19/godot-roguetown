@@ -14,6 +14,8 @@
 [ PASS ]  net: spawnable scenes
 [ PASS ]  net: replication configs
 [ PASS ]  net: resource diff dirs
+[ PASS ]  net: sync behavior
+[ PASS ]  net: resource patching
 ------------------------------------------------------------
-PASSED  -  13/13 checks passed,  0 error(s)
+PASSED  -  15/15 checks passed,  0 error(s)
 ============================================================

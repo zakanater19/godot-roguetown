@@ -1,11 +1,19 @@
+[CmdletBinding()]
+param(
+	[switch]$NoPause
+)
+
 $ErrorActionPreference = "Stop"
 
-$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = (Resolve-Path (Split-Path -Parent $MyInvocation.MyCommand.Path)).Path
 $godotExe = Join-Path (Split-Path -Parent $projectRoot) "Godot_v4.5-stable_win64.exe"
 
 if (-not (Test-Path -LiteralPath $godotExe)) {
 	Write-Error "Godot executable not found at '$godotExe'."
 }
+
+$godotExe = (Resolve-Path -LiteralPath $godotExe).Path
+$godotExeName = Split-Path -Leaf $godotExe
 
 Write-Host ""
 Write-Host "============================================================"
@@ -37,7 +45,38 @@ function Stop-ProcessTree {
 	Stop-Process -Id $RootId -Force -ErrorAction SilentlyContinue
 }
 
+function Get-SmokeGodotProcesses {
+	Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+		Where-Object {
+			$commandLine = $_.CommandLine
+			if ([string]::IsNullOrWhiteSpace($commandLine)) {
+				return $false
+			}
+
+			$matchesExe = $false
+			if (-not [string]::IsNullOrWhiteSpace($_.ExecutablePath)) {
+				$matchesExe = [string]::Equals([System.IO.Path]::GetFullPath($_.ExecutablePath), $godotExe, [System.StringComparison]::OrdinalIgnoreCase)
+			}
+			if (-not $matchesExe) {
+				$matchesExe = [string]::Equals($_.Name, $godotExeName, [System.StringComparison]::OrdinalIgnoreCase)
+			}
+
+			$matchesExe -and
+			$commandLine -match '(?i)(^|\s)--headless(\s|$)' -and
+			$commandLine -match '(?i)(^|\s)--path(\s|$)' -and
+			$commandLine.Contains($projectRoot)
+		}
+}
+
+function Stop-SmokeGodotProcesses {
+	$procs = @(Get-SmokeGodotProcesses | Sort-Object ProcessId -Unique)
+	foreach ($projectProc in $procs) {
+		Stop-ProcessTree -RootId ([int]$projectProc.ProcessId)
+	}
+}
+
 try {
+	Stop-SmokeGodotProcesses
 	$proc = Start-Process -FilePath $godotExe -ArgumentList @("--headless", "--path", $projectRoot) -NoNewWindow -PassThru
 	$proc.WaitForExit()
 	$exitCode = $proc.ExitCode
@@ -47,6 +86,7 @@ finally {
 		Stop-ProcessTree -RootId $proc.Id
 		$proc.WaitForExit()
 	}
+	Stop-SmokeGodotProcesses
 	Remove-Item Env:CODEX_VALIDATE_IMPORTS -ErrorAction SilentlyContinue
 }
 
@@ -81,5 +121,7 @@ if (Test-Path -LiteralPath $logPath) {
 }
 
 Write-Host ""
-Read-Host "Press Enter to close"
+if (-not $NoPause) {
+	Read-Host "Press Enter to close"
+}
 exit $exitCode

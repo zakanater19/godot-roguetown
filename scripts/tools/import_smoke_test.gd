@@ -29,6 +29,114 @@ var _section_results: Array[Dictionary] = []
 var _section_name: String = ""
 var _section_error_start: int = 0
 
+
+class _SmokeBodyStub:
+	extends RefCounted
+
+	var limb_hp := {"chest": 80}
+	var limb_broken := {"chest": false}
+
+
+class _SmokePlayerStub:
+	extends Node2D
+
+	var is_possessed: bool = true
+	var z_level: int = 3
+	var health: int = 100
+	var dead: bool = false
+	var body = _SmokeBodyStub.new()
+	var hands: Array = [null, null]
+	var equipped: Dictionary = {}
+	var equipped_data: Dictionary = {}
+	var is_lying_down: bool = false
+	var is_sneaking: bool = false
+	var sneak_alpha: float = 1.0
+	var stamina: int = 100
+
+
+class _SmokeReconnectStub:
+	extends RefCounted
+
+	func capture_player_state(node: Node2D) -> Dictionary:
+		return (node.get_meta("smoke_capture_state", {}) as Dictionary).duplicate(true)
+
+	func capture_hands_state(node: Node2D) -> Array:
+		return (node.get_meta("smoke_hand_state", []) as Array).duplicate(true)
+
+	func capture_equipped_state(node: Node2D) -> Dictionary:
+		return (node.get_meta("smoke_equipped_state", {}) as Dictionary).duplicate(true)
+
+	func restore_player_state(node: Node2D, player_state: Dictionary) -> void:
+		node.set_meta("smoke_restored_state", player_state.duplicate(true))
+
+	func _recreate_hand_item(hand_state: Dictionary) -> Node:
+		var item := Node2D.new()
+		item.name = str(hand_state.get("name", "SmokeHandItem"))
+		var entity_id := str(hand_state.get("entity_id", ""))
+		if entity_id != "":
+			World.register_entity(item, entity_id)
+		return item
+
+
+class _SmokeLateJoinStub:
+	extends Node
+
+	var _world_state: Dictionary = {
+		"tiles": {},
+		"objects": {},
+		"players": {},
+	}
+	var _reconnect = null
+	var players_by_peer: Dictionary = {}
+
+	func _find_player_by_peer(peer_id: int) -> Node:
+		return players_by_peer.get(peer_id, null)
+
+
+class _SmokeSyncObjectStub:
+	extends Node2D
+
+	var z_level: int = 3
+	var hits: int = 0
+	var state: String = "closed"
+	var is_on: bool = false
+	var contents: Dictionary = {}
+	var amount: int = 0
+	var metal_type: int = 0
+	var stored_balance: int = 0
+	var key_id: String = ""
+	var is_locked: bool = false
+	var tree_id: String = ""
+	var piece_kind: String = ""
+	var support_segment_name: String = ""
+	var hits_to_break: int = 0
+	var drop_count: int = 0
+	var atlas_index: int = 0
+	var solid_piece: bool = false
+	var blocks_fov: bool = false
+	var decor_configs: Dictionary = {}
+	var sprite_updates: int = 0
+	var solidity_updates: int = 0
+	var rebuild_calls: int = 0
+
+	func set_hits(value: int) -> void:
+		hits = value
+
+	func _update_sprite() -> void:
+		sprite_updates += 1
+
+	func _update_solidity() -> void:
+		solidity_updates += 1
+
+	func _set_sprite(value: bool) -> void:
+		is_on = value
+
+	func rebuild_decor() -> void:
+		rebuild_calls += 1
+
+	func _update_merchant_balance(value: int) -> void:
+		stored_balance = value
+
 func run() -> Dictionary:
 	var item_types := {}
 	var material_ids := {}
@@ -83,6 +191,14 @@ func run() -> Dictionary:
 
 	_begin_section("net: resource diff dirs")
 	_validate_resource_diff_dirs()
+	_end_section()
+
+	_begin_section("net: sync behavior")
+	_validate_network_sync_behavior()
+	_end_section()
+
+	_begin_section("net: resource patching")
+	_validate_resource_patching()
 	_end_section()
 
 	return {
@@ -331,6 +447,288 @@ func _validate_resource_diff_dirs() -> void:
 	for dir_path: String in GameVersion.RESOURCE_DIFF_DIRS:
 		if DirAccess.open(dir_path) == null:
 			_fail("GameVersion.RESOURCE_DIFF_DIRS: directory missing or inaccessible: %s." % dir_path)
+
+func _validate_network_sync_behavior() -> void:
+	var previous_main_scene := World.main_scene
+	var previous_laws := World.current_laws.duplicate(true)
+	var temp_root := Node.new()
+	temp_root.name = "__SmokeNetRoot"
+
+	var latejoin := _SmokeLateJoinStub.new()
+	latejoin._reconnect = _SmokeReconnectStub.new()
+	temp_root.add_child(latejoin)
+
+	var sync = preload("res://scripts/net/latejoin_sync.gd").new(latejoin)
+	var main_node := Node2D.new()
+	main_node.name = "__SmokeMain"
+	temp_root.add_child(main_node)
+	World.register_main(main_node)
+	World.current_laws = ["Smoke law"]
+
+	var loose_obj := _SmokeSyncObjectStub.new()
+	loose_obj.name = "LooseObject"
+	loose_obj.position = Vector2(12, 18)
+	loose_obj.add_to_group("pickable")
+	main_node.add_child(loose_obj)
+	var loose_id := World.register_entity(loose_obj, "smoke:loose")
+
+	var held_obj := _SmokeSyncObjectStub.new()
+	held_obj.name = "HeldObject"
+	held_obj.add_to_group("pickable")
+	main_node.add_child(held_obj)
+	var held_id := World.register_entity(held_obj, "smoke:held")
+
+	var remote_hand := Node2D.new()
+	remote_hand.name = "RemoteHand"
+	temp_root.add_child(remote_hand)
+	var remote_hand_id := World.register_entity(remote_hand, "smoke:remote_hand")
+
+	var remote_player := _SmokePlayerStub.new()
+	remote_player.name = "RemotePlayer"
+	remote_player.position = Vector2(32, 48)
+	remote_player.z_level = 4
+	remote_player.health = 81
+	remote_player.hands = [remote_hand, null]
+	remote_player.equipped_data = {"head": {"item_type": "hood"}}
+	remote_player.set_meta("smoke_hand_state", [{"entity_id": remote_hand_id, "name": "RemoteHand"}, null])
+	remote_player.set_meta("smoke_equipped_state", {"head": {"item_type": "hood"}})
+	remote_player.add_to_group("player")
+	remote_player.set_multiplayer_authority(22)
+	temp_root.add_child(remote_player)
+	latejoin.players_by_peer[22] = remote_player
+
+	var joining_player := _SmokePlayerStub.new()
+	joining_player.name = "JoiningPlayer"
+	joining_player.hands = [held_obj, null]
+	joining_player.add_to_group("player")
+	joining_player.set_multiplayer_authority(77)
+	temp_root.add_child(joining_player)
+	latejoin.players_by_peer[77] = joining_player
+
+	var corpse := _SmokePlayerStub.new()
+	corpse.name = "CorpsePlayer"
+	corpse.is_possessed = false
+	corpse.dead = true
+	corpse.health = 0
+	corpse.position = Vector2(80, 96)
+	corpse.set_meta("smoke_capture_state", {
+		"position": corpse.position,
+		"health": corpse.health,
+		"dead": corpse.dead,
+	})
+	corpse.add_to_group("player")
+	temp_root.add_child(corpse)
+	var corpse_id := World.register_entity(corpse, "smoke:corpse")
+
+	latejoin._world_state["tiles"] = {
+		"0_0_3": {
+			"tile_pos": Vector2i.ZERO,
+			"z_level": 3,
+			"source_id": 1,
+			"atlas_coords": Vector2i.ZERO,
+		},
+	}
+	latejoin._world_state["objects"] = {
+		"smoke/object/path": {"hits": 2},
+	}
+
+	var player_payload := sync._build_player_sync_state(remote_player)
+	var built_hand_ids: Array = player_payload.get("hands", [])
+	if built_hand_ids.is_empty() or str(built_hand_ids[0]) != remote_hand_id:
+		_fail("LateJoinSync._build_player_sync_state: remote hand entity IDs were not captured correctly.")
+	var equipped_payload: Dictionary = player_payload.get("equipped", {})
+	var head_payload: Dictionary = equipped_payload.get("head", {})
+	if str(head_payload.get("item_type", "")) != "hood":
+		_fail("LateJoinSync._build_player_sync_state: equipped item payload did not round-trip reconnect capture data.")
+	if player_payload.get("equipped_data", {}).get("head", {}).get("item_type", "") != "hood":
+		_fail("LateJoinSync._build_player_sync_state: equipped_data was not copied from the player.")
+
+	if sync._resolve_player_sync_target(22) != remote_player:
+		_fail("LateJoinSync._resolve_player_sync_target: peer lookup did not resolve the possessed player.")
+	if sync._resolve_player_sync_target(corpse_id) != corpse:
+		_fail("LateJoinSync._resolve_player_sync_target: entity lookup did not resolve the corpse by stable ID.")
+
+	sync._apply_synced_player_state(corpse, {
+		"health": 13,
+		"dead": false,
+		"position": Vector2(5, 6),
+	}, false)
+	var restored_corpse_state: Dictionary = corpse.get_meta("smoke_restored_state", {})
+	if int(restored_corpse_state.get("health", -1)) != 13:
+		_fail("LateJoinSync._apply_synced_player_state: reconnect restore path did not receive the synced payload.")
+
+	var loose_data := sync.get_object_sync_data(loose_obj)
+	if str(loose_data.get("entity_id", "")) != loose_id:
+		_fail("LateJoinSync.get_object_sync_data: loose object entity ID was not captured.")
+	var loose_groups: Array = loose_data.get("groups", [])
+	if not loose_groups.has("pickable"):
+		_fail("LateJoinSync.get_object_sync_data: object groups were not captured.")
+
+	var pre_add_payload := {
+		"z_level": 5,
+		"tree_id": "oak",
+		"decor_configs": {"ivy": true},
+	}
+	sync._apply_pre_add_object_state(loose_obj, pre_add_payload)
+	if loose_obj.z_level != 5 or loose_obj.tree_id != "oak":
+		_fail("LateJoinSync._apply_pre_add_object_state: scalar pre-add state was not applied.")
+	if loose_obj.decor_configs.get("ivy", false) != true:
+		_fail("LateJoinSync._apply_pre_add_object_state: dictionary pre-add state was not applied.")
+	pre_add_payload["decor_configs"]["ivy"] = false
+	if loose_obj.decor_configs.get("ivy", false) != true:
+		_fail("LateJoinSync._apply_pre_add_object_state: dictionary pre-add state was not deep-copied.")
+
+	var existing_obj := _SmokeSyncObjectStub.new()
+	existing_obj.name = "ExistingObject"
+	existing_obj.z_level = 2
+	existing_obj.z_index = 25
+	existing_obj.contents = {"coins": 1}
+	existing_obj.decor_configs = {"ivy": false}
+	main_node.add_child(existing_obj)
+	World.register_entity(existing_obj, "smoke:existing")
+
+	var obj_data := {
+		"name": "ExistingObject",
+		"entity_id": "smoke:existing",
+		"position": Vector2(90, 70),
+		"z_level": 4,
+		"z_index": 815,
+		"hits": 7,
+		"state": "open",
+		"is_on": true,
+		"stored_balance": 42,
+		"contents": {"coins": 3},
+		"decor_configs": {"ivy": true},
+	}
+	sync.handle_spawn_object_for_late_join(obj_data)
+
+	if existing_obj.position != Vector2(90, 70):
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: existing object position was not updated.")
+	if existing_obj.z_level != 4 or existing_obj.z_index != 815:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: existing object z state was not updated.")
+	if existing_obj.hits != 7 or existing_obj.state != "open":
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: existing object state fields were not applied.")
+	if existing_obj.stored_balance != 42:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: merchant balance was not restored.")
+	if existing_obj.contents.get("coins", -1) != 3:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: contents were not restored.")
+	if existing_obj.decor_configs.get("ivy", false) != true:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: decor configs were not restored.")
+	if existing_obj.rebuild_calls <= 0:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: decor rebuild hook was not triggered.")
+	if existing_obj.sprite_updates <= 0:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: sprite refresh hook was not triggered.")
+	if existing_obj.solidity_updates <= 0:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: solidity refresh hook was not triggered.")
+
+	obj_data["contents"]["coins"] = 9
+	obj_data["decor_configs"]["ivy"] = false
+	if existing_obj.contents.get("coins", -1) != 3:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: contents were not deep-copied from the incoming payload.")
+	if existing_obj.decor_configs.get("ivy", false) != true:
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: decor configs were not deep-copied from the incoming payload.")
+
+	World.current_laws = previous_laws
+	if previous_main_scene != null:
+		World.register_main(previous_main_scene)
+	else:
+		World.unregister_main()
+	temp_root.free()
+
+func _validate_resource_patching() -> void:
+	var item_paths := _collect_paths(ITEMS_DIR, ".tres")
+	var material_paths := _collect_paths(MATERIALS_DIR, ".tres")
+	var recipe_paths := _collect_paths(RECIPES_DIR, ".tres")
+	if item_paths.is_empty() or material_paths.is_empty() or recipe_paths.is_empty():
+		_fail("GameVersion patch smoke: expected at least one item, material, and recipe resource.")
+		return
+
+	var item_path := item_paths[0]
+	var material_path := material_paths[0]
+	var recipe_path := recipe_paths[0]
+
+	var item_original := ResourceLoader.load(item_path, "", ResourceLoader.CACHE_MODE_REPLACE) as ItemData
+	var material_original := ResourceLoader.load(material_path, "", ResourceLoader.CACHE_MODE_REPLACE) as MaterialData
+	var recipe_original := ResourceLoader.load(recipe_path, "", ResourceLoader.CACHE_MODE_REPLACE) as RecipeData
+	if item_original == null or material_original == null or recipe_original == null:
+		_fail("GameVersion patch smoke: failed to load baseline item/material/recipe resources.")
+		return
+
+	var baseline_item := ItemRegistry.get_by_type(item_original.item_type)
+	var baseline_material := MaterialRegistry.get_material(material_original.material_id)
+	var baseline_recipe := RecipeRegistry.get_recipe(recipe_original.recipe_id)
+	if baseline_item == null or baseline_material == null or baseline_recipe == null:
+		_fail("GameVersion patch smoke: registries were missing baseline resources before patching.")
+		return
+
+	var manifest := GameVersion.build_manifest()
+	if not manifest.has(item_path):
+		_fail("GameVersion.build_manifest: item resource %s was not included in the manifest." % item_path)
+	var client_manifest := manifest.duplicate(true)
+	client_manifest[item_path] = "__smoke_mismatch__"
+	var built_diff := GameVersion.build_diff(manifest, client_manifest)
+	if not built_diff.has(item_path):
+		_fail("GameVersion.build_diff: changed item resource %s did not produce a diff." % item_path)
+	else:
+		var serialized_item: Dictionary = built_diff[item_path]
+		if str(serialized_item.get("item_type", "")) != item_original.item_type:
+			_fail("GameVersion.build_diff: serialized item payload lost the item_type for %s." % item_path)
+
+	var patched_item_description := "smoke patched: " + baseline_item.description
+	var patched_material_name := "Smoke " + baseline_material.display_name
+	var patched_recipe_name := "Smoke " + baseline_recipe.display_name
+	var patched_efficiencies := baseline_material.tool_efficiencies.duplicate(true)
+	patched_efficiencies["smoke_tool"] = 1.25
+
+	GameVersion.apply_resource_diff({
+		item_path: {
+			"item_type": item_original.item_type,
+			"scene_path": item_original.scene_path,
+			"description": patched_item_description,
+			"material_data": material_path,
+			"pickable": item_original.pickable,
+		},
+		material_path: {
+			"material_id": material_original.material_id,
+			"display_name": patched_material_name,
+			"tool_efficiencies": patched_efficiencies,
+		},
+		recipe_path: {
+			"recipe_id": recipe_original.recipe_id,
+			"display_name": patched_recipe_name,
+			"result_type": recipe_original.result_type,
+		},
+	})
+
+	var patched_item := ItemRegistry.get_by_type(item_original.item_type)
+	if patched_item == null or patched_item.description != patched_item_description:
+		_fail("GameVersion.apply_resource_diff: item registry was not updated for %s." % item_original.item_type)
+	elif patched_item.material_data == null or patched_item.material_data.resource_path != material_path:
+		_fail("GameVersion.apply_resource_diff: item resource path properties were not reloaded correctly for %s." % item_original.item_type)
+
+	var patched_material := MaterialRegistry.get_material(material_original.material_id)
+	if patched_material == null or patched_material.display_name != patched_material_name:
+		_fail("GameVersion.apply_resource_diff: material registry was not updated for %s." % material_original.material_id)
+	elif not is_equal_approx(float(patched_material.tool_efficiencies.get("smoke_tool", 0.0)), 1.25):
+		_fail("GameVersion.apply_resource_diff: material dictionary fields were not applied for %s." % material_original.material_id)
+
+	var patched_recipe := RecipeRegistry.get_recipe(recipe_original.recipe_id)
+	if patched_recipe == null or patched_recipe.display_name != patched_recipe_name:
+		_fail("GameVersion.apply_resource_diff: recipe registry was not updated for %s." % recipe_original.recipe_id)
+
+	ItemRegistry.reload()
+	MaterialRegistry.reload()
+	RecipeRegistry.reload()
+
+	var restored_item := ItemRegistry.get_by_type(item_original.item_type)
+	var restored_material := MaterialRegistry.get_material(material_original.material_id)
+	var restored_recipe := RecipeRegistry.get_recipe(recipe_original.recipe_id)
+	if restored_item == null or restored_item.description != baseline_item.description:
+		_fail("GameVersion patch smoke: ItemRegistry.reload() did not restore on-disk item data.")
+	if restored_material == null or restored_material.display_name != baseline_material.display_name:
+		_fail("GameVersion patch smoke: MaterialRegistry.reload() did not restore on-disk material data.")
+	if restored_recipe == null or restored_recipe.display_name != baseline_recipe.display_name:
+		_fail("GameVersion patch smoke: RecipeRegistry.reload() did not restore on-disk recipe data.")
 
 func _validate_replication_property(scene_path: String, root: Node, prop_path: NodePath) -> void:
 	var path_str := str(prop_path)
