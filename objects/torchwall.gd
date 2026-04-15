@@ -83,7 +83,7 @@ func should_register_entity() -> bool:
 	return true
 
 func get_runtime_groups() -> Array[String]:
-	return [Defs.GROUP_INSPECTABLE]
+	return[Defs.GROUP_INSPECTABLE]
 
 func _ready() -> void:
 	set_notify_transform(true)
@@ -252,10 +252,15 @@ func _extract_torch_to_hand(player: Node, hand_idx: int, generated_ids: Array) -
 
 	torch.position = player.pixel_pos
 	torch.set("z_level", player.z_level)
-	player.get_parent().add_child(torch)
 
+	# Set the ID and name BEFORE adding to the tree so _ready() uses the synced ID
 	var entity_id: String = str(generated_ids[0]) if not generated_ids.is_empty() else World._make_entity_id("torch_extract")
+	torch.name = Defs.make_runtime_name("Torch")
+	torch.set_meta("entity_id", entity_id)
+
+	player.get_parent().add_child(torch)
 	World.register_entity(torch, entity_id)
+	
 	torch.call("_set_sprite", is_on)
 	for child in torch.get_children():
 		if child is CollisionShape2D:

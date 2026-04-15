@@ -24,8 +24,6 @@ func _ready() -> void:
 	_precompute_rays()
 	await get_tree().process_frame
 	_draw_node = load("res://scripts/systems/fov_draw.gd").new()
-	# FIX: Godot's maximum CanvasItem z_index is 4096.
-	_draw_node.z_index = 4000
 	_draw_node.name = "FOVDraw"
 	get_tree().root.add_child(_draw_node)
 
@@ -45,7 +43,7 @@ func _process(delta: float) -> void:
 		_view_z = v_z
 		_time_since_update = 0.0
 		_compute_fov()
-		_draw_node.queue_redraw()
+		_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
 
 func refresh_local_fov() -> void:
 	_player_tile = Vector2i(-9999, -9999)
@@ -56,14 +54,14 @@ func refresh_local_fov() -> void:
 	var player = World.get_local_player()
 	if player == null:
 		if _draw_node != null:
-			_draw_node.queue_redraw()
+			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
 		return
 	_player_tile = player.tile_pos
 	_player_z = player.z_level
 	_view_z = player.get("view_z_level") if "view_z_level" in player else _player_z
 	_compute_fov()
 	if _draw_node != null:
-		_draw_node.queue_redraw()
+		_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
 
 func _is_turf_opaque(tile: Vector2i) -> bool:
 	if _solid_cache.has(tile):
@@ -207,7 +205,7 @@ func _compute_fov() -> void:
 	# vision into actual rooms on the viewed level.
 	if not local_is_ghost and _view_z != _player_z:
 		var view_tm = World.get_tilemap(_view_z)
-		var to_remove: Array = []
+		var to_remove: Array =[]
 		for tile in _visible_tiles:
 			if tile == _player_tile:
 				continue

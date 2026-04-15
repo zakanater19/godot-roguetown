@@ -9,7 +9,7 @@ const OUTLINE_WIDTH: float = 1.0
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
 ## Column order 0..10 must match TileSet atlas coords (floor + solid share one row).
-const TURF_TILE_PATHS: PackedStringArray = [
+const TURF_TILE_PATHS: PackedStringArray =[
 	"res://assets/tiles/tile_00_grass.png",
 	"res://assets/tiles/tile_01_cobble_rough.png",
 	"res://assets/tiles/tile_02_dirt.png",
@@ -26,6 +26,8 @@ const TURF_TILE_PATHS: PackedStringArray = [
 var target_fps: int = 60
 var _last_z: int = -1
 
+var _fps_label: Label = null
+
 func _ready() -> void:
 	get_viewport().physics_object_picking_sort = true
 	_build_tileset()
@@ -38,6 +40,19 @@ func _ready() -> void:
 			if darken and darken.visible:
 				darken.visible = false
 		return
+
+	# Add FPS Counter
+	var fps_layer := CanvasLayer.new()
+	fps_layer.layer = 128
+	_fps_label = Label.new()
+	_fps_label.name = "FPSLabel"
+	_fps_label.position = Vector2(10, 10)
+	_fps_label.add_theme_font_size_override("font_size", 24)
+	_fps_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))
+	_fps_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_fps_label.add_theme_constant_override("outline_size", 3)
+	fps_layer.add_child(_fps_label)
+	add_child(fps_layer)
 
 	World.register_main(self)
 	Engine.max_fps = target_fps
@@ -114,7 +129,6 @@ func _compose_turf_atlas_texture() -> ImageTexture:
 		img.blit_rect(sub, Rect2i(0, 0, World.TILE_SIZE, World.TILE_SIZE), Vector2i(i * World.TILE_SIZE, 0))
 	return ImageTexture.create_from_image(img)
 
-
 func _build_tileset() -> void:
 	if Engine.is_editor_hint():
 		var editor_ts := load("res://assets/tileset.tres") as TileSet
@@ -188,6 +202,9 @@ func _build_tileset() -> void:
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
+
+	if _fps_label != null:
+		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 
 	var local_player = World.get_local_player()
 	var current_z = 3
