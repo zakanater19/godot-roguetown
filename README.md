@@ -33,5 +33,9 @@ rest are UI buttons
 Very out of date video, ill get around to recording a new one when the game actually looks good.
 
 
-https://github.com/user-attachments/assets/d6851a3a-b7ba-45de-92e8-2eecb7c273d8
+
+
+https://github.com/user-attachments/assets/a926e817-4305-4e13-8aa2-a9a2653f09d6
+
+
 
