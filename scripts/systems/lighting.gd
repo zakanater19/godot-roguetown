@@ -71,7 +71,8 @@ func _ready() -> void:
 	# 1. Setup the heightmap image tracking opaque blocks on the CPU
 	# r channel = highest wall/opaque Z-level
 	# g channel = highest floor/any tile Z-level
-	roof_map_image = Image.create(1000, 1000, false, Image.FORMAT_RG8)
+	# b channel = opaque bitmask (bit 0 = Z1, bit 1 = Z2, etc)
+	roof_map_image = Image.create(1000, 1000, false, Image.FORMAT_RGBA8)
 	roof_map_image.fill(Color(0, 0, 0, 1))
 
 	# 2. Precalculate the tight 7x7 (3 tile radius) blur kernel for soft local shadows
@@ -113,9 +114,9 @@ func unregister_lamp(lamp: Node) -> void:
 	active_lamps.erase(lamp)
 
 func rebuild_roof_map() -> void:
-	var roof_data = PackedByteArray()
-	roof_data.resize(1000 * 1000 * 2)
-	roof_data.fill(0)
+	var img = Image.create(1000, 1000, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 1))
+	var roof_data = img.get_data()
 
 	for z in range(1, 6):
 		var tm = World.get_tilemap(z)
@@ -127,10 +128,11 @@ func rebuild_roof_map() -> void:
 					if source_id != -1:
 						if source_id == 2:
 							continue
-						var idx = (pos.y * 1000 + pos.x) * 2
+						var idx = (pos.y * 1000 + pos.x) * 4
 						var is_op = TileDefs.is_opaque(source_id, tm.get_cell_atlas_coords(pos))
 						if is_op:
 							if z > roof_data[idx]: roof_data[idx] = z
+							roof_data[idx + 2] |= (1 << (z - 1))
 						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
 
 	for z in range(1, 6):
@@ -147,17 +149,19 @@ func rebuild_roof_map() -> void:
 							break
 					World.solid_grid[z][pos] = valid_objs
 					if is_op:
-						var idx = (pos.y * 1000 + pos.x) * 2
+						var idx = (pos.y * 1000 + pos.x) * 4
 						if z > roof_data[idx]: roof_data[idx] = z
+						roof_data[idx + 2] |= (1 << (z - 1))
 						if z > roof_data[idx + 1]: roof_data[idx + 1] = z
 
-	roof_map_image = Image.create_from_data(1000, 1000, false, Image.FORMAT_RG8, roof_data)
+	roof_map_image = Image.create_from_data(1000, 1000, false, Image.FORMAT_RGBA8, roof_data)
 	_roof_map_revision += 1
 
 func update_roof_map_at(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.x >= 1000 or pos.y < 0 or pos.y >= 1000: return
 	var highest_wall_z = 0
 	var highest_floor_z = 0
+	var opaque_mask = 0
 
 	for z in range(5, 0, -1):
 		var tm = World.get_tilemap(z)
@@ -180,13 +184,13 @@ func update_roof_map_at(pos: Vector2i) -> void:
 			World.solid_grid[z][pos] = valid_objs
 
 		if source_id != -1 and highest_floor_z == 0: highest_floor_z = z
-		if is_opaque and highest_wall_z == 0:
-			highest_wall_z = z
-			if highest_floor_z == 0: highest_floor_z = z
+		if is_opaque:
+			opaque_mask |= (1 << (z - 1))
+			if highest_wall_z == 0:
+				highest_wall_z = z
+				if highest_floor_z == 0: highest_floor_z = z
 
-		if highest_wall_z > 0 and highest_floor_z > 0: break
-
-	var new_col = Color(highest_wall_z / 255.0, highest_floor_z / 255.0, 0, 1)
+	var new_col = Color8(highest_wall_z, highest_floor_z, opaque_mask, 255)
 	if roof_map_image.get_pixel(pos.x, pos.y) != new_col:
 		roof_map_image.set_pixel(pos.x, pos.y, new_col)
 		_roof_map_revision += 1
@@ -269,7 +273,7 @@ func _build_sunlight_job(player_tile: Vector2i, current_z: int, roof_data: Packe
 				wall_z_data[idx] = 0; floor_z_data[idx] = 0; tile_flags[idx] = 0
 				continue
 
-			var roof_idx := (tile.y * 1000 + tile.x) * 2
+			var roof_idx := (tile.y * 1000 + tile.x) * 4
 			wall_z_data[idx] = roof_data[roof_idx]
 			floor_z_data[idx] = roof_data[roof_idx + 1]
 
@@ -539,7 +543,7 @@ func _begin_light_calc() -> void:
 			var tile = player_tile + Vector2i(lx - 16, ly - 11)
 			var flags = 0
 			if tile.x >= 0 and tile.x < 1000 and tile.y >= 0 and tile.y < 1000:
-				var roof_idx = (tile.y * 1000 + tile.x) * 2
+				var roof_idx = (tile.y * 1000 + tile.x) * 4
 				var wall_z = roof_data[roof_idx]
 				var floor_z = roof_data[roof_idx + 1]
 				var is_roofed = (wall_z > current_z) or (floor_z > current_z)
@@ -640,7 +644,7 @@ func _calc_light_row(ly: int) -> void:
 					var cx = tile.x + offset.x
 					var cy = tile.y + offset.y
 					if cx < 0 or cx >= 1000 or cy < 0 or cy >= 1000: continue
-					var c_idx = (cy * 1000 + cx) * 2
+					var c_idx = (cy * 1000 + cx) * 4
 					var block = 1.0 if (roof_data[c_idx] >= current_z or roof_data[c_idx + 1] > current_z) else 0.0
 					var w = blur_weights[offset]
 					shadow += block * w
@@ -700,8 +704,8 @@ func _threaded_is_line_blocked(start_px: Vector2, end_px: Vector2, check_z: int,
 		if x0 == x1 and y0 == y1: break
 		if x0 != start_x or y0 != start_y:
 			if x0 >= 0 and x0 < 1000 and y0 >= 0 and y0 < 1000:
-				var idx = (y0 * 1000 + x0) * 2
-				if roof_data[idx] >= check_z or roof_data[idx+1] > check_z:
+				var idx = (y0 * 1000 + x0) * 4
+				if (roof_data[idx + 2] & (1 << (check_z - 1))) != 0:
 					return true
 		var e2 = 2 * err
 		if e2 >= dy:
