@@ -29,8 +29,15 @@ const ON_TEXTURES: Dictionary = {
 	4: preload("res://objects/torchwall_on_dir4.png"),
 }
 
+const SPRITE_OFFSETS: Dictionary = {
+	1: Vector2(0, -64),
+	2: Vector2.ZERO,
+	3: Vector2.ZERO,
+	4: Vector2.ZERO,
+}
+
 const HITBOX_OFFSETS: Dictionary = {
-	1: Vector2(-1, -8),
+	1: Vector2(-1, -64),
 	2: Vector2(0, 11),
 	3: Vector2(-18, -8),
 	4: Vector2(16, -8),
@@ -169,6 +176,7 @@ func _apply_visual_state() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite != null:
 		sprite.scale = Vector2(2.0, 2.0)
+		sprite.position = SPRITE_OFFSETS.get(direction_rotation, Vector2.ZERO)
 		if not has_torch:
 			sprite.texture = EMPTY_TEXTURES.get(direction_rotation, EMPTY_TEXTURES[1])
 			sprite.region_enabled = false

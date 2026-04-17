@@ -178,8 +178,10 @@ func _check_stamina_regen(delta: float) -> void:                               i
 func _equip_clothing(item: Node) -> void:                                      if backend: backend.equip_clothing(item)
 func _equip_clothing_to_slot(item: Node, slot_name: String) -> void:          if backend: backend.equip_clothing_to_slot(item, slot_name)
 func _perform_equip(item: Node, slot_name: String, hand_index: int) -> void:  if backend: backend.perform_equip(item, slot_name, hand_index)
+func _sync_equip_state(slot_name: String, hand_index: int, item_type: String, slot_data: Variant, expected_item_id: String = "") -> void: if backend: backend.sync_equip_state(slot_name, hand_index, item_type, slot_data, expected_item_id)
 func _unequip_clothing_from_slot(slot_name: String) -> void:                   if backend: backend.unequip_clothing_from_slot(slot_name)
 func _perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void: if backend: backend.perform_unequip(slot_name, new_entity_id, hand_index)
+func _sync_unequip_state(slot_name: String, new_entity_id: String, hand_index: int, item_type: String, slot_data: Variant = null) -> void: if backend: backend.sync_unequip_state(slot_name, new_entity_id, hand_index, item_type, slot_data)
 func _inspect_at(world_pos: Vector2) -> void:                                  if inspect: inspect.inspect_at(world_pos)
 func _show_inspect_text(text: String, detailed_desc: String) -> void:         if inspect: inspect.show_inspect_text(text, detailed_desc)
 func _apply_action_cooldown(item: Node, is_attack: bool = false) -> void:     if backend: backend.apply_action_cooldown(item, is_attack)
@@ -570,6 +572,8 @@ func sync_hands(hand_ids: Array) -> void:
 			for child in found.get_children():
 				if child is CollisionShape2D: child.disabled = true
 			found.set("z_level", z_level)
+		else:
+			hands[i] = null
 	_update_hands_ui()
 
 func _exit_tree() -> void:

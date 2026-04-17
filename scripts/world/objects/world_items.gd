@@ -21,6 +21,42 @@ func _is_torch_item(item: Node) -> bool:
 	var script := item.get_script() as Script
 	return script != null and script.resource_path == TORCH_SCRIPT_PATH
 
+func _find_hand_holder(item: Node, hand_index: int, fallback_peer_id: int) -> Node2D:
+	if item != null and is_instance_valid(item):
+		for candidate in world.get_tree().get_nodes_in_group("player"):
+			if candidate == null or not is_instance_valid(candidate):
+				continue
+			var hands: Variant = candidate.get("hands")
+			if not (hands is Array):
+				continue
+			if hand_index < 0 or hand_index >= hands.size():
+				continue
+			if hands[hand_index] == item:
+				return candidate as Node2D
+	return world.utils.find_player_by_peer(fallback_peer_id) as Node2D
+
+func _get_item_type_name(item: Node) -> String:
+	if item == null or not is_instance_valid(item):
+		return ""
+	var item_type = item.get("item_type")
+	if item_type == null:
+		item_type = item.name.get_slice("@", 0)
+	return str(item_type)
+
+func _capture_item_slot_data(item: Node) -> Dictionary:
+	var slot_data := {}
+	if item == null or not is_instance_valid(item):
+		return slot_data
+	if "contents" in item:
+		slot_data["contents"] = item.get("contents").duplicate(true)
+	if "amount" in item:
+		slot_data["amount"] = item.get("amount")
+	if "metal_type" in item:
+		slot_data["metal_type"] = item.get("metal_type")
+	if "key_id" in item:
+		slot_data["key_id"] = item.get("key_id")
+	return slot_data
+
 # ── Hand item interaction ─────────────────────────────────────────────────────
 
 func handle_rpc_request_interact_hand_item(sender_id: int, hand_idx: int) -> void:
@@ -155,26 +191,41 @@ func handle_rpc_request_equip(sender_id: int, item_id: String, slot_name: String
 	if player.body != null and player.body.is_arm_broken(hand_index): return
 	var item = world.get_entity(item_id)
 	if item == null or player.hands[hand_index] != item: return
-	world.rpc_confirm_equip.rpc(sender_id, item_id, slot_name, hand_index)
+	world.rpc_confirm_equip.rpc(sender_id, item_id, slot_name, hand_index, _get_item_type_name(item), _capture_item_slot_data(item))
 
-func handle_rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, hand_index: int) -> void:
-	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
+func handle_rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, hand_index: int, item_type: String, slot_data: Dictionary) -> void:
 	var obj    = world.get_entity(item_id)
-	if player != null and obj != null:
+	var player: Node2D = _find_hand_holder(obj, hand_index, peer_id)
+	if player == null:
+		return
+	if obj != null:
 		player._perform_equip(obj, slot_name, hand_index)
+		return
+	player._sync_equip_state(slot_name, hand_index, item_type, slot_data, item_id)
 
 func handle_rpc_request_unequip(sender_id: int, slot_name: String, hand_index: int) -> void:
 	if not world.multiplayer.is_server() or not Defs.is_valid_hand_index(hand_index): return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
+	var current_item = player.equipped.get(slot_name)
+	var item_type: String = current_item if current_item is String else ""
+	if item_type == "":
+		return
 	var new_entity_id = world._make_entity_id("unequip")
-	world.rpc_confirm_unequip.rpc(sender_id, slot_name, new_entity_id, hand_index)
+	var slot_data = player.equipped_data.get(slot_name)
+	var slot_payload: Dictionary = slot_data.duplicate(true) if slot_data is Dictionary else {}
+	world.rpc_confirm_unequip.rpc(sender_id, slot_name, new_entity_id, hand_index, item_type, slot_payload)
 
-func handle_rpc_confirm_unequip(peer_id: int, slot_name: String, new_entity_id: String, hand_index: int) -> void:
+func handle_rpc_confirm_unequip(peer_id: int, slot_name: String, new_entity_id: String, hand_index: int, item_type: String, slot_data: Dictionary) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
-	if player != null:
+	if player == null:
+		return
+	var equipped_item = player.equipped.get(slot_name)
+	if equipped_item is String and equipped_item == item_type and equipped_item != "":
 		player._perform_unequip(slot_name, new_entity_id, hand_index)
+		return
+	player._sync_unequip_state(slot_name, new_entity_id, hand_index, item_type, slot_data)
 
 # ── Furnace ───────────────────────────────────────────────────────────────────
 
@@ -240,6 +291,15 @@ func handle_rpc_confirm_torchwall_action(peer_id: int, torchwall_id: String, act
 	if torchwall != null and torchwall.has_method("_perform_action"):
 		torchwall._perform_action(action, player, hand_idx, generated_ids)
 
+func handle_rpc_confirm_auto_extinguish_torch(torch_id: String) -> void:
+	var torch = world.get_entity(torch_id)
+	if torch == null or not is_instance_valid(torch):
+		return
+	if torch.has_method("_extinguish_from_world"):
+		torch._extinguish_from_world()
+	elif "is_on" in torch:
+		torch.set("is_on", false)
+
 # ── Pickup ────────────────────────────────────────────────────────────────────
 
 func handle_rpc_request_pickup(sender_id: int, item_id: String, hand_index: int) -> void:
@@ -274,12 +334,12 @@ func handle_rpc_request_drop(sender_id: int, item_id: String, tile: Vector2i, sp
 	world.rpc_drop_item_at.rpc(sender_id, item_id, tile, spread, hand_index)
 
 func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:
-	var player: Node2D = world.utils.find_player_by_peer(player_peer_id) as Node2D
+	var obj: Node = world.get_entity(item_id)
+	var player: Node2D = _find_hand_holder(obj, hand_index, player_peer_id)
 	if player != null:
 		player.hands[hand_index] = null
 		if player._is_local_authority():
 			player._update_hands_ui()
-	var obj: Node = world.get_entity(item_id)
 	if obj == null: return
 	var sprite: Node = obj.get_node_or_null("Sprite2D")
 	if sprite != null:

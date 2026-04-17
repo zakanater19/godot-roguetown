@@ -40,6 +40,15 @@ var main_scene: Node = null
 var _tilemap_cache: Dictionary = {}
 var _entity_registry: Dictionary = {}
 
+func _is_live_entity_node(node: Variant) -> bool:
+	if node == null:
+		return false
+	if not is_instance_valid(node):
+		return false
+	if not (node is Node):
+		return false
+	return not node.is_queued_for_deletion()
+
 func _make_entity_id(prefix: String = "entity") -> String:
 	return "%s:%s:%s" % [prefix, Time.get_ticks_usec(), randi()]
 
@@ -74,7 +83,9 @@ func ensure_entity_id(node: Node, preferred_id: String = "") -> String:
 
 	if _entity_registry.has(entity_id):
 		var existing = _entity_registry[entity_id]
-		if existing != null and is_instance_valid(existing) and existing != node:
+		if not _is_live_entity_node(existing):
+			_entity_registry.erase(entity_id)
+		elif existing != node:
 			entity_id = _make_entity_id(entity_id.replace(":", "_"))
 
 	node.set_meta("entity_id", entity_id)
@@ -97,21 +108,21 @@ func get_entity(entity_id: String) -> Node:
 	if entity_id == "":
 		return null
 	var node = _entity_registry.get(entity_id, null)
-	if node != null and is_instance_valid(node):
+	if _is_live_entity_node(node):
 		return node
+	_entity_registry.erase(entity_id)
 	if entity_id.begins_with("scene:") and main_scene != null:
 		var rel_path := entity_id.trim_prefix("scene:")
 		var scene_node := main_scene.get_node_or_null(NodePath(rel_path))
-		if scene_node != null:
+		if _is_live_entity_node(scene_node):
 			register_entity(scene_node, entity_id)
 			return scene_node
 	if entity_id.begins_with("player:"):
 		var player_name := entity_id.trim_prefix("player:")
 		for candidate in get_tree().get_nodes_in_group("player"):
-			if candidate.name == player_name:
+			if candidate.name == player_name and _is_live_entity_node(candidate):
 				register_entity(candidate, entity_id)
 				return candidate
-	_entity_registry.erase(entity_id)
 	return null
 
 func register_main(node: Node) -> void:
@@ -534,8 +545,8 @@ func rpc_request_equip(item_id: String, slot_name: String, hand_index: int) -> v
 	objects.handle_rpc_request_equip(sender_id, item_id, slot_name, hand_index)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, hand_index: int) -> void:
-	objects.handle_rpc_confirm_equip(peer_id, item_id, slot_name, hand_index)
+func rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, hand_index: int, item_type: String, slot_data: Dictionary) -> void:
+	objects.handle_rpc_confirm_equip(peer_id, item_id, slot_name, hand_index, item_type, slot_data)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_unequip(slot_name: String, hand_index: int) -> void:
@@ -544,8 +555,8 @@ func rpc_request_unequip(slot_name: String, hand_index: int) -> void:
 	objects.handle_rpc_request_unequip(sender_id, slot_name, hand_index)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_unequip(peer_id: int, slot_name: String, new_entity_id: String, hand_index: int) -> void:
-	objects.handle_rpc_confirm_unequip(peer_id, slot_name, new_entity_id, hand_index)
+func rpc_confirm_unequip(peer_id: int, slot_name: String, new_entity_id: String, hand_index: int, item_type: String, slot_data: Dictionary) -> void:
+	objects.handle_rpc_confirm_unequip(peer_id, slot_name, new_entity_id, hand_index, item_type, slot_data)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_furnace_action(furnace_id: String, action: String, hand_idx: int) -> void:
@@ -567,6 +578,10 @@ func rpc_request_torchwall_action(torchwall_id: String, action: String, hand_idx
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_torchwall_action(peer_id: int, torchwall_id: String, action: String, hand_idx: int, generated_ids: Array) -> void:
 	objects.handle_rpc_confirm_torchwall_action(peer_id, torchwall_id, action, hand_idx, generated_ids)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_auto_extinguish_torch(torch_id: String) -> void:
+	objects.handle_rpc_confirm_auto_extinguish_torch(torch_id)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_split_coins(from_hand: int, to_hand: int, split_amount: int) -> void:

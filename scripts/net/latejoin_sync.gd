@@ -370,10 +370,15 @@ func handle_purge_missing_objects(valid_ids: Array) -> void:
 	var groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 	for group in groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
-			if obj is Node2D and obj.get_parent() == main_node:
-				var obj_id := World.register_entity(obj)
-				if not valid_ids.has(obj_id):
-					obj.queue_free()
+			if obj == null or not is_instance_valid(obj):
+				continue
+			if not (obj is Node2D):
+				continue
+			if obj.is_queued_for_deletion() or obj.get_parent() != main_node:
+				continue
+			var obj_id := World.get_entity_id(obj)
+			if not valid_ids.has(obj_id):
+				obj.queue_free()
 
 func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 	var main_node = World.main_scene

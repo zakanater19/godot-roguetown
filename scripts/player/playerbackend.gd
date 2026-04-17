@@ -170,8 +170,10 @@ func get_clothing_transform(item_name: String, facing_name: String) -> Dictionar
 func equip_clothing(item: Node) -> void:                                              equipment.equip_clothing(item)
 func equip_clothing_to_slot(item: Node, slot_name: String) -> void:                  equipment.equip_clothing_to_slot(item, slot_name)
 func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:          equipment.perform_equip(item, slot_name, hand_index)
+func sync_equip_state(slot_name: String, hand_index: int, item_type: String, slot_data: Variant, expected_item_id: String = "") -> void: equipment.sync_equip_state(slot_name, hand_index, item_type, slot_data, expected_item_id)
 func unequip_clothing_from_slot(slot_name: String) -> void:                          equipment.unequip_clothing_from_slot(slot_name)
 func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void: equipment.perform_unequip(slot_name, new_entity_id, hand_index)
+func sync_unequip_state(slot_name: String, new_entity_id: String, hand_index: int, item_type: String, slot_data: Variant = null) -> void: equipment.sync_unequip_state(slot_name, new_entity_id, hand_index, item_type, slot_data)
 
 # ===========================================================================
 # Action delegation

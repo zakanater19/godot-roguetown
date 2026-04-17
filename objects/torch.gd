@@ -7,6 +7,7 @@ const ON_FRAME_COUNT: int = 8
 const ON_FPS: float = 10.0
 const FRAME_SIZE: int = 32
 const DISPLAY_SCALE: Vector2 = Vector2(1.5, 1.5)
+const GROUND_EXTINGUISH_DELAY: float = 5.0
 
 var item_type: String = "Torch"
 var tool_type: String = ""
@@ -27,6 +28,8 @@ var is_smeltable_ore: bool = false
 @export var light_intensity: float = 1.0
 
 var _anim_timer: float = 0.0
+var _ground_burn_time: float = 0.0
+var _auto_extinguish_requested: bool = false
 
 func get_description() -> String:
 	return "a torch, currently " + ("ON" if is_on else "OFF")
@@ -43,9 +46,23 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint() or not is_on:
+		_ground_burn_time = 0.0
+		_auto_extinguish_requested = false
 		return
 	_anim_timer += delta
 	_update_animation_frame()
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		return
+	if _is_held_by_any_player() or not _is_ground_drop():
+		_ground_burn_time = 0.0
+		_auto_extinguish_requested = false
+		return
+	if _is_in_water_tile():
+		_request_auto_extinguish()
+		return
+	_ground_burn_time += delta
+	if _ground_burn_time >= GROUND_EXTINGUISH_DELAY:
+		_request_auto_extinguish()
 
 func _exit_tree() -> void:
 	super._exit_tree()
@@ -63,6 +80,11 @@ func _set_fov_visibility(p_visible: bool) -> void:
 
 func _set_sprite(on: bool) -> void:
 	is_on = on
+
+func _extinguish_from_world() -> void:
+	_set_sprite(false)
+	_ground_burn_time = 0.0
+	_auto_extinguish_requested = false
 
 func interact_in_hand(player: Node) -> void:
 	_set_sprite(not is_on)
@@ -98,3 +120,37 @@ func _update_animation_frame() -> void:
 		return
 	var frame := int(floor(_anim_timer * ON_FPS)) % ON_FRAME_COUNT
 	sprite.region_rect = Rect2(frame * FRAME_SIZE, 0, FRAME_SIZE, FRAME_SIZE)
+
+func _is_held_by_any_player() -> bool:
+	for player in get_tree().get_nodes_in_group(Defs.GROUP_PLAYER):
+		if player == null or not is_instance_valid(player):
+			continue
+		var hands: Variant = player.get("hands")
+		if not (hands is Array):
+			continue
+		for hand_item in hands:
+			if hand_item == self:
+				return true
+	return false
+
+func _is_ground_drop() -> bool:
+	return z_index % Defs.Z_LAYER_SIZE == Defs.Z_OFFSET_ITEMS
+
+func _is_in_water_tile() -> bool:
+	var tilemap := World.get_tilemap(z_level)
+	if tilemap == null:
+		return false
+	return tilemap.get_cell_source_id(get_anchor_tile()) == 5
+
+func _request_auto_extinguish() -> void:
+	if _auto_extinguish_requested:
+		return
+	_auto_extinguish_requested = true
+	var torch_id := World.get_entity_id(self)
+	if torch_id == "":
+		_extinguish_from_world()
+		return
+	if multiplayer.has_multiplayer_peer():
+		World.rpc_confirm_auto_extinguish_torch.rpc(torch_id)
+	else:
+		_extinguish_from_world()

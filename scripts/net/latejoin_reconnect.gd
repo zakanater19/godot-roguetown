@@ -271,15 +271,41 @@ func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void
 	var h_arr       = player_node.get("hands")
 	for i in range(min(2, hands_state.size())):
 		var h_data = hands_state[i]
-		if h_data != null:
-			if h_arr[i] == null or not is_instance_valid(h_arr[i]):
-				var item = _recreate_hand_item(h_data)
-				if item != null:
-					h_arr[i] = item
-					for child in item.get_children():
-						if child is CollisionShape2D: child.disabled = true
+		if h_data == null:
+			h_arr[i] = null
+			continue
+
+		var desired_entity_id := str(h_data.get("entity_id", ""))
+		var current_item: Node = h_arr[i]
+		if current_item != null:
+			if not is_instance_valid(current_item) or current_item.is_queued_for_deletion():
+				current_item = null
+				h_arr[i] = null
+			elif desired_entity_id == "" or World.get_entity_id(current_item) != desired_entity_id:
+				current_item = null
+				h_arr[i] = null
+
+		if desired_entity_id == "":
+			h_arr[i] = null
+			continue
+
+		if current_item == null:
+			current_item = World.get_entity(desired_entity_id)
+			if current_item == null:
+				current_item = _recreate_hand_item(h_data)
+
+		if current_item != null and is_instance_valid(current_item):
+			h_arr[i] = current_item
+			if "z_level" in current_item:
+				current_item.set("z_level", player_node.get("z_level"))
+			for child in current_item.get_children():
+				if child is CollisionShape2D:
+					child.disabled = true
 		else:
 			h_arr[i] = null
+
+	for i in range(hands_state.size(), 2):
+		h_arr[i] = null
 
 	if player_node.has_method("_update_sprite"):          player_node.call("_update_sprite")
 	if player_node.has_method("_update_clothing_sprites"): player_node.call("_update_clothing_sprites")
