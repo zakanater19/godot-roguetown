@@ -3,7 +3,7 @@ extends Node
 
 ## Keep this for executable/binary level compatibility only. Runtime content,
 ## scenes, scripts, and maps are synced via the server bundle hash below.
-const APP_VERSION: String = "1776420308"
+const APP_VERSION: String = "a14f90d"
 
 ## Directories that still support lightweight resource diffs as a fallback when
 ## talking to older servers. Full bundle sync does not depend on this list.
@@ -107,9 +107,19 @@ func _compute_version() -> String:
 	var ctx: HashingContext = HashingContext.new()
 	ctx.start(HashingContext.HASH_MD5)
 	for entry in _get_runtime_entries():
-		ctx.update(entry["dest"].to_utf8_buffer())
-		ctx.update(_read_file_bytes(entry["source"]))
+		_hash_update_chunk(ctx, entry["dest"].to_utf8_buffer())
+		_hash_update_chunk(ctx, _read_file_bytes(entry["source"]))
 	return ctx.finish().hex_encode()
+
+
+func _hash_update_chunk(ctx: HashingContext, bytes: PackedByteArray) -> void:
+	# HashingContext.update() rejects empty buffers, so include an explicit
+	# length marker and only append payload bytes when present.
+	ctx.update(str(bytes.size()).to_utf8_buffer())
+	ctx.update(PackedByteArray([0]))
+	if not bytes.is_empty():
+		ctx.update(bytes)
+	ctx.update(PackedByteArray([0]))
 
 
 func build_manifest() -> Dictionary:

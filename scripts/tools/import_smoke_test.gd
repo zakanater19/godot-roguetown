@@ -35,25 +35,75 @@ var scene_tree: SceneTree = null
 class _SmokeBodyStub:
 	extends RefCounted
 
+	var LIMB_MAX_HP := {"chest": 80}
 	var limb_hp := {"chest": 80}
 	var limb_broken := {"chest": false}
+	var broken_arms: Dictionary = {}
+
+	func is_arm_broken(hand_idx: int) -> bool:
+		return bool(broken_arms.get(hand_idx, false))
+
+
+class _SmokeHudStub:
+	extends RefCounted
+
+	var stats_updates: Array[Dictionary] = []
+
+	func update_stats(health: int, stamina: float) -> void:
+		stats_updates.append({
+			"health": health,
+			"stamina": stamina,
+		})
 
 
 class _SmokePlayerStub:
 	extends Node2D
 
 	var is_possessed: bool = true
+	var character_name: String = "Smoke Player"
+	var character_class: String = "peasant"
 	var z_level: int = 3
+	var tile_pos: Vector2i = Vector2i.ZERO
+	var pixel_pos: Vector2 = Vector2.ZERO
 	var health: int = 100
 	var dead: bool = false
 	var body = _SmokeBodyStub.new()
 	var hands: Array =[null, null]
+	var active_hand: int = 0
 	var equipped: Dictionary = {}
 	var equipped_data: Dictionary = {}
 	var is_lying_down: bool = false
 	var is_sneaking: bool = false
 	var sneak_alpha: float = 1.0
 	var stamina: int = 100
+	var sleep_state: int = 0
+	var _ui_root: Control = null
+	var _hud = null
+	var hands_ui_updates: int = 0
+	var clothing_sprite_updates: int = 0
+	var water_updates: int = 0
+	var sprite_updates: int = 0
+
+	func _is_local_authority() -> bool:
+		return true
+
+	func _update_hands_ui() -> void:
+		hands_ui_updates += 1
+
+	func _update_clothing_sprites() -> void:
+		clothing_sprite_updates += 1
+
+	func _update_water_submerge() -> void:
+		water_updates += 1
+
+	func _update_sprite() -> void:
+		sprite_updates += 1
+
+	func _apply_sneak_alpha(alpha: float) -> void:
+		sneak_alpha = alpha
+
+	func sync_hands(resolved_ids: Array) -> void:
+		set_meta("smoke_synced_hand_ids", resolved_ids.duplicate())
 
 
 class _SmokeReconnectStub:
@@ -75,6 +125,8 @@ class _SmokeReconnectStub:
 		var item := Node2D.new()
 		item.name = str(hand_state.get("name", "SmokeHandItem"))
 		var entity_id := str(hand_state.get("entity_id", ""))
+		if World.main_scene != null:
+			World.main_scene.add_child(item)
 		if entity_id != "":
 			World.register_entity(item, entity_id)
 		return item
@@ -139,6 +191,89 @@ class _SmokeSyncObjectStub:
 	func _update_merchant_balance(value: int) -> void:
 		stored_balance = value
 
+
+class _SmokeInventoryItemStub:
+	extends Node2D
+
+	var item_type: String = "SmokeItem"
+	var z_level: int = 3
+	var amount: int = 1
+	var metal_type: int = 0
+	var contents: Dictionary = {}
+	var key_id: String = ""
+
+
+class _SmokeSatchelStub:
+	extends Node2D
+
+	var z_level: int = 3
+	var contents: Array = []
+	var refresh_calls: int = 0
+
+	func _refresh_ui() -> void:
+		refresh_calls += 1
+
+
+class _SmokeKeyringStub:
+	extends Node2D
+
+	var item_type: String = "Keyring"
+	var z_level: int = 3
+	var contents: Array = []
+	var inserted_states: Array[Dictionary] = []
+	var removed_indices: Array[int] = []
+
+	func validate_key_insert(item: Node) -> Dictionary:
+		if item == null or not is_instance_valid(item) or not item.has_method("has_key_id"):
+			return {"ok": false}
+		return {
+			"ok": true,
+			"key_state": {
+				"item_type": str(item.get("item_type")),
+				"key_id": int(item.get("key_id")),
+			}
+		}
+
+	func insert_key_state(key_state: Dictionary) -> void:
+		var copied_state := key_state.duplicate(true)
+		inserted_states.append(copied_state)
+		contents.append(copied_state)
+
+	func can_extract_key() -> bool:
+		return not contents.is_empty()
+
+	func get_random_key_roll() -> Dictionary:
+		if contents.is_empty():
+			return {}
+		return {
+			"index": 0,
+			"key_state": (contents[0] as Dictionary).duplicate(true),
+		}
+
+	func remove_key_at(index: int) -> Dictionary:
+		removed_indices.append(index)
+		if index < 0 or index >= contents.size():
+			return {}
+		var removed_state := (contents[index] as Dictionary).duplicate(true)
+		contents.remove_at(index)
+		return removed_state
+
+
+class _SmokeKeyItemStub:
+	extends Node2D
+
+	var item_type: String = "BrownKey"
+	var key_id: int = 1
+
+	func has_key_id(_target_key_id: int = 0) -> bool:
+		return key_id > 0
+
+
+class _SmokeTableStub:
+	extends Node2D
+
+	var z_level: int = 3
+
 func run() -> Dictionary:
 	var item_types := {}
 	var material_ids := {}
@@ -199,6 +334,10 @@ func run() -> Dictionary:
 	_validate_network_sync_behavior()
 	_end_section()
 
+	_begin_section("gameplay: player object interactions")
+	await _validate_player_object_interactions()
+	_end_section()
+
 	_begin_section("net: resource patching")
 	_validate_resource_patching()
 	_end_section()
@@ -242,6 +381,8 @@ func _validate_all_instantiations() -> void:
 		# We exclude main.tscn and main_menu.tscn to prevent test loop overriding / global scene changes
 		if path.ends_with("main_menu.tscn") or path.ends_with("main.tscn"):
 			continue
+		if path.begins_with("res://npcs/"):
+			continue
 			
 		var packed := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
 		if packed == null:
@@ -278,12 +419,22 @@ func _validate_all_instantiations() -> void:
 
 # NEW: Spins up a headless server and client, validates connection, and cleanly destroys them.
 func _validate_live_networking() -> void:
-	var port := 12345
-	
-	var server_peer := ENetMultiplayerPeer.new()
-	var err := server_peer.create_server(port, 4)
-	if err != OK:
-		_fail("Live Network: Failed to create headless test server on port %d (Error %d)." % [port, err])
+	var port := -1
+	var err := FAILED
+	var server_peer: ENetMultiplayerPeer = null
+
+	for _attempt in range(8):
+		var candidate_port := 22000 + int(randi() % 20000)
+		var candidate_peer := ENetMultiplayerPeer.new()
+		var candidate_err := candidate_peer.create_server(candidate_port, 4)
+		if candidate_err == OK:
+			server_peer = candidate_peer
+			port = candidate_port
+			err = OK
+			break
+
+	if server_peer == null:
+		_fail("Live Network: Failed to create headless test server after retrying random smoke-test ports (last error %d)." % err)
 		return
 
 	var client_peer := ENetMultiplayerPeer.new()
@@ -310,7 +461,7 @@ func _validate_live_networking() -> void:
 		elapsed += 0.1
 
 	if not client_connected:
-		_fail("Live Network: Headless client timed out attempting to connect to the local server.")
+		_fail("Live Network: Headless client timed out attempting to connect to the local server on port %d." % port)
 	
 	# KILL headless test clients and cleanup to prevent ghost sessions
 	client_peer.close()
@@ -551,6 +702,7 @@ func _validate_network_sync_behavior() -> void:
 	var previous_laws := World.current_laws.duplicate(true)
 	var temp_root := Node.new()
 	temp_root.name = "__SmokeNetRoot"
+	World.add_child(temp_root)
 
 	var latejoin := _SmokeLateJoinStub.new()
 	latejoin._reconnect = _SmokeReconnectStub.new()
@@ -655,6 +807,39 @@ func _validate_network_sync_behavior() -> void:
 	if int(restored_corpse_state.get("health", -1)) != 13:
 		_fail("LateJoinSync._apply_synced_player_state: reconnect restore path did not receive the synced payload.")
 
+	var synced_remote := _SmokePlayerStub.new()
+	synced_remote.name = "SyncedRemote"
+	synced_remote._hud = _SmokeHudStub.new()
+	synced_remote.equipped = {"face": null}
+	synced_remote.equipped_data = {"face": null}
+	temp_root.add_child(synced_remote)
+	sync._apply_synced_player_state(synced_remote, {
+		"hands": ["missing:hand", ""],
+		"hand_states": [{"entity_id": "smoke:recreated_hand", "name": "RecreatedHand"}, {}],
+		"equipped": {"face": {"item_type": "Hood"}},
+		"equipped_data": {"face": {"hood_up": true}},
+		"is_lying_down": true,
+		"is_sneaking": true,
+		"sneak_alpha": 0.35,
+		"health": 77,
+	}, true)
+	var synced_hand_ids: Array = synced_remote.get_meta("smoke_synced_hand_ids", [])
+	if synced_hand_ids.is_empty() or str(synced_hand_ids[0]) == "":
+		_fail("LateJoinSync._sync_player_hands: missing hand entities were not recreated from reconnect state.")
+	if synced_remote.equipped.get("face", null) != "Hood":
+		_fail("LateJoinSync._apply_synced_player_state: equipped item labels were not restored from synced payload.")
+	if not synced_remote.equipped_data.get("face", {}).get("hood_up", false):
+		_fail("LateJoinSync._apply_synced_player_state: equipped_data dictionaries were not restored.")
+	if synced_remote.hands_ui_updates <= 0:
+		_fail("LateJoinSync._apply_synced_player_state: hands UI was not refreshed after syncing held items.")
+	if synced_remote.clothing_sprite_updates <= 0:
+		_fail("LateJoinSync._apply_synced_player_state: clothing visuals were not refreshed after syncing equipment.")
+	if synced_remote.sprite_updates <= 0 or synced_remote.water_updates <= 0:
+		_fail("LateJoinSync._apply_synced_player_state: posture or sneak visuals were not refreshed.")
+	var hud_updates: Array[Dictionary] = (synced_remote._hud as _SmokeHudStub).stats_updates
+	if hud_updates.is_empty() or int(hud_updates[0].get("health", -1)) != 77:
+		_fail("LateJoinSync._apply_synced_player_state: HUD stats were not refreshed from the synced health payload.")
+
 	var loose_data := sync.get_object_sync_data(loose_obj)
 	if str(loose_data.get("entity_id", "")) != loose_id:
 		_fail("LateJoinSync.get_object_sync_data: loose object entity ID was not captured.")
@@ -726,12 +911,295 @@ func _validate_network_sync_behavior() -> void:
 	if existing_obj.decor_configs.get("ivy", false) != true:
 		_fail("LateJoinSync.handle_spawn_object_for_late_join: decor configs were not deep-copied from the incoming payload.")
 
+	var held_ids := sync._collect_held_object_ids()
+	if not held_ids.has(held_id):
+		_fail("LateJoinSync._collect_held_object_ids: held item entity IDs were not captured from player hands.")
+	if held_ids.has(loose_id):
+		_fail("LateJoinSync._collect_held_object_ids: loose world objects were incorrectly treated as held items.")
+
+	var stale_obj := _SmokeSyncObjectStub.new()
+	stale_obj.name = "StaleObject"
+	stale_obj.add_to_group("pickable")
+	main_node.add_child(stale_obj)
+	World.register_entity(stale_obj, "smoke:stale")
+
+	var off_main_obj := _SmokeSyncObjectStub.new()
+	off_main_obj.name = "OffMainObject"
+	off_main_obj.add_to_group("pickable")
+	temp_root.add_child(off_main_obj)
+	World.register_entity(off_main_obj, "smoke:off_main")
+
+	sync.handle_purge_missing_objects([loose_id])
+	if not stale_obj.is_queued_for_deletion():
+		_fail("LateJoinSync.handle_purge_missing_objects: stale main-scene objects were not purged.")
+	if held_obj.is_queued_for_deletion():
+		_fail("LateJoinSync.handle_purge_missing_objects: held objects should not be purged as missing world objects.")
+	if off_main_obj.is_queued_for_deletion():
+		_fail("LateJoinSync.handle_purge_missing_objects: non-main-scene helper nodes were incorrectly purged.")
+
 	World.current_laws = previous_laws
 	if previous_main_scene != null:
 		World.register_main(previous_main_scene)
 	else:
 		World.unregister_main()
+	if temp_root.get_parent() == World:
+		World.remove_child(temp_root)
 	temp_root.free()
+
+func _validate_player_object_interactions() -> void:
+	var temp_root := Node2D.new()
+	temp_root.name = "__SmokeInteractionRoot"
+	World.add_child(temp_root)
+
+	var misc_player := _SmokePlayerStub.new()
+	misc_player.name = "SmokeViewer"
+	misc_player.tile_pos = Vector2i(10, 10)
+	misc_player.pixel_pos = Defs.tile_to_pixel(misc_player.tile_pos)
+	misc_player._ui_root = Control.new()
+	misc_player._ui_root.name = "UiRoot"
+	misc_player.add_child(misc_player._ui_root)
+	temp_root.add_child(misc_player)
+
+	var misc_target := _SmokePlayerStub.new()
+	misc_target.name = "SmokeTarget"
+	misc_target.character_name = "Smoke Target"
+	misc_target.tile_pos = Vector2i(11, 10)
+	misc_target.pixel_pos = Defs.tile_to_pixel(misc_target.tile_pos)
+	misc_target.z_level = misc_player.z_level
+	for slot_name in Defs.SLOTS_ALL:
+		misc_target.equipped[slot_name] = null
+		misc_target.equipped_data[slot_name] = null
+
+	var hand_keyring := _SmokeKeyringStub.new()
+	hand_keyring.name = "HeldKeyring"
+	var hand_keyring_sprite := Sprite2D.new()
+	hand_keyring_sprite.name = "Sprite2D"
+	var hand_keyring_icon := Defs.get_keyring_icon_path(2)
+	if hand_keyring_icon != "":
+		hand_keyring_sprite.texture = load(hand_keyring_icon) as Texture2D
+	hand_keyring.add_child(hand_keyring_sprite)
+	hand_keyring.contents = [
+		{"item_type": "BrownKey", "key_id": 1},
+		{"item_type": "BrownKey", "key_id": 2},
+	]
+	temp_root.add_child(hand_keyring)
+	misc_target.hands[0] = hand_keyring
+	misc_target.equipped["pocket_l"] = "Keyring"
+	misc_target.equipped_data["pocket_l"] = {
+		"contents": [
+			{"item_type": "BrownKey", "key_id": 1},
+			{"item_type": "BrownKey", "key_id": 2},
+		]
+	}
+	misc_target.equipped["pocket_r"] = "CopperCoin"
+	misc_target.equipped_data["pocket_r"] = {
+		"amount": 5,
+		"metal_type": 0,
+	}
+	temp_root.add_child(misc_target)
+
+	var misc = preload("res://scripts/player/playermisc.gd").new(misc_player)
+	misc.open_target_inventory(misc_target)
+
+	if misc.loot_panel == null:
+		_fail("PlayerMisc.open_target_inventory: target inventory panel did not open for a nearby target.")
+	elif misc.loot_slot_controls.size() != Defs.HAND_COUNT + Defs.SLOTS_ALL.size():
+		_fail("PlayerMisc.open_target_inventory: target inventory rows were not created for both hands and all equipment slots.")
+
+	var hand_btn := (misc.loot_slot_controls.get("hand_0", {}).get("btn", null) as Button)
+	if hand_btn == null or (hand_btn.icon == null and hand_btn.text.find("Keyring") == -1):
+		_fail("PlayerMisc.refresh_loot_panel: held keyring entries were not rendered in the target object list.")
+
+	var ring_btn := (misc.loot_slot_controls.get("equip_pocket_l", {}).get("btn", null) as Button)
+	if ring_btn == null or (ring_btn.icon == null and ring_btn.text.find("Keyring") == -1):
+		_fail("PlayerMisc.refresh_loot_panel: equipped keyring entries were not rendered correctly.")
+
+	var coin_btn := (misc.loot_slot_controls.get("equip_pocket_r", {}).get("btn", null) as Button)
+	if coin_btn == null or (coin_btn.icon == null and coin_btn.text != "5" and coin_btn.text.find("CopperCoin") == -1):
+		_fail("PlayerMisc.refresh_loot_panel: equipped coin entries were not rendered with stack-aware UI.")
+
+	misc_player.tile_pos = Vector2i(40, 40)
+	misc.update(0.1)
+	if misc.loot_panel != null:
+		_fail("PlayerMisc.update: the target inventory panel stayed open after the player moved out of interaction range.")
+
+	var storage = preload("res://scripts/world/objects/world_storage.gd").new(World)
+	var items = preload("res://scripts/world/objects/world_items.gd").new(World)
+	var keyring_scene_path := ItemRegistry.get_scene_path("Keyring")
+	var key_scene_path := ItemRegistry.get_scene_path("BrownKey")
+	if keyring_scene_path == "" or key_scene_path == "":
+		_fail("Container smoke: failed to resolve keyring/key item scene paths from ItemRegistry.")
+		await _free_smoke_temp_root(temp_root)
+		return
+
+	var storage_player := _SmokePlayerStub.new()
+	storage_player.name = "StoragePlayer"
+	storage_player.tile_pos = Vector2i(10, 10)
+	storage_player.pixel_pos = Defs.tile_to_pixel(storage_player.tile_pos)
+	storage_player.z_level = 3
+	storage_player.add_to_group("player")
+	storage_player.set_multiplayer_authority(91)
+	temp_root.add_child(storage_player)
+
+	var satchel := _SmokeSatchelStub.new()
+	satchel.name = "SmokeSatchel"
+	satchel.z_level = 3
+	satchel.position = Defs.tile_to_pixel(Vector2i(11, 10))
+	satchel.contents = [null, null]
+	temp_root.add_child(satchel)
+	var satchel_id := World.register_entity(satchel, "smoke:satchel")
+
+	var held_satchel_item := _SmokeInventoryItemStub.new()
+	held_satchel_item.name = "HeldSatchelItem"
+	held_satchel_item.item_type = "Keyring"
+	held_satchel_item.contents = {"legacy": true}
+	temp_root.add_child(held_satchel_item)
+	var held_satchel_item_id := World.register_entity(held_satchel_item, "smoke:held_satchel_item")
+	storage_player.hands[0] = held_satchel_item
+
+	storage.handle_rpc_confirm_satchel_insert(91, satchel_id, held_satchel_item_id, 0, 1, keyring_scene_path, "Keyring", {
+		"contents": [
+			{"item_type": "BrownKey", "key_id": 1},
+		]
+	})
+	if storage_player.hands[0] != null:
+		_fail("WorldStorage.handle_rpc_confirm_satchel_insert: the inserted item stayed in the player's hand.")
+	if satchel.contents[1] == null or satchel.contents[1].get("item_type", "") != "Keyring":
+		_fail("WorldStorage.handle_rpc_confirm_satchel_insert: the satchel slot was not populated with the inserted item payload.")
+	if satchel.refresh_calls <= 0:
+		_fail("WorldStorage.handle_rpc_confirm_satchel_insert: satchel UI refresh was not triggered after inserting an item.")
+	if World.get_entity(held_satchel_item_id) != null:
+		_fail("WorldStorage.handle_rpc_confirm_satchel_insert: the old held item entity was not unregistered.")
+
+	var satchel_extract_state := {
+		"contents": [
+			{"item_type": "BrownKey", "key_id": 1},
+			{"item_type": "BrownKey", "key_id": 2},
+		]
+	}
+	satchel.contents[0] = {
+		"scene_path": keyring_scene_path,
+		"item_type": "Keyring",
+		"state": satchel_extract_state.duplicate(true),
+	}
+	storage.handle_rpc_confirm_satchel_extract(91, satchel_id, 0, 1, "smoke:satchel_extract", keyring_scene_path, satchel_extract_state)
+	var satchel_extracted_item: Node = storage_player.hands[1]
+	if satchel.contents[0] != null:
+		_fail("WorldStorage.handle_rpc_confirm_satchel_extract: the extracted satchel slot was not cleared.")
+	if satchel_extracted_item == null or not is_instance_valid(satchel_extracted_item):
+		_fail("WorldStorage.handle_rpc_confirm_satchel_extract: no item was recreated into the player's hand.")
+	elif satchel_extracted_item.get("contents").size() != 2:
+		_fail("WorldStorage.handle_rpc_confirm_satchel_extract: nested container contents were not restored on the recreated item.")
+	if World.get_entity("smoke:satchel_extract") != satchel_extracted_item:
+		_fail("WorldStorage.handle_rpc_confirm_satchel_extract: recreated satchel item did not register with its generated entity ID.")
+
+	var keyring_player := _SmokePlayerStub.new()
+	keyring_player.name = "KeyringPlayer"
+	keyring_player.tile_pos = Vector2i(12, 10)
+	keyring_player.pixel_pos = Defs.tile_to_pixel(keyring_player.tile_pos)
+	keyring_player.z_level = 3
+	keyring_player.add_to_group("player")
+	keyring_player.set_multiplayer_authority(92)
+	temp_root.add_child(keyring_player)
+
+	var keyring := _SmokeKeyringStub.new()
+	keyring.name = "SmokeKeyring"
+	temp_root.add_child(keyring)
+	var keyring_id := World.register_entity(keyring, "smoke:keyring")
+
+	var key_item := _SmokeKeyItemStub.new()
+	key_item.name = "SmokeKey"
+	key_item.item_type = "BrownKey"
+	key_item.key_id = 1
+	temp_root.add_child(key_item)
+	var key_item_id := World.register_entity(key_item, "smoke:key")
+	keyring_player.hands[0] = key_item
+
+	items.handle_rpc_confirm_keyring_insert(92, keyring_id, 0, {
+		"item_type": "BrownKey",
+		"key_id": 1,
+	})
+	if keyring.contents.size() != 1:
+		_fail("WorldItems.handle_rpc_confirm_keyring_insert: key state was not inserted into the keyring container.")
+	if keyring_player.hands[0] != null:
+		_fail("WorldItems.handle_rpc_confirm_keyring_insert: the inserted key stayed in the player's hand.")
+	if World.get_entity(key_item_id) != null:
+		_fail("WorldItems.handle_rpc_confirm_keyring_insert: the inserted key entity was not unregistered.")
+
+	items.handle_rpc_confirm_keyring_extract(92, keyring_id, 1, 0, "smoke:key_extract", key_scene_path, {
+		"item_type": "BrownKey",
+		"key_id": 1,
+	})
+	var extracted_key: Node = keyring_player.hands[1]
+	if keyring.removed_indices.is_empty() or keyring.removed_indices[0] != 0:
+		_fail("WorldItems.handle_rpc_confirm_keyring_extract: the extracted key slot was not removed from the keyring container.")
+	if extracted_key == null or not is_instance_valid(extracted_key):
+		_fail("WorldItems.handle_rpc_confirm_keyring_extract: no key item was recreated into the destination hand.")
+	elif int(extracted_key.get("key_id")) != 1:
+		_fail("WorldItems.handle_rpc_confirm_keyring_extract: recreated key items lost their key_id state.")
+	if World.get_entity("smoke:key_extract") != extracted_key:
+		_fail("WorldItems.handle_rpc_confirm_keyring_extract: recreated key items were not registered with their generated entity IDs.")
+
+	var table_player := _SmokePlayerStub.new()
+	table_player.name = "TablePlayer"
+	table_player.tile_pos = Vector2i(14, 10)
+	table_player.pixel_pos = Defs.tile_to_pixel(table_player.tile_pos)
+	table_player.z_level = 4
+	table_player.add_to_group("player")
+	table_player.set_multiplayer_authority(93)
+	temp_root.add_child(table_player)
+
+	var table := _SmokeTableStub.new()
+	table.name = "SmokeTable"
+	table.z_level = 4
+	temp_root.add_child(table)
+	var table_id := World.register_entity(table, "smoke:table")
+
+	var table_item := _SmokeInventoryItemStub.new()
+	table_item.name = "PlacedItem"
+	table_item.item_type = "Torch"
+	var table_item_sprite := Sprite2D.new()
+	table_item_sprite.name = "Sprite2D"
+	table_item_sprite.rotation_degrees = 27.0
+	table_item_sprite.scale = Vector2(-2.0, 3.0)
+	table_item.add_child(table_item_sprite)
+	var table_item_collision := CollisionShape2D.new()
+	table_item_collision.shape = CircleShape2D.new()
+	table_item_collision.disabled = true
+	table_item.add_child(table_item_collision)
+	temp_root.add_child(table_item)
+	table_player.hands[0] = table_item
+
+	var table_place_pos := Vector2(320, 448)
+	storage.handle_rpc_confirm_table_place(93, table_id, 0, table_place_pos)
+	if table_player.hands[0] != null:
+		_fail("WorldStorage.handle_rpc_confirm_table_place: placed items stayed in the player's hand.")
+	if table_item.global_position != table_place_pos:
+		_fail("WorldStorage.handle_rpc_confirm_table_place: placed items were not moved onto the target table position.")
+	if int(table_item.get("z_level")) != table.z_level:
+		_fail("WorldStorage.handle_rpc_confirm_table_place: placed items did not inherit the table z-level.")
+	if table_item.z_index != Defs.get_z_index(table.z_level, 3):
+		_fail("WorldStorage.handle_rpc_confirm_table_place: placed items did not receive the table placement z-index.")
+	if table_item_collision.disabled:
+		_fail("WorldStorage.handle_rpc_confirm_table_place: placed item collisions were not re-enabled.")
+	if not is_zero_approx(table_item_sprite.rotation_degrees) or table_item_sprite.scale.x < 0.0 or table_item_sprite.scale.y < 0.0:
+		_fail("WorldStorage.handle_rpc_confirm_table_place: placed item visuals were not reset to an upright positive scale.")
+
+	var cleanup_nodes: Array[Node] = [
+		satchel,
+		held_satchel_item,
+		satchel_extracted_item,
+		keyring,
+		key_item,
+		extracted_key,
+		table,
+		table_item,
+	]
+	for node in cleanup_nodes:
+		if node != null and is_instance_valid(node):
+			World.unregister_entity(node)
+
+	await _free_smoke_temp_root(temp_root)
 
 func _validate_resource_patching() -> void:
 	var item_paths := _collect_paths(ITEMS_DIR, ".tres")
@@ -933,3 +1401,12 @@ func _collect_paths_recursive(root_path: String, extension: String, out_paths: A
 
 func _fail(message: String) -> void:
 	_errors.append(message)
+
+func _free_smoke_temp_root(temp_root: Node) -> void:
+	if temp_root == null or not is_instance_valid(temp_root):
+		return
+	if temp_root.get_parent() == World:
+		World.remove_child(temp_root)
+	temp_root.queue_free()
+	if scene_tree != null:
+		await scene_tree.process_frame

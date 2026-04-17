@@ -367,6 +367,7 @@ func _sync_player_hands(node: Node2D, hand_ids: Array, hand_states: Array) -> vo
 func handle_purge_missing_objects(valid_ids: Array) -> void:
 	var main_node = World.main_scene
 	if main_node == null: return
+	var held_object_ids := _collect_held_object_ids()
 	var groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 	for group in groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
@@ -377,6 +378,8 @@ func handle_purge_missing_objects(valid_ids: Array) -> void:
 			if obj.is_queued_for_deletion() or obj.get_parent() != main_node:
 				continue
 			var obj_id := World.get_entity_id(obj)
+			if held_object_ids.has(obj_id):
+				continue
 			if not valid_ids.has(obj_id):
 				obj.queue_free()
 

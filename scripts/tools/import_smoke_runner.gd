@@ -1,6 +1,5 @@
 extends Node
 
-const LOG_PATH := "res://import_smoke_test.log"
 const FLAG_PATH := "res://run_import_smoke_test.flag"
 const VALIDATOR_SCRIPT := "res://scripts/tools/import_smoke_test.gd"
 
@@ -78,16 +77,8 @@ func _ready() -> void:
 		else:
 			print(line)
 
-	_write_log(log_lines)
 	_clear_flag()
 	get_tree().quit(1 if errors.size() > 0 else 0)
-
-func _write_log(lines: PackedStringArray) -> void:
-	var file := FileAccess.open(ProjectSettings.globalize_path(LOG_PATH), FileAccess.WRITE)
-	if file == null:
-		return
-	for line in lines:
-		file.store_line(line)
 
 func _clear_flag() -> void:
 	var flag_path := ProjectSettings.globalize_path(FLAG_PATH)
