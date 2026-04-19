@@ -140,6 +140,7 @@ class _SmokeLateJoinStub:
 		"objects": {},
 		"players": {},
 	}
+	var _disconnected_players: Dictionary = {}
 	var _reconnect = null
 	var players_by_peer: Dictionary = {}
 
@@ -332,6 +333,10 @@ func run() -> Dictionary:
 
 	_begin_section("net: sync behavior")
 	_validate_network_sync_behavior()
+	_end_section()
+
+	_begin_section("net: reconnect behavior")
+	_validate_reconnection_behavior()
 	_end_section()
 
 	_begin_section("gameplay: player object interactions")
@@ -942,6 +947,65 @@ func _validate_network_sync_behavior() -> void:
 		World.register_main(previous_main_scene)
 	else:
 		World.unregister_main()
+	if temp_root.get_parent() == World:
+		World.remove_child(temp_root)
+	temp_root.free()
+
+func _validate_reconnection_behavior() -> void:
+	var previous_host_peers: Dictionary = Host.peers.duplicate()
+	var temp_root := Node.new()
+	temp_root.name = "__SmokeReconnectRoot"
+	World.add_child(temp_root)
+
+	var latejoin := _SmokeLateJoinStub.new()
+	temp_root.add_child(latejoin)
+
+	var reconnect = preload("res://scripts/net/latejoin_reconnect.gd").new(latejoin)
+
+	var corpse := _SmokePlayerStub.new()
+	corpse.name = "StoredCorpse"
+	corpse.is_possessed = false
+	corpse.dead = true
+	corpse.set_multiplayer_authority(44)
+	temp_root.add_child(corpse)
+
+	var ghost := _SmokePlayerStub.new()
+	ghost.name = "LiveGhost"
+	ghost.set_multiplayer_authority(44)
+	temp_root.add_child(ghost)
+
+	latejoin._disconnected_players[44] = {
+		"node_path": corpse.get_path(),
+		"timestamp": 1,
+		"ip": "127.0.0.1",
+	}
+	latejoin.players_by_peer[44] = ghost
+
+	Host.peers.clear()
+	Host.peers[44] = ghost
+	if reconnect._resolve_reconnection_node(44, latejoin._disconnected_players[44]) != ghost:
+		_fail("LateJoinReconnect._resolve_reconnection_node: live ghost did not win over the stale disconnected corpse path.")
+
+	Host.peers.clear()
+	if reconnect._resolve_reconnection_node(44, latejoin._disconnected_players[44]) != ghost:
+		_fail("LateJoinReconnect._resolve_reconnection_node: peer lookup fallback did not recover the live ghost.")
+
+	latejoin.players_by_peer.erase(44)
+	if reconnect._resolve_reconnection_node(44, latejoin._disconnected_players[44]) != corpse:
+		_fail("LateJoinReconnect._resolve_reconnection_node: stored node-path fallback no longer resolved the disconnected body when no live avatar existed.")
+
+	Host.peers.clear()
+	Host.peers[44] = ghost
+	reconnect._update_peer_registry(ghost, 44, 77)
+	if Host.peers.has(44):
+		_fail("LateJoinReconnect._update_peer_registry: old disconnected peer mapping was not cleared after reassignment.")
+	if Host.peers.get(77, null) != ghost:
+		_fail("LateJoinReconnect._update_peer_registry: reassigned peer mapping did not point at the live avatar.")
+
+	Host.peers.clear()
+	for peer_id in previous_host_peers.keys():
+		Host.peers[peer_id] = previous_host_peers[peer_id]
+
 	if temp_root.get_parent() == World:
 		World.remove_child(temp_root)
 	temp_root.free()

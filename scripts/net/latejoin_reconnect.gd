@@ -53,8 +53,8 @@ func handle_reconnection(peer_id: int) -> bool:
 	var best_peer_id = _find_reconnection_candidate_for_peer(peer_id)
 	if best_peer_id == -1: return false
 
-	var player_node_path = lj._disconnected_players[best_peer_id]["node_path"]
-	var player_node      = lj.get_node_or_null(player_node_path)
+	var disconnected_data: Dictionary = lj._disconnected_players[best_peer_id]
+	var player_node = _resolve_reconnection_node(best_peer_id, disconnected_data)
 	if player_node == null or not is_instance_valid(player_node):
 		lj._disconnected_players.erase(best_peer_id)
 		return false
@@ -63,11 +63,25 @@ func handle_reconnection(peer_id: int) -> bool:
 		var ghost = Host.peers[peer_id]
 		if is_instance_valid(ghost) and ghost != player_node: ghost.queue_free()
 
-	Host.peers[peer_id] = player_node
 	var success = _perform_reconnection(peer_id, best_peer_id, player_node, {})
 	if success: lj._disconnected_players.erase(best_peer_id)
 	else:        Host.peers.erase(peer_id)
 	return success
+
+func _resolve_reconnection_node(old_peer_id: int, disconnected_data: Dictionary) -> Node:
+	var current_node: Node = Host.peers.get(old_peer_id, null)
+	if current_node == null or not is_instance_valid(current_node) or current_node.is_queued_for_deletion():
+		current_node = lj._find_player_by_peer(old_peer_id)
+	if current_node != null and is_instance_valid(current_node) and not current_node.is_queued_for_deletion():
+		return current_node
+
+	var player_node_path: NodePath = disconnected_data.get("node_path", NodePath())
+	if player_node_path.is_empty():
+		return null
+	var player_node = lj.get_node_or_null(player_node_path)
+	if player_node == null or not is_instance_valid(player_node) or player_node.is_queued_for_deletion():
+		return null
+	return player_node
 
 func _find_reconnection_candidate_for_peer(new_peer_id: int) -> int:
 	var new_ip: String = Host._get_peer_ip(new_peer_id)
@@ -100,7 +114,7 @@ func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node
 			entry["target"]         = node
 
 	restore_player_state(node, current_state)
-	_reassign_player_node(node, new_peer_id)
+	_reassign_player_node(node, new_peer_id, old_peer_id)
 
 	lj.rpc_set_disconnect_indicator.rpc(node.get_path(), false)
 
@@ -115,8 +129,13 @@ func _perform_reconnection(new_peer_id: int, old_peer_id: int, player_node: Node
 	lj.receive_reconnect_state.rpc_id(new_peer_id, node.get_path(), current_state)
 	return true
 
-func _reassign_player_node(player_node: Node, new_peer_id: int) -> void:
+func _update_peer_registry(player_node: Node, old_peer_id: int, new_peer_id: int) -> void:
+	if old_peer_id != new_peer_id and Host.peers.get(old_peer_id, null) == player_node:
+		Host.peers.erase(old_peer_id)
 	Host.peers[new_peer_id] = player_node
+
+func _reassign_player_node(player_node: Node, new_peer_id: int, old_peer_id: int = -1) -> void:
+	_update_peer_registry(player_node, old_peer_id, new_peer_id)
 	lj.rpc_update_player_authority.rpc(player_node.get_path(), new_peer_id)
 	lj.reconnection_confirmed.rpc_id(new_peer_id, player_node.get_path())
 
