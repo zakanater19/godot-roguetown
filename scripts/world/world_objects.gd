@@ -13,6 +13,7 @@ var loot       = null
 var crafting   = null
 var storage    = null
 var merchant   = null
+var foraging   = null
 
 func _init(p_world: Node) -> void:
 	world      = p_world
@@ -25,6 +26,7 @@ func _init(p_world: Node) -> void:
 	crafting   = preload("res://scripts/world/objects/world_crafting.gd").new(world)
 	storage    = preload("res://scripts/world/objects/world_storage.gd").new(world)
 	merchant   = preload("res://scripts/world/objects/world_merchant.gd").new(world)
+	foraging   = preload("res://scripts/world/objects/world_foraging.gd").new(world)
 
 # Shared utility used by items, loot, crafting, storage sub-modules.
 func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
@@ -44,6 +46,10 @@ func handle_rpc_confirm_break_tree(tree_path: NodePath, break_payload: Dictionar
 func handle_rpc_request_hit_breakable(sender_id: int, obj_path: NodePath) -> void:  harvesting.handle_rpc_request_hit_breakable(sender_id, obj_path)
 func handle_rpc_confirm_hit_breakable(obj_path: NodePath) -> void:                   harvesting.handle_rpc_confirm_hit_breakable(obj_path)
 func handle_rpc_confirm_break_breakable(obj_path: NodePath) -> void:                 harvesting.handle_rpc_confirm_break_breakable(obj_path)
+
+# ── Foraging ─────────────────────────────────────────────────────────────────
+func handle_rpc_request_search_bush(sender_id: int, bush_id: String, hand_idx: int) -> void: foraging.handle_rpc_request_search_bush(sender_id, bush_id, hand_idx)
+func handle_rpc_confirm_search_bush(bush_id: String, peer_id: int, hand_idx: int, item_type: String, node_name: String, entity_id: String, picked_count: int) -> void: foraging.handle_rpc_confirm_search_bush(bush_id, peer_id, hand_idx, item_type, node_name, entity_id, picked_count)
 
 # ── Doors ─────────────────────────────────────────────────────────────────────
 func handle_rpc_request_hit_door(sender_id: int, door_path: NodePath) -> void:      doors.handle_rpc_request_hit_door(sender_id, door_path)

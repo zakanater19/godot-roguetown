@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defines/item_data.gd" id="1_fibers_data"]
+
+[resource]
+script = ExtResource("1_fibers_data")
+item_type = "Fibers"
+scene_path = "res://objects/fibers.tscn"
+sprite_col = -1
+description = "loose plant fibers, rough but useful"
+slot = ""
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true
+has_inventory = false
+inventory_slots = 0
+is_fuel = true
+is_smeltable_ore = false
+hud_texture_path = "res://objects/natural/fibers.png"

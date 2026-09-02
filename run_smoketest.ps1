@@ -5,27 +5,38 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$projectRoot = (Resolve-Path (Split-Path -Parent $MyInvocation.MyCommand.Path)).Path
-$godotExe = Join-Path (Split-Path -Parent $projectRoot) "Godot_v4.5-stable_win64.exe"
-
-if (-not (Test-Path -LiteralPath $godotExe)) {
-	Write-Error "Godot executable not found at '$godotExe'."
-}
-
-$godotExe = (Resolve-Path -LiteralPath $godotExe).Path
-$godotExeName = Split-Path -Leaf $godotExe
-
-Write-Host ""
-Write-Host "============================================================"
-Write-Host "  ROGUETOWN SMOKE TEST" -ForegroundColor Cyan
-Write-Host "============================================================"
-Write-Host "  Running Godot headless..." -ForegroundColor DarkGray
-Write-Host ""
-
-$env:CODEX_VALIDATE_IMPORTS = "1"
 $exitCode = 1
 $proc = $null
-$logPath = Join-Path $projectRoot "import_smoke_test.log"
+$projectRoot = ""
+$godotExe = ""
+$godotExeName = ""
+$logPath = ""
+
+function Resolve-GodotExecutable {
+	param(
+		[string]$ProjectRoot
+	)
+
+	$projectParent = Split-Path -Parent $ProjectRoot
+	$desktopParent = Split-Path -Parent $projectParent
+	$candidates = @(
+		(Join-Path $projectParent "Godot_v4.5-stable_win64.exe"),
+		(Join-Path $desktopParent "Godot_v4.5-stable_win64.exe")
+	)
+
+	foreach ($candidate in $candidates) {
+		if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+			return (Resolve-Path -LiteralPath $candidate).Path
+		}
+	}
+
+	$command = Get-Command "Godot_v4.5-stable_win64.exe" -ErrorAction SilentlyContinue
+	if ($null -ne $command) {
+		return $command.Source
+	}
+
+	throw "Godot_v4.5-stable_win64.exe was not found beside the project folder, on the Desktop, or on PATH."
+}
 
 function Stop-ProcessTree {
 	param(
@@ -47,6 +58,10 @@ function Stop-ProcessTree {
 }
 
 function Get-SmokeGodotProcesses {
+	if ([string]::IsNullOrWhiteSpace($godotExe) -or [string]::IsNullOrWhiteSpace($projectRoot)) {
+		return
+	}
+
 	Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
 		Where-Object {
 			$commandLine = $_.CommandLine
@@ -77,24 +92,48 @@ function Stop-SmokeGodotProcesses {
 }
 
 try {
+	$projectRoot = (Resolve-Path (Split-Path -Parent $MyInvocation.MyCommand.Path)).Path
+	$logPath = Join-Path $projectRoot "import_smoke_test.log"
+	$godotExe = Resolve-GodotExecutable -ProjectRoot $projectRoot
+	$godotExeName = Split-Path -Leaf $godotExe
+
+	Write-Host ""
+	Write-Host "============================================================"
+	Write-Host "  ROGUETOWN SMOKE TEST" -ForegroundColor Cyan
+	Write-Host "============================================================"
+	Write-Host "  Running Godot headless..." -ForegroundColor DarkGray
+	Write-Host ""
+
+	$env:CODEX_VALIDATE_IMPORTS = "1"
 	Stop-SmokeGodotProcesses
 	Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
-	$proc = Start-Process -FilePath $godotExe -ArgumentList @("--headless", "--path", $projectRoot) -NoNewWindow -PassThru
+	$quotedProjectRoot = '"' + $projectRoot + '"'
+	$proc = Start-Process -FilePath $godotExe -ArgumentList @("--headless", "--path", $quotedProjectRoot) -NoNewWindow -PassThru
 	$proc.WaitForExit()
 	$exitCode = $proc.ExitCode
+}
+catch {
+	Write-Host ""
+	Write-Host "Smoke test launcher failed: $($_.Exception.Message)" -ForegroundColor Red
+	$exitCode = 1
 }
 finally {
 	if ($proc -ne $null -and -not $proc.HasExited) {
 		Stop-ProcessTree -RootId $proc.Id
 		$proc.WaitForExit()
 	}
-	Stop-SmokeGodotProcesses
-	Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+	if (-not [string]::IsNullOrWhiteSpace($godotExe)) {
+		Stop-SmokeGodotProcesses
+	}
+	if (-not [string]::IsNullOrWhiteSpace($logPath)) {
+		Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+	}
 	Remove-Item Env:CODEX_VALIDATE_IMPORTS -ErrorAction SilentlyContinue
+
+	Write-Host ""
+	if (-not $NoPause) {
+		Read-Host "Press Enter to close"
+	}
 }
 
-Write-Host ""
-if (-not $NoPause) {
-	Read-Host "Press Enter to close"
-}
 exit $exitCode

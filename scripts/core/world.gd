@@ -467,6 +467,18 @@ func rpc_confirm_cut_grass(tile_pos: Vector2i, z_level: int) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_search_bush(bush_id: String, hand_idx: int) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_search_bush(sender_id, bush_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_search_bush(bush_id: String, peer_id: int, hand_idx: int, item_type: String, node_name: String, entity_id: String, picked_count: int) -> void:
+	objects.handle_rpc_confirm_search_bush(bush_id, peer_id, hand_idx, item_type, node_name, entity_id, picked_count)
+
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_rock(rock_path: NodePath) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()

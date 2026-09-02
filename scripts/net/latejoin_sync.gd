@@ -148,6 +148,7 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	if "amount"        in obj: data["amount"]         = obj.get("amount")
 	if "metal_type"    in obj: data["metal_type"]     = obj.get("metal_type")
 	if "stored_balance" in obj: data["stored_balance"] = obj.get("stored_balance")
+	if "items_picked"  in obj: data["items_picked"]  = obj.get("items_picked")
 	if "key_id"        in obj: data["key_id"]         = obj.get("key_id")
 	if "is_locked"     in obj: data["is_locked"]      = obj.get("is_locked")
 	if "tree_id"       in obj: data["tree_id"]        = obj.get("tree_id")
@@ -183,6 +184,7 @@ func _apply_pre_add_object_state(obj: Node, obj_data: Dictionary) -> void:
 		"solid_piece",
 		"blocks_fov",
 		"decor_configs",
+		"items_picked",
 	]
 
 	for key in pre_add_keys:
@@ -245,6 +247,7 @@ func _retry_receive_object_states(object_states: Dictionary, retries: int) -> vo
 			if obj_data.has("amount")     and "amount"     in obj: obj.set("amount",     obj_data["amount"])
 			if obj_data.has("metal_type") and "metal_type" in obj: obj.set("metal_type", obj_data["metal_type"])
 			if obj_data.has("stored_balance") and obj.has_method("_update_merchant_balance"): obj.call("_update_merchant_balance", int(obj_data["stored_balance"]))
+			if obj_data.has("items_picked") and obj.has_method("set_items_picked"): obj.call("set_items_picked", int(obj_data["items_picked"]))
 			if obj_data.has("contents")   and "contents"   in obj: obj.set("contents",   obj_data["contents"].duplicate(true))
 			if obj_data.has("key_id")     and "key_id"     in obj: obj.set("key_id",     obj_data["key_id"])
 			if obj_data.has("is_locked")  and "is_locked"  in obj: obj.set("is_locked",  obj_data["is_locked"])
@@ -464,6 +467,8 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 		if obj_data.has("metal_type"):    obj.set("metal_type",    obj_data["metal_type"])
 		if obj_data.has("stored_balance") and obj.has_method("_update_merchant_balance"):
 			obj.call("_update_merchant_balance", int(obj_data["stored_balance"]))
+		if obj_data.has("items_picked") and obj.has_method("set_items_picked"):
+			obj.call("set_items_picked", int(obj_data["items_picked"]))
 		if obj_data.has("key_id") and "key_id" in obj:
 			obj.set("key_id", obj_data["key_id"])
 		if obj_data.has("is_locked") and "is_locked" in obj:
