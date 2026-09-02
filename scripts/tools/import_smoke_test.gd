@@ -5,6 +5,7 @@ const PROJECT_ROOT := "res://"
 const ITEMS_DIR := "res://items"
 const RECIPES_DIR := "res://recipes"
 const MATERIALS_DIR := "res://materials"
+const MULTIPLAYER_SMOKE_PROBE := preload("res://scripts/tools/multiplayer_smoke_probe.gd")
 
 # Scenes registered with MultiplayerSpawner.add_spawnable_scene() in Host.gd.
 const NET_SPAWNABLE_SCENES: Array[String] =[
@@ -356,7 +357,7 @@ func run() -> Dictionary:
 		await _validate_all_instantiations()
 		_end_section()
 
-		_begin_section("dynamic: live networking")
+		_begin_section("net: live multiplayer/desync")
 		await _validate_live_networking()
 		_end_section()
 
@@ -426,7 +427,8 @@ func _validate_all_instantiations() -> void:
 	if is_instance_valid(sandbox):
 		sandbox.queue_free()
 
-# NEW: Spins up a headless server and client, validates connection, and cleanly destroys them.
+# Spins up isolated server/client MultiplayerAPI branches, sends authoritative
+# state over real RPCs, and verifies desync detection and correction.
 func _validate_live_networking() -> void:
 	var port := -1
 	var err := FAILED
@@ -446,35 +448,166 @@ func _validate_live_networking() -> void:
 		_fail("Live Network: Failed to create headless test server after retrying random smoke-test ports (last error %d)." % err)
 		return
 
+	var server_root := Node.new()
+	server_root.name = "SmokeServer"
+	var client_root := Node.new()
+	client_root.name = "SmokeClient"
+	scene_tree.root.add_child(server_root)
+	scene_tree.root.add_child(client_root)
+
+	var server_api := MultiplayerAPI.create_default_interface()
+	var client_api := MultiplayerAPI.create_default_interface()
+	scene_tree.set_multiplayer(server_api, server_root.get_path())
+	scene_tree.set_multiplayer(client_api, client_root.get_path())
+	server_api.multiplayer_peer = server_peer
+
 	var client_peer := ENetMultiplayerPeer.new()
 	err = client_peer.create_client("127.0.0.1", port)
 	if err != OK:
 		_fail("Live Network: Failed to create headless test client (Error %d)." % err)
-		server_peer.close()
+		await _cleanup_live_networking(server_root, client_root, server_peer, client_peer)
 		return
+	client_api.multiplayer_peer = client_peer
 
-	var timeout := 2.0
-	var elapsed := 0.0
-	var client_connected := false
-	
-	# Poll network until connected or timed out
-	while not client_connected and elapsed < timeout:
-		server_peer.poll()
-		client_peer.poll()
-		
-		if client_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
-			client_connected = true
-			break
-			
-		await scene_tree.create_timer(0.1).timeout
-		elapsed += 0.1
+	var initial_state := {
+		"tick": 0,
+		"tile": Vector2i(12, 9),
+		"health": 87,
+		"active_hand": 1,
+		"inventory": ["Torch", "Keyring"],
+	}
+	var server_probe = MULTIPLAYER_SMOKE_PROBE.new()
+	server_probe.name = "StateProbe"
+	server_probe.configure(initial_state)
+	server_root.add_child(server_probe)
+	var client_probe = MULTIPLAYER_SMOKE_PROBE.new()
+	client_probe.name = "StateProbe"
+	client_probe.configure(initial_state)
+	client_root.add_child(client_probe)
+
+	var client_connected := await _wait_for_live_network_condition(
+		func() -> bool:
+			return (
+				client_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+				and server_api.get_peers().size() == 1
+			),
+		2.0
+	)
 
 	if not client_connected:
 		_fail("Live Network: Headless client timed out attempting to connect to the local server on port %d." % port)
-	
-	# KILL headless test clients and cleanup to prevent ghost sessions
+		await _cleanup_live_networking(server_root, client_root, server_peer, client_peer)
+		return
+
+	# Establish an initial authoritative baseline, then make the client submit a
+	# short ordered input stream. Every server update must arrive and converge.
+	server_probe.broadcast_authoritative_state()
+	if not await _wait_for_live_network_condition(
+		func() -> bool: return client_probe.received_snapshots >= 1,
+		2.0
+	):
+		_fail("Live Network: Initial authoritative snapshot did not reach the client.")
+	else:
+		var moves: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+		for input_index in range(moves.size()):
+			var expected_inputs := input_index + 1
+			client_probe.request_move(expected_inputs, moves[input_index])
+			var update_arrived := await _wait_for_live_network_condition(
+				func() -> bool:
+					return (
+						server_probe.accepted_inputs >= expected_inputs
+						and client_probe.received_sequence >= expected_inputs
+					),
+				2.0
+			)
+			if not update_arrived:
+				_fail("Live Network: Timed out waiting for authoritative update %d." % expected_inputs)
+				break
+			if client_probe.state_checksum() != server_probe.state_checksum():
+				_fail("Live Network: Client/server state checksum diverged after input %d." % expected_inputs)
+
+	# Replaying an input must not advance server state. This catches accidental
+	# duplicate processing after a reconnect or retransmission.
+	var accepted_before_replay: int = server_probe.accepted_inputs
+	var tick_before_replay: int = server_probe.authoritative_sequence
+	client_probe.request_move(accepted_before_replay, Vector2i(99, 99))
+	if not await _wait_for_live_network_condition(
+		func() -> bool: return server_probe.rejected_inputs >= 1,
+		2.0
+	):
+		_fail("Live Network: Server did not reject a replayed input sequence.")
+	elif server_probe.accepted_inputs != accepted_before_replay or server_probe.authoritative_sequence != tick_before_replay:
+		_fail("Live Network: Replayed input mutated authoritative state.")
+
+	# A payload whose contents do not match its advertised checksum must be
+	# rejected without poisoning the client's last known-good state.
+	var invalid_snapshots_before: int = client_probe.invalid_snapshots
+	var corrupt_snapshot: Dictionary = server_probe.state.duplicate(true)
+	corrupt_snapshot["health"] = int(corrupt_snapshot.get("health", 0)) - 1
+	server_probe.receive_authoritative_state.rpc(
+		server_probe.authoritative_sequence,
+		corrupt_snapshot,
+		server_probe.state_checksum()
+	)
+	if not await _wait_for_live_network_condition(
+		func() -> bool: return client_probe.invalid_snapshots > invalid_snapshots_before,
+		2.0
+	):
+		_fail("Live Network: Client did not reject a snapshot with a mismatched checksum.")
+	elif client_probe.state_checksum() != server_probe.state_checksum():
+		_fail("Live Network: Invalid snapshot changed the client's last known-good state.")
+
+	# Deliberately corrupt only the client, prove the checksums disagree, then
+	# require the next server snapshot to detect and repair that desync.
+	var desyncs_before: int = client_probe.detected_desyncs
+	client_probe.state["health"] = int(client_probe.state.get("health", 0)) - 23
+	client_probe.state["tile"] = Vector2i(-500, 700)
+	if client_probe.state_checksum() == server_probe.state_checksum():
+		_fail("Live Network: Deliberate client divergence did not change the state checksum.")
+	server_probe.broadcast_authoritative_state()
+	var desync_repaired := await _wait_for_live_network_condition(
+		func() -> bool:
+			return (
+				client_probe.detected_desyncs > desyncs_before
+				and client_probe.corrected_desyncs > desyncs_before
+				and client_probe.state_checksum() == server_probe.state_checksum()
+			),
+		2.0
+	)
+	if not desync_repaired:
+		_fail("Live Network: Authoritative snapshot did not detect and repair a forced client desync.")
+	if client_probe.invalid_snapshots != invalid_snapshots_before + 1:
+		_fail("Live Network: Unexpected invalid-snapshot count %d." % client_probe.invalid_snapshots)
+
+	await _cleanup_live_networking(server_root, client_root, server_peer, client_peer)
+
+
+func _wait_for_live_network_condition(predicate: Callable, timeout_seconds: float) -> bool:
+	var deadline := Time.get_ticks_msec() + int(timeout_seconds * 1000.0)
+	while Time.get_ticks_msec() < deadline:
+		if predicate.call():
+			return true
+		await scene_tree.process_frame
+	return bool(predicate.call())
+
+
+func _cleanup_live_networking(server_root: Node, client_root: Node, server_peer: ENetMultiplayerPeer, client_peer: ENetMultiplayerPeer) -> void:
+	# Detach the peers from their MultiplayerAPI instances before releasing the
+	# branch mappings. Godot may otherwise poll a closed ENet peer once more
+	# during shutdown, which can crash the headless runner after a passing test.
+	if is_instance_valid(server_root):
+		server_root.multiplayer.multiplayer_peer = null
+	if is_instance_valid(client_root):
+		client_root.multiplayer.multiplayer_peer = null
 	client_peer.close()
 	server_peer.close()
+	if is_instance_valid(server_root):
+		scene_tree.set_multiplayer(null, server_root.get_path())
+		server_root.queue_free()
+	if is_instance_valid(client_root):
+		scene_tree.set_multiplayer(null, client_root.get_path())
+		client_root.queue_free()
+	await scene_tree.process_frame
 
 func _validate_items(item_types: Dictionary) -> void:
 	const VALID_SLOTS: Array[String] =[
