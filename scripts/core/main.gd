@@ -45,6 +45,13 @@ func _ready() -> void:
 				darken.visible = false
 		return
 
+	# Region maps are editor-only metadata, like SS13 areas. Their overlay never
+	# renders to players; gameplay behavior can be attached later.
+	for z in range(1, 6):
+		var region_map := get_node_or_null("RegionMapLayer_Z" + str(z)) as TileMapLayer
+		if region_map != null:
+			region_map.visible = false
+
 	# Add FPS Counter
 	var fps_layer := CanvasLayer.new()
 	fps_layer.layer = 128

@@ -307,6 +307,10 @@ func run() -> Dictionary:
 	_validate_classes(item_types)
 	_end_section()
 
+	_begin_section("regions")
+	_validate_regions()
+	_end_section()
+
 	_begin_section("clothing offsets")
 	_validate_clothing_offsets()
 	_end_section()
@@ -601,6 +605,24 @@ func _validate_classes(item_types: Dictionary) -> void:
 			var item_type: String = str(equipment[slot_key])
 			if not item_types.has(item_type):
 				_fail("Classes['%s'].equipment['%s']: item_type '%s' not found in %s." %[class_key, slot_key, item_type, ITEMS_DIR])
+
+func _validate_regions() -> void:
+	var region_tileset := load("res://assets/region_tileset.tres") as TileSet
+	if region_tileset == null:
+		_fail("Region TileSet failed to load.")
+		return
+	if region_tileset.get_source_count() != 1 or not region_tileset.has_source(0):
+		_fail("Region TileSet must contain exactly the dedicated region source 0.")
+		return
+	var atlas := region_tileset.get_source(0) as TileSetAtlasSource
+	if atlas == null or not atlas.has_tile(Vector2i.ZERO):
+		_fail("Region TileSet is missing the town tile at atlas (0, 0).")
+		return
+	var region_image := atlas.texture.get_image() if atlas.texture != null else null
+	if region_image == null or region_image.is_empty():
+		_fail("Town region texture could not be read.")
+	elif absf(region_image.get_pixel(10, 10).a - 0.4) > 0.02:
+		_fail("Town region texture must render at 40% opacity.")
 
 # GAMEPLAY: clothing_offsets.json must parse and have a complete entry (all 4
 # directions, valid offset array and positive scale) for every item_type key.

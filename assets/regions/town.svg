@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <g opacity="0.4">
+    <rect width="64" height="64" fill="#795136"/>
+    <!-- Pixel-letter paths are used instead of SVG text so Godot renders the
+         TOWN label identically in the TileMap palette and on painted cells. -->
+    <path fill="#fff3df" d="M3 23h12v4h-4v15H7V27H3z"/>
+    <path fill="#fff3df" d="M17 23h12v4H17zm0 4h4v11h-4zm8 0h4v11h-4zm-8 11h12v4H17z"/>
+    <path fill="#fff3df" d="M31 23h4v13h2v-9h4v9h2V23h4v19h-6l-2-4-2 4h-6z"/>
+    <path fill="#fff3df" d="M49 23h4l5 10V23h4v19h-4l-5-10v10h-4z"/>
+  </g>
+</svg>
