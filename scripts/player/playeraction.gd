@@ -138,6 +138,7 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var choppable_target = _find_object_at_tile(Defs.GROUP_CHOPPABLE, target_tile)
 	var breakable_target = _find_object_at_tile(Defs.GROUP_BREAKABLE, target_tile)
 	var minable_target = _find_object_at_tile(Defs.GROUP_MINABLE, target_tile)
+	var grass_decor_target := Defs.is_tool_sword(held_item) and World.has_runtime_grass_decor_at(target_tile, player.z_level)
 
 	var target_found = false
 	var is_exerting = false
@@ -175,6 +176,10 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 		is_exerting = true
 
 	if not target_found and minable_target != null and MaterialRegistry.can_tool_affect(minable_target, held_item):
+		target_found = true
+		is_exerting = true
+
+	if not target_found and grass_decor_target:
 		target_found = true
 		is_exerting = true
 
@@ -240,6 +245,13 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			World.rpc_request_hit_rock(minable_target.get_path())
 		else:
 			World.rpc_request_hit_rock.rpc_id(1, minable_target.get_path())
+		return
+
+	if grass_decor_target:
+		if player.multiplayer.is_server():
+			World.rpc_request_cut_grass(target_tile, player.z_level)
+		else:
+			World.rpc_request_cut_grass.rpc_id(1, target_tile, player.z_level)
 		return
 
 	if wall_material_id != "" and MaterialRegistry.can_tool_affect(wall_material_id, held_item):

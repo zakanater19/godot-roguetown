@@ -82,7 +82,7 @@ func _on_quit_pressed() -> void:
 		Lobby._ui_layer.visible = false
 		
 	# 4. Clean up LateJoin state
-	LateJoin._world_state = {"tiles": {}, "objects": {}, "players": {}}
+	LateJoin._world_state = {"tiles": {}, "grass_cuts": {}, "objects": {}, "players": {}}
 	LateJoin._pending_joins.clear()
 	LateJoin._disconnected_players.clear()
 	LateJoin._state_dirty = false

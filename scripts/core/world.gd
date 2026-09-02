@@ -309,6 +309,24 @@ func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return tiles.get_tile_description(source_id, atlas_coords)
 
+func has_runtime_grass_decor_at(tile_pos: Vector2i, z_level: int) -> bool:
+	if main_scene == null or not main_scene.has_method("has_runtime_grass_decor_at"):
+		return false
+	return bool(main_scene.call("has_runtime_grass_decor_at", tile_pos, z_level))
+
+func remove_runtime_grass_decor(tile_pos: Vector2i, z_level: int) -> void:
+	if main_scene != null and main_scene.has_method("remove_runtime_grass_decor"):
+		main_scene.call("remove_runtime_grass_decor", tile_pos, z_level)
+
+func handle_runtime_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	if source_id == 0 and atlas_coords == Vector2i.ZERO:
+		return
+	if not has_runtime_grass_decor_at(tile_pos, z_level):
+		return
+	remove_runtime_grass_decor(tile_pos, z_level)
+	if multiplayer.has_multiplayer_peer() and multiplayer.is_server():
+		LateJoin.register_grass_cut(tile_pos, z_level)
+
 func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_sword_attack: bool) -> Dictionary:
 	return combat.calculate_combat_roll(attacker, defender, base_amount, is_sword_attack)
 
@@ -414,6 +432,38 @@ func rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: String, brea
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
 	tiles.handle_rpc_confirm_replace_tile(pos, z_level, source_id, atlas_coords)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_cut_grass(tile_pos: Vector2i, z_level: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	var player: Node = utils.find_player_by_peer(sender_id)
+	if not utils.can_player_interact(player):
+		return
+	if int(player.get("z_level")) != z_level:
+		return
+	var player_tile: Vector2i = player.get("tile_pos")
+	var distance := (tile_pos - player_tile).abs()
+	if distance.x > 1 or distance.y > 1:
+		return
+	if player.get("body") != null and player.body.is_arm_broken(player.get("active_hand")):
+		return
+	var held_item = player.hands[player.get("active_hand")]
+	if not Defs.is_tool_sword(held_item):
+		return
+	if not has_runtime_grass_decor_at(tile_pos, z_level):
+		return
+	if not utils.server_check_action_cooldown(player):
+		return
+	LateJoin.register_grass_cut(tile_pos, z_level)
+	rpc_confirm_cut_grass.rpc(tile_pos, z_level)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_cut_grass(tile_pos: Vector2i, z_level: int) -> void:
+	remove_runtime_grass_decor(tile_pos, z_level)
 
 
 @rpc("any_peer", "call_remote", "reliable")

@@ -17,9 +17,10 @@ signal ready_to_enter_game
 # ---------------------------------------------------------------------------
 
 var _world_state: Dictionary = {
-	"tiles":   {},
-	"objects": {},
-	"players": {},
+	"tiles":      {},
+	"grass_cuts": {},
+	"objects":    {},
+	"players":    {},
 }
 
 var _pending_joins: Array[int] = []
@@ -98,6 +99,16 @@ func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atla
 		"z_level": z_level,
 		"source_id": source_id,
 		"atlas_coords": atlas_coords,
+	}
+	_state_dirty = true
+
+func register_grass_cut(tile_pos: Vector2i, z_level: int) -> void:
+	if not _world_state.has("grass_cuts"):
+		_world_state["grass_cuts"] = {}
+	var key := "%d_%d_%d" % [tile_pos.x, tile_pos.y, z_level]
+	_world_state["grass_cuts"][key] = {
+		"tile_pos": tile_pos,
+		"z_level": z_level,
 	}
 	_state_dirty = true
 
@@ -183,6 +194,10 @@ func request_sync() -> void:
 @rpc("authority", "call_remote", "reliable")
 func receive_tile_changes(tile_changes: Dictionary) -> void:
 	_sync.handle_receive_tile_changes(tile_changes)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_grass_cuts(grass_cuts: Dictionary) -> void:
+	_sync.handle_receive_grass_cuts(grass_cuts)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_object_states(object_states: Dictionary) -> void:

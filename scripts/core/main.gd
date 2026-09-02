@@ -27,8 +27,18 @@ const SOLID_TILE_PATHS: PackedStringArray =[
 	"res://assets/tiles/tile_10_wooden_window.png",
 ]
 
+const GRASS_DECOR_TILE_PATHS: PackedStringArray =[
+	"res://assets/foliage/grass7.png",
+	"res://assets/foliage/grass8.png",
+]
+const GRASS_FLOOR_ATLAS_COORDS: Vector2i = Vector2i(0, 0)
+const GRASS_DECOR_SPAWN_CHANCE: float = 0.1
+const GRASS_DECOR_Z_OFFSET: int = 1
+const GRASS_DECOR_LAYOUT_SEED: int = 734287
+
 var target_fps: int = 60
 var _last_z: int = -1
+var _grass_decor_layers: Dictionary = {}
 
 var _fps_label: Label = null
 
@@ -51,6 +61,10 @@ func _ready() -> void:
 		var region_map := get_node_or_null("RegionMapLayer_Z" + str(z)) as TileMapLayer
 		if region_map != null:
 			region_map.visible = false
+
+	# Tree spawners also build their runtime pieces deferred. Queue grass after
+	# them so their full ground footprint is part of the occupied-tile check.
+	call_deferred("_spawn_runtime_grass_decor")
 
 	# Add FPS Counter
 	var fps_layer := CanvasLayer.new()
@@ -204,6 +218,74 @@ func _build_tileset() -> void:
 		if tm != null:
 			tm.tile_set = ts
 
+func _spawn_runtime_grass_decor() -> void:
+	if not _grass_decor_layers.is_empty():
+		return
+
+	var decor_tileset := TileSet.new()
+	decor_tileset.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+
+	var decor_atlas := TileSetAtlasSource.new()
+	decor_atlas.resource_name = "Runtime Grass Decorations"
+	decor_atlas.texture = _compose_atlas_texture(GRASS_DECOR_TILE_PATHS)
+	decor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+	for i in GRASS_DECOR_TILE_PATHS.size():
+		decor_atlas.create_tile(Vector2i(i, 0))
+	decor_tileset.add_source(decor_atlas, 0)
+
+	var occupied_tiles := _collect_runtime_occupied_tiles()
+
+	for z in range(1, 6):
+		var world_layer := get_node_or_null("TileMapLayer_Z" + str(z)) as TileMapLayer
+		if world_layer == null:
+			continue
+
+		var decor_layer := TileMapLayer.new()
+		decor_layer.name = "RuntimeGrassDecor_Z" + str(z)
+		decor_layer.tile_set = decor_tileset
+		decor_layer.z_as_relative = false
+		decor_layer.z_index = Defs.get_z_index(z, GRASS_DECOR_Z_OFFSET)
+		decor_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(decor_layer)
+		_grass_decor_layers[z] = decor_layer
+
+		for cell in world_layer.get_used_cells_by_id(0, GRASS_FLOOR_ATLAS_COORDS):
+			if occupied_tiles[z].has(cell):
+				continue
+			var spawn_roll := posmod(_get_grass_decor_hash(cell, z, 0), 10000)
+			if spawn_roll >= int(GRASS_DECOR_SPAWN_CHANCE * 10000.0):
+				continue
+			var variant := posmod(_get_grass_decor_hash(cell, z, 1), GRASS_DECOR_TILE_PATHS.size())
+			decor_layer.set_cell(cell, 0, Vector2i(variant, 0))
+
+func _collect_runtime_occupied_tiles() -> Dictionary:
+	var occupied: Dictionary = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}}
+	for child in get_children():
+		if not (child is Node2D):
+			continue
+		var z_value = child.get("z_level")
+		if z_value == null:
+			continue
+		var z := clampi(int(z_value), 1, 5)
+		var anchor_tile := Defs.world_to_tile(child.global_position)
+		occupied[z][anchor_tile] = true
+		if child.has_method("get_solid_tiles"):
+			for solid_tile in child.call("get_solid_tiles"):
+				occupied[z][Vector2i(solid_tile)] = true
+	return occupied
+
+func _get_grass_decor_hash(cell: Vector2i, z: int, salt: int) -> int:
+	return ("%d:%d:%d:%d:%d" % [GRASS_DECOR_LAYOUT_SEED, cell.x, cell.y, z, salt]).hash()
+
+func has_runtime_grass_decor_at(tile_pos: Vector2i, z_level: int) -> bool:
+	var decor_layer := _grass_decor_layers.get(z_level) as TileMapLayer
+	return decor_layer != null and decor_layer.get_cell_source_id(tile_pos) != -1
+
+func remove_runtime_grass_decor(tile_pos: Vector2i, z_level: int) -> void:
+	var decor_layer := _grass_decor_layers.get(z_level) as TileMapLayer
+	if decor_layer != null:
+		decor_layer.erase_cell(tile_pos)
+
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
@@ -224,6 +306,10 @@ func _process(_delta: float) -> void:
 			var tm = get_node_or_null("TileMapLayer_Z" + str(z))
 			if tm:
 				tm.visible = (z <= current_z)
+
+			var grass_decor := _grass_decor_layers.get(z) as TileMapLayer
+			if grass_decor:
+				grass_decor.visible = (z <= current_z)
 				
 			var darken = get_node_or_null("Darken_Z" + str(z) + "_Z" + str(z+1))
 			if darken:

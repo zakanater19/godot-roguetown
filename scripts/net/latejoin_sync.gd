@@ -16,6 +16,10 @@ func send_world_state_to_peer(peer_id: int) -> void:
 	if not tile_changes.is_empty():
 		lj.rpc_id(peer_id, "receive_tile_changes", tile_changes)
 
+	var grass_cuts = lj._world_state.get("grass_cuts", {})
+	if not grass_cuts.is_empty():
+		lj.rpc_id(peer_id, "receive_grass_cuts", grass_cuts)
+
 	var object_states = lj._world_state["objects"]
 	if not object_states.is_empty():
 		lj.rpc_id(peer_id, "receive_object_states", object_states)
@@ -203,6 +207,20 @@ func handle_receive_tile_changes(tile_changes: Dictionary) -> void:
 		var tm      = World.get_tilemap(z_level)
 		if tm != null:
 			tm.set_cell(change["tile_pos"], change["source_id"], change["atlas_coords"])
+			World.handle_runtime_tile_change(
+				change["tile_pos"],
+				z_level,
+				change["source_id"],
+				change["atlas_coords"]
+			)
+
+func handle_receive_grass_cuts(grass_cuts: Dictionary) -> void:
+	for key in grass_cuts:
+		var cut: Dictionary = grass_cuts[key]
+		World.remove_runtime_grass_decor(
+			cut.get("tile_pos", Vector2i.ZERO),
+			int(cut.get("z_level", 3))
+		)
 
 func handle_receive_object_states(object_states: Dictionary) -> void:
 	_retry_receive_object_states(object_states, 20)
