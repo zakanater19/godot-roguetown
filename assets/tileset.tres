@@ -1,29 +1,30 @@
-[gd_resource type="TileSet" load_steps=8 format=3 uid="uid://dvay042606hsy"]
+[gd_resource type="TileSet" format=3 uid="uid://dvay042606hsy"]
 
-[ext_resource type="Texture2D" uid="uid://bdj1mqusy4yhs" path="res://assets/tiles/tiles_sheet.png" id="1_sheet"]
+[ext_resource type="Texture2D" uid="uid://41gp5cpduqg5" path="res://assets/tiles/floor_tiles_sheet.png" id="1_floor"]
+[ext_resource type="Texture2D" uid="uid://glmpmfaaywpp" path="res://assets/tiles/solid_tiles_sheet.png" id="2_solid"]
 [ext_resource type="Texture2D" uid="uid://bxyh8myxk32b4" path="res://doors/stairs.png" id="2_stairs"]
 [ext_resource type="Texture2D" uid="uid://dxo1qyl685x72" path="res://animated/water_sheet.png" id="3_water"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_floor"]
 resource_name = "Floor Tiles"
-texture = ExtResource("1_sheet")
+texture = ExtResource("1_floor")
 texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 1:0/0 = 0
 2:0/0 = 0
+3:0/0 = 0
 4:0/0 = 0
 5:0/0 = 0
-8:0/0 = 0
-9:0/0 = 0
+6:0/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_solid"]
 resource_name = "Solid Tiles"
-texture = ExtResource("1_sheet")
+texture = ExtResource("2_solid")
 texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
 3:0/0 = 0
-6:0/0 = 0
-7:0/0 = 0
-10:0/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_stairs"]
 resource_name = "Stairs"

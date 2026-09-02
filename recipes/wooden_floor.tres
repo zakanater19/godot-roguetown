@@ -12,4 +12,4 @@ req_amount = 1
 skill_requirements = {}
 result_type = "tile"
 result_tile_source = 0
-result_tile_coords = Vector2i(4, 0)
+result_tile_coords = Vector2i(3, 0)

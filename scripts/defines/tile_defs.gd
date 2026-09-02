@@ -41,49 +41,49 @@ const DEFS: Dictionary = {
 		Vector2i(0, 0): { "opaque": false, "description": "short tangled grass, wild and unkempt" },
 		Vector2i(1, 0): { "opaque": false, "description": "rough cobble, jagged worn stones" },
 		Vector2i(2, 0): { "opaque": false, "description": "rough dirt, uneven and loose" },
-		Vector2i(4, 0): { "opaque": false, "description": "worn wooden planks, creaking underfoot" },
-		Vector2i(5, 0): { "opaque": false, "description": "cobblestone floor, rough and uneven" },
-		Vector2i(8, 0): { "opaque": false, "description": "greenblocks, a green patterned floor" },
-		Vector2i(9, 0): { "opaque": false, "description": "loose rock, scattered debris on the floor" },
+		Vector2i(3, 0): { "opaque": false, "description": "worn wooden planks, creaking underfoot" },
+		Vector2i(4, 0): { "opaque": false, "description": "cobblestone floor, rough and uneven" },
+		Vector2i(5, 0): { "opaque": false, "description": "greenblocks, a green patterned floor" },
+		Vector2i(6, 0): { "opaque": false, "description": "loose rock, scattered debris on the floor" },
 	},
 	# -------------------------------------------------------------------------
 	# Source 1 — Wall tiles (all implicitly solid)
 	# -------------------------------------------------------------------------
 	1: {
-		Vector2i(3, 0): {
+		Vector2i(0, 0): {
 			"opaque"            : true,
 			"description"       : "a rock wall, solid and immovable",
 			"break_hits"        : 3,
 			"break_type"        : "debris",
-			"break_floor"       : Vector2i(9, 0),
+			"break_floor"       : Vector2i(6, 0),
 			"break_debris"      : "res://objects/rock.tscn",
 			"break_drops"       : [
 				{"type": "goldore", "chance": 0.025},
 			],
 			"material_id"       : "coarse_rock",
 		},
-		Vector2i(6, 0): {
+		Vector2i(1, 0): {
 			"opaque"            : true,
 			"description"       : "a stone wall, solid but workable",
 			"break_hits"        : 10,
 			"break_type"        : "replace",
-			"break_floor"       : Vector2i(5, 0),
+			"break_floor"       : Vector2i(4, 0),
 			"material_id"       : "stone",
 		},
-		Vector2i(7, 0): {
+		Vector2i(2, 0): {
 			"opaque"            : true,
 			"description"       : "a wooden wall, solid and sturdy",
 			"break_hits"        : 5,
 			"break_type"        : "replace",
-			"break_floor"       : Vector2i(4, 0),
+			"break_floor"       : Vector2i(3, 0),
 			"material_id"       : "wood",
 		},
-		Vector2i(10, 0): {
+		Vector2i(3, 0): {
 			"opaque"            : false,   # solid but transparent — light and FOV pass through
 			"description"       : "a wooden window, solid but lets light through",
 			"break_hits"        : 5,
 			"break_type"        : "replace",
-			"break_floor"       : Vector2i(4, 0),
+			"break_floor"       : Vector2i(3, 0),
 			"material_id"       : "wood",
 		},
 	},

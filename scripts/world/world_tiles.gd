@@ -60,7 +60,7 @@ func _build_break_drop_payload(def: Dictionary) -> Array:
 			})
 	return payload
 
-func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0), drops_data: Array = []) -> void:
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(6, 0), drops_data: Array = []) -> void:
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, 0, break_floor)

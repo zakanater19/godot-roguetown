@@ -303,7 +303,7 @@ func is_opaque(pos: Vector2i, z_level: int) -> bool:
 func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	return tiles.try_move(from, z_level, dir)
 
-func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(9, 0), drops_data: Array = []) -> void:
+func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(6, 0), drops_data: Array = []) -> void:
 	tiles.break_wall(pos, z_level, parent, rock_name, break_floor, drops_data)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:

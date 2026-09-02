@@ -8,18 +8,22 @@ const OUTLINE_WIDTH: float = 1.0
 
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
-## Column order 0..10 must match TileSet atlas coords (floor + solid share one row).
-const TURF_TILE_PATHS: PackedStringArray =[
+## Each category is packed into its own atlas so the TileMap palette only shows
+## tiles that can actually be painted from that source.
+const FLOOR_TILE_PATHS: PackedStringArray =[
 	"res://assets/tiles/tile_00_grass.png",
 	"res://assets/tiles/tile_01_cobble_rough.png",
 	"res://assets/tiles/tile_02_dirt.png",
-	"res://assets/tiles/tile_03_wall_rock.png",
 	"res://assets/tiles/tile_04_wood_planks.png",
 	"res://assets/tiles/tile_05_cobble_floor.png",
-	"res://assets/tiles/tile_06_wall_stone.png",
-	"res://assets/tiles/tile_07_wall_wood.png",
 	"res://assets/tiles/tile_08_greenblocks.png",
 	"res://assets/tiles/tile_09_loose_rock.png",
+]
+
+const SOLID_TILE_PATHS: PackedStringArray =[
+	"res://assets/tiles/tile_03_wall_rock.png",
+	"res://assets/tiles/tile_06_wall_stone.png",
+	"res://assets/tiles/tile_07_wall_wood.png",
 	"res://assets/tiles/tile_10_wooden_window.png",
 ]
 
@@ -108,13 +112,13 @@ func _build_background() -> void:
 	add_child(rect)
 	move_child(rect, 0)
 
-func _compose_turf_atlas_texture() -> ImageTexture:
-	var w := TURF_TILE_PATHS.size() * World.TILE_SIZE
+func _compose_atlas_texture(tile_paths: PackedStringArray) -> ImageTexture:
+	var w := tile_paths.size() * World.TILE_SIZE
 	var h := World.TILE_SIZE
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
-	for i in TURF_TILE_PATHS.size():
-		var tex_path: String = TURF_TILE_PATHS[i]
+	for i in tile_paths.size():
+		var tex_path: String = tile_paths[i]
 		var tex: Texture2D = load(tex_path) as Texture2D
 		if tex == null:
 			push_error("_compose_turf_atlas_texture: missing or invalid texture: %s" % tex_path)
@@ -140,28 +144,22 @@ func _build_tileset() -> void:
 		return
 
 	var tilemap: TileMapLayer = $TileMapLayer_Z3
-	var turf_tex := _compose_turf_atlas_texture()
+	var floor_tex := _compose_atlas_texture(FLOOR_TILE_PATHS)
+	var solid_tex := _compose_atlas_texture(SOLID_TILE_PATHS)
 
 	var floor_atlas := TileSetAtlasSource.new()
 	floor_atlas.resource_name = "Floor Tiles"
-	floor_atlas.texture = turf_tex
+	floor_atlas.texture = floor_tex
 	floor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-	floor_atlas.create_tile(Vector2i(0, 0))
-	floor_atlas.create_tile(Vector2i(1, 0))
-	floor_atlas.create_tile(Vector2i(2, 0))
-	floor_atlas.create_tile(Vector2i(4, 0))
-	floor_atlas.create_tile(Vector2i(5, 0))
-	floor_atlas.create_tile(Vector2i(8, 0))
-	floor_atlas.create_tile(Vector2i(9, 0))
+	for i in FLOOR_TILE_PATHS.size():
+		floor_atlas.create_tile(Vector2i(i, 0))
 
 	var solid_atlas := TileSetAtlasSource.new()
 	solid_atlas.resource_name = "Solid Tiles"
-	solid_atlas.texture = turf_tex
+	solid_atlas.texture = solid_tex
 	solid_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-	solid_atlas.create_tile(Vector2i(3, 0))
-	solid_atlas.create_tile(Vector2i(6, 0))
-	solid_atlas.create_tile(Vector2i(7, 0))
-	solid_atlas.create_tile(Vector2i(10, 0))
+	for i in SOLID_TILE_PATHS.size():
+		solid_atlas.create_tile(Vector2i(i, 0))
 
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)

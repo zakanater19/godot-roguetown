@@ -280,7 +280,7 @@ func _build_sunlight_job(player_tile: Vector2i, current_z: int, roof_data: Packe
 			var flags := TILE_FLAG_VALID
 			if tm != null and tm.get_cell_source_id(tile) == 1:
 				var atlas := tm.get_cell_atlas_coords(tile)
-				if atlas == Vector2i(10, 0): flags |= TILE_FLAG_WINDOW
+				if atlas == Vector2i(3, 0): flags |= TILE_FLAG_WINDOW
 				if TileDefs.is_opaque(1, atlas): flags |= TILE_FLAG_OPAQUE
 			elif World.solid_grid.has(current_z) and World.solid_grid[current_z].has(tile):
 				var valid_objs: Array =[]
@@ -547,7 +547,7 @@ func _begin_light_calc() -> void:
 				var wall_z = roof_data[roof_idx]
 				var floor_z = roof_data[roof_idx + 1]
 				var is_roofed = (wall_z > current_z) or (floor_z > current_z)
-				var is_window = (tm != null and tm.get_cell_source_id(tile) == 1 and tm.get_cell_atlas_coords(tile) == Vector2i(10, 0))
+				var is_window = (tm != null and tm.get_cell_source_id(tile) == 1 and tm.get_cell_atlas_coords(tile) == Vector2i(3, 0))
 				if is_window: is_roofed = false
 				if is_roofed: flags |= 1
 				if is_window: flags |= 2
