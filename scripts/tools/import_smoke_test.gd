@@ -940,6 +940,8 @@ func _validate_replication_configs() -> void:
 		var replicated_properties := config.get_properties()
 		if NodePath(".:position") in replicated_properties:
 			_fail("%s: position must not be replicated while authoritative movement interpolation is active." % scene_path)
+		if scene_path == "res://scenes/player.tscn" and NodePath(".:view_z_level") in replicated_properties:
+			_fail("%s: view_z_level is client-local view intent and must not be overwritten by server state replication." % scene_path)
 		for prop_path: NodePath in replicated_properties:
 			_validate_replication_property(scene_path, instance, prop_path)
 
