@@ -169,8 +169,8 @@ func server_try_resist(peer_id: int) -> void:
 	var break_chance = (float(grabbed.get("stats").get("strength", 10)) / total_str) * 100.0
 	if grabbed.get("is_lying_down"): break_chance *= CombatDefs.LYING_DOWN_RESIST_MULT
 	
-	grabbed.rpc_consume_stamina(resist_cost)
-	grabber.rpc_consume_stamina(grabber_cost)
+	world.utils.server_consume_stamina(grabbed, resist_cost)
+	world.utils.server_consume_stamina(grabber, grabber_cost)
 	
 	if randf() * 100.0 < break_chance:
 		release_grab_for_peer(grabber_peer_id, true)

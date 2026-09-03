@@ -172,3 +172,154 @@ offset_right = 420.0
 offset_bottom = -20.0
 theme_override_font_sizes/font_size = 20
 placeholder_text = "Lobby chat... (Press Escape to cancel)"
+
+[node name="HostDashboard" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchor_bottom = 1.0
+offset_right = 1000.0
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="HostDashboard"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 32.0
+offset_bottom = 82.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+theme_override_font_sizes/font_size = 36
+text = "SERVER HOST"
+horizontal_alignment = 1
+
+[node name="Content" type="HBoxContainer" parent="HostDashboard"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = 104.0
+offset_right = -32.0
+offset_bottom = -48.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="PlayersPanel" type="PanelContainer" parent="HostDashboard/Content"]
+custom_minimum_size = Vector2(500, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Margin" type="MarginContainer" parent="HostDashboard/Content/PlayersPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 20
+
+[node name="Players" type="VBoxContainer" parent="HostDashboard/Content/PlayersPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Heading" type="Label" parent="HostDashboard/Content/PlayersPanel/Margin/Players"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 27
+text = "PLAYER LIST"
+
+[node name="CountLabel" type="Label" parent="HostDashboard/Content/PlayersPanel/Margin/Players"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.72, 0.76, 1)
+theme_override_font_sizes/font_size = 17
+text = "Connected players  0 / 200"
+
+[node name="Divider" type="HSeparator" parent="HostDashboard/Content/PlayersPanel/Margin/Players"]
+layout_mode = 2
+
+[node name="PlayerScroll" type="ScrollContainer" parent="HostDashboard/Content/PlayersPanel/Margin/Players"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="PlayerList" type="VBoxContainer" parent="HostDashboard/Content/PlayersPanel/Margin/Players/PlayerScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="StatsPanel" type="PanelContainer" parent="HostDashboard/Content"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Margin" type="MarginContainer" parent="HostDashboard/Content/StatsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="Stats" type="VBoxContainer" parent="HostDashboard/Content/StatsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Heading" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 27
+text = "GAME STATUS"
+
+[node name="Divider" type="HSeparator" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+
+[node name="ServerLabel" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.76, 0.78, 0.82, 1)
+theme_override_font_sizes/font_size = 18
+text = "Roguetown Server\nPort 9904  •  Max players 200"
+
+[node name="PhaseCaption" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.6, 0.64, 1)
+theme_override_font_sizes/font_size = 15
+text = "CURRENT PHASE"
+
+[node name="PhaseLabel" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.75, 0.3, 1)
+theme_override_font_sizes/font_size = 34
+text = "LOBBY"
+
+[node name="TimeLabel" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Auto start: 05:00"
+
+[node name="PlayerStatsLabel" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.76, 0.78, 0.82, 1)
+theme_override_font_sizes/font_size = 18
+text = "Ready players: 0 / 0"
+
+[node name="Spacer" type="Control" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ForceStartButton" type="Button" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_font_sizes/font_size = 21
+text = "Force Start Round"
+
+[node name="RestartRoundButton" type="Button" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+visible = false
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_font_sizes/font_size = 21
+text = "Restart Round"
+
+[node name="HintLabel" type="Label" parent="HostDashboard/Content/StatsPanel/Margin/Stats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.54, 0.58, 1)
+theme_override_font_sizes/font_size = 14
+text = "The host is server-only and will not spawn.\nPress Escape for server menu."
+horizontal_alignment = 1
+autowrap_mode = 2

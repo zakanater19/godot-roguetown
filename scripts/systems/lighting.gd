@@ -37,6 +37,7 @@ const TILE_FLAG_VALID: int = 1
 const TILE_FLAG_WINDOW: int = 2
 const TILE_FLAG_OPAQUE: int = 4
 const LIGHT_REPORT_EPSILON: float = 0.02
+const LIGHT_REPORT_KEEPALIVE_MS: int = 750
 const LEAF_LIGHT_BLOCK_PER_PASS: float = 0.10
 const LEAF_LIGHT_GROUP: StringName = &"leaf_canopy"
 
@@ -66,6 +67,7 @@ var _sunlight_result_cache: Dictionary = {}
 var _last_reported_light_tile: Vector2i = Vector2i(-9999, -9999)
 var _last_reported_light_z: int = -1
 var _last_reported_light_value: float = -1.0
+var _last_light_report_ms: int = -LIGHT_REPORT_KEEPALIVE_MS
 
 func _ready() -> void:
 	# 1. Setup the heightmap image tracking opaque blocks on the CPU
@@ -105,7 +107,7 @@ func report_local_world_light_now() -> void:
 	var local_player = World.get_local_player()
 	if local_player == null or not is_instance_valid(local_player):
 		return
-	_report_local_world_light(local_player, local_player.z_level)
+	_report_local_world_light(local_player, local_player.z_level, true)
 
 func register_lamp(lamp: Node) -> void:
 	if not active_lamps.has(lamp): active_lamps.append(lamp)
@@ -300,16 +302,19 @@ func _build_sunlight_job(player_tile: Vector2i, current_z: int, roof_data: Packe
 		"floor_z_data": floor_z_data, "tile_flags": tile_flags,
 	}
 
-func _report_local_world_light(local_player: Node, current_z: int) -> void:
+func _report_local_world_light(local_player: Node, current_z: int, force: bool = false) -> void:
 	if local_player == null or not is_instance_valid(local_player): return
 	if not multiplayer.has_multiplayer_peer(): return
 	var tile: Vector2i = local_player.tile_pos
 	var light_value: float = world_light_cache.get(tile, 1.0)
-	if tile == _last_reported_light_tile and current_z == _last_reported_light_z and abs(light_value - _last_reported_light_value) < LIGHT_REPORT_EPSILON: return
+	var now_ms := Time.get_ticks_msec()
+	var sample_unchanged: bool = tile == _last_reported_light_tile and current_z == _last_reported_light_z and abs(light_value - _last_reported_light_value) < LIGHT_REPORT_EPSILON
+	if not force and sample_unchanged and now_ms - _last_light_report_ms < LIGHT_REPORT_KEEPALIVE_MS: return
 
 	_last_reported_light_tile = tile
 	_last_reported_light_z = current_z
 	_last_reported_light_value = light_value
+	_last_light_report_ms = now_ms
 
 	if multiplayer.is_server(): World.update_client_light_sample(multiplayer.get_unique_id(), tile, current_z, light_value)
 	else: World.rpc_report_client_light_sample.rpc_id(1, tile, current_z, light_value)

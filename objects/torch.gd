@@ -51,6 +51,9 @@ func _process(delta: float) -> void:
 		return
 	_anim_timer += delta
 	_update_animation_frame()
+	var peer := multiplayer.multiplayer_peer
+	if peer != null and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
 	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
 		return
 	if _is_held_by_any_player() or not _is_ground_drop():

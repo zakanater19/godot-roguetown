@@ -5,6 +5,7 @@ extends RefCounted
 const GHOST_SCENE = preload("res://core/ghost.tscn")
 
 var world: Node
+var _round_restart_pending: bool = false
 
 func _init(p_world: Node) -> void:
 	world = p_world
@@ -77,11 +78,21 @@ func handle_rpc_request_respawn(sender_id: int, request_peer_id: int) -> void:
 		world.rpc_return_to_lobby.rpc_id(sender_id)
 
 func handle_rpc_execute_round_end() -> void:
+	if _round_restart_pending:
+		return
+	_round_restart_pending = true
+	if not world.multiplayer.is_server():
+		# Set this as soon as the server announces a restart. If the transport
+		# closes slightly before this client's timer, the main menu still knows
+		# to reconnect rather than treating it as an ordinary disconnect.
+		Host.auto_reconnect_client = true
 	Sidebar.add_message(
 		"\n[color=#ff4444][b][font_size=24]THE ROUND HAS ENDED! RESTARTING IN 5 SECONDS...[/font_size][/b][/color]\n"
 	)
 	world.get_tree().create_timer(5.0).timeout.connect(_on_round_restart_timeout)
 
 func _on_round_restart_timeout() -> void:
-	if world.get_tree().current_scene.name != "MainMenu":
+	_round_restart_pending = false
+	var current_scene := world.get_tree().current_scene
+	if current_scene != null and current_scene.name != "MainMenu":
 		Host.execute_round_restart()

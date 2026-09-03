@@ -2,6 +2,8 @@
 extends Node
 
 const PORT: int = 9904
+const PEER_IP_RETRY_COUNT: int = 10
+const PEER_IP_RETRY_DELAY_SEC: float = 0.05
 
 var last_server_address: String = ""
 var last_server_port: int = PORT
@@ -142,10 +144,29 @@ func _on_peer_connected(id: int) -> void:
 		_disconnect_peer(id)
 		return
 
-	var ip := _query_peer_ip_from_enet(id)
-	if ip != "":
-		_peer_ips[id] = ip
-	_assign_session_id(id)
+	# SceneMultiplayer can emit peer_connected one poll before ENet exposes the
+	# peer object. Resolve the address asynchronously instead of rejecting a
+	# healthy client during that short window.
+	_finish_peer_connection_setup(id)
+
+
+func _finish_peer_connection_setup(peer_id: int) -> void:
+	for _attempt in range(PEER_IP_RETRY_COUNT):
+		if not _is_server_peer_active():
+			return
+		if multiplayer.get_peers().has(peer_id):
+			var ip := _query_peer_ip_from_enet(peer_id)
+			if ip != "":
+				_peer_ips[peer_id] = ip
+				_assign_session_id(peer_id, ip)
+				return
+		await get_tree().create_timer(PEER_IP_RETRY_DELAY_SEC).timeout
+
+	# The peer may have disconnected while its connection signal was queued.
+	# Only reject it if it is still present after the full retry window.
+	if _is_server_peer_active() and multiplayer.get_peers().has(peer_id):
+		push_warning("Host: peer %d connected without a readable remote IP; disconnecting." % peer_id)
+		_disconnect_peer(peer_id)
 
 
 func _on_peer_disconnected(id: int) -> void:
@@ -205,7 +226,9 @@ func _get_peer_ip(peer_id: int) -> String:
 
 func _query_peer_ip_from_enet(peer_id: int) -> String:
 	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
-	if enet == null:
+	if enet == null or enet.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return ""
+	if not multiplayer.get_peers().has(peer_id):
 		return ""
 	var ep := enet.get_peer(peer_id)
 	if ep == null:
@@ -215,7 +238,9 @@ func _query_peer_ip_from_enet(peer_id: int) -> String:
 
 func _disconnect_peer(peer_id: int) -> void:
 	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
-	if enet == null:
+	if enet == null or enet.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	if not multiplayer.get_peers().has(peer_id):
 		return
 
 	var ep := enet.get_peer(peer_id)
@@ -223,11 +248,9 @@ func _disconnect_peer(peer_id: int) -> void:
 		ep.peer_disconnect()
 
 
-func _assign_session_id(peer_id: int) -> void:
-	var ip := _get_peer_ip(peer_id)
+func _assign_session_id(peer_id: int, known_ip: String = "") -> void:
+	var ip := known_ip if known_ip != "" else _get_peer_ip(peer_id)
 	if ip == "":
-		push_warning("Host: peer %d connected without a readable remote IP; disconnecting." % peer_id)
-		_disconnect_peer(peer_id)
 		return
 
 	var is_local := _is_local_ip(ip)
@@ -257,6 +280,13 @@ func _assign_session_id(peer_id: int) -> void:
 		}
 
 
+func _is_server_peer_active() -> bool:
+	var peer := multiplayer.multiplayer_peer
+	return peer != null \
+		and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED \
+		and is_host_mode
+
+
 func clear_session_data() -> void:
 	_ip_sessions.clear()
 	_peer_ips.clear()
@@ -268,6 +298,11 @@ func clear_session_data() -> void:
 
 
 func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peasant", is_latejoin: bool = false) -> void:
+	# The listen server keeps peer ID 1 for networking/RPC authority, but the
+	# graphical host is a server console rather than a playable character.
+	if is_host_mode and multiplayer.is_server() and peer_id == multiplayer.get_unique_id():
+		return
+
 	if peers.has(peer_id):
 		return
 

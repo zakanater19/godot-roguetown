@@ -29,7 +29,9 @@ func server_consume_stamina(player: Node, amount: float) -> bool:
 		return false
 	# Match the existing "one last effort" behavior: an action is accepted when
 	# stamina is low, but that action exhausts the player on the server.
-	player.rpc_consume_stamina(amount)
+	if not player.has_method("consume_stamina_authoritative"):
+		return false
+	player.consume_stamina_authoritative(amount)
 	return true
 
 func server_check_action_cooldown(player: Node, is_attack: bool = false, stamina_cost: float = 0.0) -> bool:

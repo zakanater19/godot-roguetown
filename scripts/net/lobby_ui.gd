@@ -28,6 +28,7 @@ func build(bg: ColorRect) -> void:
 	_bind_latejoin_panel(ui_root)
 	_bind_subclass_panel(ui_root)
 	_bind_chat_input(ui_root)
+	_bind_host_dashboard(ui_root)
 
 func _bind_main_controls(ui_root: Control) -> void:
 	lobby._main_content = ui_root.get_node("MainContent") as Control
@@ -77,6 +78,19 @@ func _bind_subclass_panel(ui_root: Control) -> void:
 func _bind_chat_input(ui_root: Control) -> void:
 	lobby._chat_input = ui_root.get_node("ChatInput") as LineEdit
 	lobby._chat_input.text_submitted.connect(lobby._on_chat_submitted)
+
+func _bind_host_dashboard(ui_root: Control) -> void:
+	lobby._host_dashboard = ui_root.get_node("HostDashboard") as Control
+	lobby._host_server_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/ServerLabel") as Label
+	lobby._host_phase_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/PhaseLabel") as Label
+	lobby._host_time_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/TimeLabel") as Label
+	lobby._host_player_stats_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/PlayerStatsLabel") as Label
+	lobby._host_count_label = ui_root.get_node("HostDashboard/Content/PlayersPanel/Margin/Players/CountLabel") as Label
+	lobby._host_player_list = ui_root.get_node("HostDashboard/Content/PlayersPanel/Margin/Players/PlayerScroll/PlayerList") as VBoxContainer
+	lobby._host_force_btn = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/ForceStartButton") as Button
+	lobby._host_restart_btn = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/RestartRoundButton") as Button
+	lobby._host_force_btn.pressed.connect(lobby._on_force_pressed)
+	lobby._host_restart_btn.pressed.connect(lobby._on_restart_round_pressed)
 
 func _populate_class_option(option: OptionButton) -> void:
 	if option == null:

@@ -253,16 +253,27 @@ func _apply_sneak_alpha(alpha: float) -> void: if sneak: sneak.apply_sneak_alpha
 
 # ── Stamina RPC ───────────────────────────────────────────────────────────────
 
+func _apply_stamina_cost(amount: float) -> void:
+	if amount <= 0.0:
+		return
+	if stamina < amount:
+		exhausted = true
+		if _is_local_authority():
+			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself defending![/color]")
+	_spend_stamina(amount)
+
+func consume_stamina_authoritative(amount: float) -> void:
+	# Server gameplay handlers can call this while an inbound client RPC is still
+	# on the stack, when get_remote_sender_id() still refers to that client.
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		return
+	_apply_stamina_cost(amount)
+
 @rpc("any_peer", "call_local", "reliable")
 func rpc_consume_stamina(amount: float) -> void:
 	if not _is_server_state_message():
 		return
-	if multiplayer.is_server() or _is_local_authority() or not multiplayer.has_multiplayer_peer():
-		if stamina < amount:
-			exhausted = true
-			if _is_local_authority():
-				Sidebar.add_message("[color=#ffaaaa]You overexerted yourself defending![/color]")
-		_spend_stamina(amount)
+	_apply_stamina_cost(amount)
 
 # ── Combat mode / stance RPCs ─────────────────────────────────────────────────
 

@@ -67,6 +67,11 @@ func _on_server_disconnected() -> void:
 	version_checked = false
 	_version_check_sent = false
 	is_manual_reconnect = false
+	# ENet leaves a disconnected peer object assigned after the server closes.
+	# Remove it immediately so gameplay nodes cannot poll an inactive instance
+	# while the synchronized round-restart timer moves us back to the menu.
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer = null
 	LoadingScreen.hide_loading()
 	BootstrapNet.reset_client_state(true)
 	if _sync != null and _sync.has_method("reset_snapshot_state"):
