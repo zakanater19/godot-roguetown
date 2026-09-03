@@ -312,6 +312,10 @@ func run() -> Dictionary:
 	_validate_regions()
 	_end_section()
 
+	_begin_section("foliage")
+	_validate_foliage()
+	_end_section()
+
 	_begin_section("clothing offsets")
 	_validate_clothing_offsets()
 	_end_section()
@@ -770,7 +774,20 @@ func _validate_regions() -> void:
 		_fail("Town regions must reject grass decoration placement.")
 	if not Regions.allows_grass_decor_at(test_root, town_cell + Vector2i.RIGHT, 3):
 		_fail("Unpainted cells must allow grass decoration placement.")
+	if Regions.allows_bushes_at(test_root, town_cell, 3):
+		_fail("Town regions must reject random bush placement.")
+	if not Regions.allows_bushes_at(test_root, town_cell + Vector2i.RIGHT, 3):
+		_fail("Unpainted cells must allow random bush placement.")
 	test_root.free()
+
+func _validate_foliage() -> void:
+	for grass_number in range(1, 9):
+		var texture_path := "res://assets/foliage/grass%d.png" % grass_number
+		_validate_texture(texture_path, "grass decoration")
+		var texture := ResourceLoader.load(texture_path, "", ResourceLoader.CACHE_MODE_REPLACE) as Texture2D
+		if texture != null and texture.get_size() != Vector2(64, 64):
+			_fail("Grass decoration texture must be 64x64: %s." % texture_path)
+	_validate_packed_scene("res://objects/bush.tscn", "runtime bush")
 
 # GAMEPLAY: clothing_offsets.json must parse and have a complete entry (all 4
 # directions, valid offset array and positive scale) for every item_type key.

@@ -5,6 +5,7 @@ extends Node2D
 const SHOW_OUTLINES: bool  = true
 const OUTLINE_COLOR: Color = Color(0.5, 0.5, 0.5, 0.5)
 const OUTLINE_WIDTH: float = 1.0
+const BUSH_SCENE: PackedScene = preload("res://objects/bush.tscn")
 
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
@@ -28,13 +29,20 @@ const SOLID_TILE_PATHS: PackedStringArray =[
 ]
 
 const GRASS_DECOR_TILE_PATHS: PackedStringArray =[
+	"res://assets/foliage/grass1.png",
+	"res://assets/foliage/grass2.png",
+	"res://assets/foliage/grass3.png",
+	"res://assets/foliage/grass4.png",
+	"res://assets/foliage/grass5.png",
+	"res://assets/foliage/grass6.png",
 	"res://assets/foliage/grass7.png",
 	"res://assets/foliage/grass8.png",
 ]
 const GRASS_FLOOR_ATLAS_COORDS: Vector2i = Vector2i(0, 0)
 const GRASS_DECOR_SPAWN_CHANCE: float = 0.1
+const BUSH_SPAWN_CHANCE: float = 0.025
 const GRASS_DECOR_Z_OFFSET: int = 1
-const GRASS_DECOR_LAYOUT_SEED: int = 734287
+const FOLIAGE_LAYOUT_SEED: int = 734287
 
 var target_fps: int = 60
 var _last_z: int = -1
@@ -62,9 +70,9 @@ func _ready() -> void:
 		if region_map != null:
 			region_map.visible = false
 
-	# Tree spawners also build their runtime pieces deferred. Queue grass after
+	# Tree spawners also build their runtime pieces deferred. Queue foliage after
 	# them so their full ground footprint is part of the occupied-tile check.
-	call_deferred("_spawn_runtime_grass_decor")
+	call_deferred("_spawn_runtime_foliage")
 
 	# Add FPS Counter
 	var fps_layer := CanvasLayer.new()
@@ -218,7 +226,7 @@ func _build_tileset() -> void:
 		if tm != null:
 			tm.tile_set = ts
 
-func _spawn_runtime_grass_decor() -> void:
+func _spawn_runtime_foliage() -> void:
 	if not _grass_decor_layers.is_empty():
 		return
 
@@ -250,15 +258,33 @@ func _spawn_runtime_grass_decor() -> void:
 		_grass_decor_layers[z] = decor_layer
 
 		for cell in world_layer.get_used_cells_by_id(0, GRASS_FLOOR_ATLAS_COORDS):
-			if not Regions.allows_grass_decor_at(self, cell, z):
-				continue
 			if occupied_tiles[z].has(cell):
 				continue
-			var spawn_roll := posmod(_get_grass_decor_hash(cell, z, 0), 10000)
+			var bush_roll := posmod(_get_foliage_hash(cell, z, 2), 10000)
+			if (
+				Regions.allows_bushes_at(self, cell, z)
+				and bush_roll < int(BUSH_SPAWN_CHANCE * 10000.0)
+			):
+				_spawn_runtime_bush(cell, z)
+				occupied_tiles[z][cell] = true
+				continue
+			if not Regions.allows_grass_decor_at(self, cell, z):
+				continue
+			var spawn_roll := posmod(_get_foliage_hash(cell, z, 0), 10000)
 			if spawn_roll >= int(GRASS_DECOR_SPAWN_CHANCE * 10000.0):
 				continue
-			var variant := posmod(_get_grass_decor_hash(cell, z, 1), GRASS_DECOR_TILE_PATHS.size())
+			var variant := posmod(_get_foliage_hash(cell, z, 1), GRASS_DECOR_TILE_PATHS.size())
 			decor_layer.set_cell(cell, 0, Vector2i(variant, 0))
+
+func _spawn_runtime_bush(cell: Vector2i, z_level: int) -> void:
+	var bush := BUSH_SCENE.instantiate() as Node2D
+	if bush == null:
+		push_error("Could not instantiate the runtime bush scene.")
+		return
+	bush.name = "RuntimeBush_Z%d_X%d_Y%d" % [z_level, cell.x, cell.y]
+	bush.position = Defs.tile_to_pixel(cell)
+	bush.set("z_level", z_level)
+	add_child(bush)
 
 func _collect_runtime_occupied_tiles() -> Dictionary:
 	var occupied: Dictionary = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}}
@@ -276,8 +302,8 @@ func _collect_runtime_occupied_tiles() -> Dictionary:
 				occupied[z][Vector2i(solid_tile)] = true
 	return occupied
 
-func _get_grass_decor_hash(cell: Vector2i, z: int, salt: int) -> int:
-	return ("%d:%d:%d:%d:%d" % [GRASS_DECOR_LAYOUT_SEED, cell.x, cell.y, z, salt]).hash()
+func _get_foliage_hash(cell: Vector2i, z: int, salt: int) -> int:
+	return ("%d:%d:%d:%d:%d" % [FOLIAGE_LAYOUT_SEED, cell.x, cell.y, z, salt]).hash()
 
 func has_runtime_grass_decor_at(tile_pos: Vector2i, z_level: int) -> bool:
 	var decor_layer := _grass_decor_layers.get(z_level) as TileMapLayer

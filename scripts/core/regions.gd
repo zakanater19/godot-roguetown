@@ -10,6 +10,7 @@ const REGION_DEFINITIONS: Dictionary = {
 		"source_id": 0,
 		"atlas_coords": Vector2i(0, 0),
 		"allows_grass_decor": false,
+		"allows_bushes": false,
 	},
 }
 
@@ -31,7 +32,15 @@ func get_region_at(map_root: Node, tile_pos: Vector2i, z_level: int) -> StringNa
 
 
 func allows_grass_decor_at(map_root: Node, tile_pos: Vector2i, z_level: int) -> bool:
+	return _allows_feature_at(map_root, tile_pos, z_level, "allows_grass_decor")
+
+
+func allows_bushes_at(map_root: Node, tile_pos: Vector2i, z_level: int) -> bool:
+	return _allows_feature_at(map_root, tile_pos, z_level, "allows_bushes")
+
+
+func _allows_feature_at(map_root: Node, tile_pos: Vector2i, z_level: int, feature: String) -> bool:
 	var region_name := get_region_at(map_root, tile_pos, z_level)
 	if region_name == NONE:
 		return true
-	return bool(REGION_DEFINITIONS[region_name].get("allows_grass_decor", true))
+	return bool(REGION_DEFINITIONS[region_name].get(feature, true))
