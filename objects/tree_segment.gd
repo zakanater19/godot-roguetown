@@ -4,12 +4,23 @@ extends BreakableWorldObject
 
 const DEFAULT_MATERIAL: MaterialData = preload("res://materials/wood.tres")
 const TREE_TEXTURE: Texture2D = preload("res://assets/tree_sheet.png")
+const STUMP_TEXTURES: Array[Texture2D] = [
+	preload("res://assets/foliage/t1stump.png"),
+	preload("res://assets/foliage/t2stump.png"),
+	preload("res://assets/foliage/t3stump.png"),
+	preload("res://assets/foliage/t4stump.png"),
+]
 const TREE_DECOR_SCRIPT = preload("res://objects/tree_decor.gd")
 const CELL_SIZE: int = 32
 const SHEET_COLUMNS: int = 5
 const WORLD_SCALE: float = 2.0
+const STUMP_FRAME_SIZE: Vector2 = Vector2(64, 96)
+const STUMP_SPRITE_OFFSET: Vector2 = Vector2(0, -64)
+const STUMP_LOG_DROP_COUNT: int = 1
+const FELLED_TREE_LOG_MIN: int = 4
+const FELLED_TREE_LOG_MAX: int = 5
 const DROP_SPREAD: float = 12.0
-const BRANCH_SLOW_MULTIPLIER: float = 1.2
+const BRANCH_SLOW_MULTIPLIER: float = 1.5
 
 @export var tree_id: String = ""
 @export var piece_kind: String = "trunk"
@@ -37,6 +48,11 @@ func get_hits_to_break() -> float:
 func get_z_offset() -> int:
 	return z_offset
 
+func get_visual_z_offset() -> int:
+	if piece_kind == "stump":
+		return z_offset - 1
+	return z_offset + 1
+
 func should_snap_to_tile() -> bool:
 	return true
 
@@ -52,11 +68,13 @@ func get_description() -> String:
 	match piece_kind:
 		"branch":
 			return "a tree branch"
+		"stump":
+			return "a tree stump"
 		_:
 			return "a tree trunk"
 
 func get_movement_slow_multiplier() -> float:
-	if piece_kind == "branch":
+	if piece_kind == "branch" or piece_kind == "stump":
 		return BRANCH_SLOW_MULTIPLIER
 	return 1.0
 
@@ -87,6 +105,15 @@ func build_break_payload() -> Dictionary:
 		if current.piece_kind == "trunk":
 			for dependent in current.get_supported_segments():
 				pending.append(dependent)
+
+	if piece_kind == "trunk" and support_segment_name.is_empty():
+		# A base-trunk chop fells the entire tree. Keep its total yield bounded
+		# instead of summing every vertical segment's individual drop count.
+		drop_names.clear()
+		var names: Array[String] = []
+		for _i in range(randi_range(FELLED_TREE_LOG_MIN, FELLED_TREE_LOG_MAX)):
+			names.append(Defs.make_runtime_name("Log"))
+		drop_names[str(get_path())] = names
 
 	return {
 		"broken_paths": broken_paths,
@@ -126,7 +153,22 @@ func perform_break(log_names: Array) -> void:
 			drop_center,
 			DROP_SPREAD
 		)
+
+	if piece_kind == "trunk" and support_segment_name.is_empty():
+		become_stump()
+		return
+
 	queue_free()
+
+func become_stump() -> void:
+	piece_kind = "stump"
+	hits = 0.0
+	drop_count = STUMP_LOG_DROP_COUNT
+	solid_piece = false
+	blocks_fov = false
+	support_segment_name = ""
+	rebuild_decor()
+	_update_sprite()
 
 func rebuild_decor() -> void:
 	for child in get_children():
@@ -152,13 +194,25 @@ func _update_sprite() -> void:
 	if sprite == null:
 		return
 
-	sprite.texture = TREE_TEXTURE
 	sprite.centered = true
 	sprite.region_enabled = true
-	sprite.region_rect = _get_region_rect(atlas_index)
 	sprite.scale = Vector2.ONE * WORLD_SCALE
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.z_as_relative = false
-	sprite.z_index = Defs.get_z_index(z_level, z_offset + 1)
+	sprite.z_index = Defs.get_z_index(z_level, get_visual_z_offset())
+
+	if piece_kind == "stump":
+		sprite.texture = STUMP_TEXTURES[_get_stump_variant()]
+		sprite.region_rect = Rect2(Vector2.ZERO, STUMP_FRAME_SIZE)
+		sprite.position = STUMP_SPRITE_OFFSET
+		return
+
+	sprite.texture = TREE_TEXTURE
+	sprite.region_rect = _get_region_rect(atlas_index)
+	sprite.position = Vector2.ZERO
+
+func _get_stump_variant() -> int:
+	return posmod(tree_id.hash(), STUMP_TEXTURES.size())
 
 func _get_region_rect(cell_index: int) -> Rect2:
 	var x: int = (cell_index % SHEET_COLUMNS) * CELL_SIZE

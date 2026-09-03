@@ -787,6 +787,62 @@ func _validate_foliage() -> void:
 		var texture := ResourceLoader.load(texture_path, "", ResourceLoader.CACHE_MODE_REPLACE) as Texture2D
 		if texture != null and texture.get_size() != Vector2(64, 64):
 			_fail("Grass decoration texture must be 64x64: %s." % texture_path)
+	for stump_number in range(1, 5):
+		var texture_path := "res://assets/foliage/t%dstump.png" % stump_number
+		_validate_texture(texture_path, "tree stump")
+		var texture := ResourceLoader.load(texture_path, "", ResourceLoader.CACHE_MODE_REPLACE) as Texture2D
+		if texture != null and texture.get_size() != Vector2(64, 96):
+			_fail("Tree stump texture must be 64x96: %s." % texture_path)
+
+	var tree_segment_scene := load("res://objects/tree_segment.tscn") as PackedScene
+	if tree_segment_scene != null:
+		var stump := tree_segment_scene.instantiate() as TreeSegment
+		stump.tree_id = "smoke_tree"
+		stump.piece_kind = "trunk"
+		stump.support_segment_name = ""
+		stump.hits_to_break = 7.0
+		stump.become_stump()
+		if stump.piece_kind != "stump" or not is_equal_approx(stump.get_hits_to_break(), 7.0):
+			_fail("A felled tree base must become a stump with the same chopping effort.")
+		if stump.drop_count != 1:
+			_fail("A chopped tree stump must yield exactly one log.")
+		if stump.solid_piece or not stump.get_solid_tile_offsets().is_empty():
+			_fail("Tree stumps must not block movement.")
+		if not is_equal_approx(stump.get_movement_slow_multiplier(), 1.5):
+			_fail("Tree stumps must apply the same movement slowdown as branches.")
+		if stump.get_visual_z_offset() >= Defs.Z_OFFSET_ITEMS:
+			_fail("Tree stumps must render behind dropped items.")
+		stump.free()
+
+	if scene_tree != null and tree_segment_scene != null:
+		var tree_root := Node2D.new()
+		tree_root.name = "SmokeTreeDropRoot"
+		var base := tree_segment_scene.instantiate() as TreeSegment
+		base.name = "Base"
+		base.tree_id = "smoke_drop_tree"
+		base.piece_kind = "trunk"
+		base.support_segment_name = ""
+		base.solid_piece = false
+		tree_root.add_child(base)
+		var upper := tree_segment_scene.instantiate() as TreeSegment
+		upper.name = "Upper"
+		upper.tree_id = base.tree_id
+		upper.piece_kind = "trunk"
+		upper.support_segment_name = base.name
+		upper.solid_piece = false
+		tree_root.add_child(upper)
+		World.add_child(tree_root)
+		for _roll in range(20):
+			var tree_payload := base.build_break_payload()
+			var tree_drops: Dictionary = tree_payload.get("drop_names", {})
+			var total_logs := 0
+			for path in tree_drops:
+				total_logs += (tree_drops[path] as Array).size()
+			if total_logs < 4 or total_logs > 5:
+				_fail("A fully felled tree must yield only four or five logs.")
+				break
+		World.remove_child(tree_root)
+		tree_root.free()
 	_validate_packed_scene("res://objects/bush.tscn", "runtime bush")
 
 # GAMEPLAY: clothing_offsets.json must parse and have a complete entry (all 4
@@ -1059,6 +1115,14 @@ func _validate_network_sync_behavior() -> void:
 	existing_obj.z_index = 25
 	existing_obj.contents = {"coins": 1}
 	existing_obj.decor_configs = {"ivy": false}
+	existing_obj.tree_id = "standing_tree"
+	existing_obj.piece_kind = "trunk"
+	existing_obj.support_segment_name = "lower_trunk"
+	existing_obj.hits_to_break = 9
+	existing_obj.drop_count = 2
+	existing_obj.atlas_index = 7
+	existing_obj.solid_piece = true
+	existing_obj.blocks_fov = true
 	main_node.add_child(existing_obj)
 	World.register_entity(existing_obj, "smoke:existing")
 
@@ -1074,6 +1138,14 @@ func _validate_network_sync_behavior() -> void:
 		"stored_balance": 42,
 		"contents": {"coins": 3},
 		"decor_configs": {"ivy": true},
+		"tree_id": "felled_tree",
+		"piece_kind": "stump",
+		"support_segment_name": "",
+		"hits_to_break": 5,
+		"drop_count": 1,
+		"atlas_index": 18,
+		"solid_piece": false,
+		"blocks_fov": false,
 	}
 	sync.handle_spawn_object_for_late_join(obj_data)
 
@@ -1087,6 +1159,17 @@ func _validate_network_sync_behavior() -> void:
 		_fail("LateJoinSync.handle_spawn_object_for_late_join: merchant balance was not restored.")
 	if existing_obj.contents.get("coins", -1) != 3:
 		_fail("LateJoinSync.handle_spawn_object_for_late_join: contents were not restored.")
+	if (
+		existing_obj.tree_id != "felled_tree"
+		or existing_obj.piece_kind != "stump"
+		or existing_obj.support_segment_name != ""
+		or existing_obj.hits_to_break != 5
+		or existing_obj.drop_count != 1
+		or existing_obj.atlas_index != 18
+		or existing_obj.solid_piece
+		or existing_obj.blocks_fov
+	):
+		_fail("LateJoinSync.handle_spawn_object_for_late_join: an existing felled tree base did not receive its authoritative stump state.")
 	if existing_obj.decor_configs.get("ivy", false) != true:
 		_fail("LateJoinSync.handle_spawn_object_for_late_join: decor configs were not restored.")
 	if existing_obj.rebuild_calls <= 0:

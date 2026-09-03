@@ -121,6 +121,20 @@ func handle_rpc_confirm_break_tree(tree_path: NodePath, break_payload: Dictionar
 			tree.perform_break(log_names)
 		LateJoin.unregister_object(piece_path)
 
+	# Tree drops from upper z-levels must finish their gravity calculation while
+	# every broken segment is non-solid. Re-enable a surviving stump only after
+	# all pieces have produced their drops, otherwise the stump catches later
+	# logs one floor above the player and they disappear on the next FOV refresh.
+	for raw_path in broken_paths:
+		var survivor_path := NodePath(String(raw_path))
+		var survivor = world.get_node_or_null(survivor_path)
+		if (
+			survivor != null
+			and not survivor.is_queued_for_deletion()
+			and survivor.has_method("set_solid_enabled")
+		):
+			survivor.call("set_solid_enabled", true)
+
 func handle_rpc_request_hit_breakable(sender_id: int, obj_path: NodePath) -> void:
 	if not world.multiplayer.is_server(): return
 	var obj = world.get_node_or_null(obj_path)

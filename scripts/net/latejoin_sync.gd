@@ -454,6 +454,10 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 				main_node.move_child(obj, child_index)
 
 	if obj != null:
+		# Runtime objects can already exist from deterministic scene setup (tree
+		# spawners are the important case). Apply authoritative construction state
+		# to those retained nodes too, not only to newly instantiated objects.
+		_apply_pre_add_object_state(obj, obj_data)
 		if obj_data.has("child_index"):
 			var desired_child_index: int = clampi(int(obj_data["child_index"]), 0, max(0, main_node.get_child_count() - 1))
 			main_node.move_child(obj, desired_child_index)
@@ -477,6 +481,13 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			obj.set("decor_configs", obj_data["decor_configs"].duplicate(true))
 			if obj.has_method("rebuild_decor"):
 				obj.call("rebuild_decor")
+		if obj_data.has("solid_piece") and obj.has_method("set_solid_enabled"):
+			obj.call("set_solid_enabled", bool(obj_data["solid_piece"]))
+		if (
+			(obj_data.has("piece_kind") or obj_data.has("atlas_index"))
+			and obj.has_method("_update_sprite")
+		):
+			obj.call("_update_sprite")
 		if obj_data.has("state"):
 			obj.set("state", obj_data["state"])
 			if obj.has_method("_update_sprite"):   obj.call("_update_sprite")
