@@ -286,6 +286,43 @@ class _SmokeCraftingRefreshStub:
 	func on_tile_pos_changed() -> void:
 		refresh_count += 1
 
+
+class _SmokeSleepPlayerStub:
+	extends Node2D
+
+	enum SleepState { AWAKE, FALLING_ASLEEP, ASLEEP, WAKING_UP }
+
+	var dead: bool = false
+	var combat_mode: bool = false
+	var is_lying_down: bool = false
+	var sleep_state: SleepState = SleepState.AWAKE
+	var sleep_timer: float = 0.0
+	var is_possessed: bool = true
+	var _sleeping_on_bed: bool = false
+	var _sleep_blackout: ColorRect = null
+	var health_regen_accumulator: float = 0.0
+	var health: int = 100
+	var body = null
+	var z_level: int = 3
+	var tile_pos: Vector2i = Vector2i.ZERO
+	var sprite_updates: int = 0
+
+	func _is_local_authority() -> bool:
+		return true
+
+	func toggle_combat_mode() -> void:
+		combat_mode = not combat_mode
+
+	func _update_sprite() -> void:
+		sprite_updates += 1
+
+	func _update_water_submerge() -> void:
+		pass
+
+	@rpc("any_peer", "call_remote", "reliable")
+	func _sync_sleep_state(_new_state: int) -> void:
+		pass
+
 func run() -> Dictionary:
 	var item_types := {}
 	var material_ids := {}
@@ -370,6 +407,10 @@ func run() -> Dictionary:
 	_validate_crafting_menu_refresh_stability()
 	_end_section()
 
+	_begin_section("gameplay: sleep transitions")
+	_validate_sleep_transitions()
+	_end_section()
+
 	_begin_section("net: resource patching")
 	_validate_resource_patching()
 	_end_section()
@@ -420,6 +461,42 @@ func _validate_crafting_menu_refresh_stability() -> void:
 		_fail("Player.tile_pos: replicated duplicate values refresh the crafting menu repeatedly.")
 
 	test_player.free()
+
+func _validate_sleep_transitions() -> void:
+	var sleeper := _SmokeSleepPlayerStub.new()
+	World.add_child(sleeper)
+	var sleep_system = preload("res://scripts/player/playersleep.gd").new(sleeper)
+
+	sleep_system.toggle_sleep()
+	if sleeper.sleep_state != sleeper.SleepState.FALLING_ASLEEP or not is_equal_approx(sleeper.sleep_timer, 5.0):
+		_fail("PlayerSleep: starting sleep must enter a five-second falling-asleep transition.")
+
+	sleep_system.update(4.9, true)
+	if sleeper.sleep_state != sleeper.SleepState.FALLING_ASLEEP:
+		_fail("PlayerSleep: the player became asleep before five seconds elapsed.")
+
+	sleep_system.toggle_sleep()
+	if sleeper.sleep_state != sleeper.SleepState.AWAKE or not is_zero_approx(sleeper.sleep_timer):
+		_fail("PlayerSleep: pressing sleep while falling asleep must wake the player immediately.")
+
+	sleep_system.toggle_sleep()
+	sleep_system.update(5.0, true)
+	if sleeper.sleep_state != sleeper.SleepState.ASLEEP:
+		_fail("PlayerSleep: the player did not become asleep after five seconds.")
+
+	sleep_system.toggle_sleep()
+	if sleeper.sleep_state != sleeper.SleepState.WAKING_UP or not is_equal_approx(sleeper.sleep_timer, 5.0):
+		_fail("PlayerSleep: waking from sleep must start a five-second transition.")
+
+	sleep_system.update(4.9, true)
+	if sleeper.sleep_state != sleeper.SleepState.WAKING_UP:
+		_fail("PlayerSleep: the player woke before five seconds elapsed.")
+
+	sleep_system.update(0.11, true)
+	if sleeper.sleep_state != sleeper.SleepState.AWAKE:
+		_fail("PlayerSleep: the player did not wake after five seconds.")
+
+	sleeper.free()
 
 # NEW: Automatically pull, scan and test EVERY scene in the project to catch _ready() crashes dynamically.
 func _validate_all_instantiations() -> void:

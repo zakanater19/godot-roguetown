@@ -338,14 +338,12 @@ func _sync_sleep_state(new_state: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()
 	if multiplayer.is_server():
-		if sender_id == get_multiplayer_authority():
-			sleep_state = new_state as SleepState
-			_set_lying_down_visuals(sleep_state != SleepState.AWAKE)
+		if sender_id == get_multiplayer_authority() and sleep_ != null and sleep_.is_valid_requested_transition(new_state):
+			sleep_.apply_sleep_state(new_state)
 			rpc("_sync_sleep_state", new_state)
 	else:
-		if sender_id == 1:
-			sleep_state = new_state as SleepState
-			_set_lying_down_visuals(sleep_state != SleepState.AWAKE)
+		if sender_id == 1 and sleep_ != null:
+			sleep_.apply_sleep_state(new_state)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_heal_limbs(amount: int) -> void: if body != null: body.heal_limbs(amount)

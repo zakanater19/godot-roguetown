@@ -2,6 +2,9 @@
 # Sleep, lying-down, and stand-up logic extracted from player.gd.
 extends RefCounted
 
+const FALL_ASLEEP_DURATION: float = 5.0
+const WAKE_UP_DURATION: float = 5.0
+
 var player: Node2D
 
 func _init(p_player: Node2D) -> void:
@@ -16,20 +19,36 @@ func toggle_sleep() -> void:
 	if player.sleep_state == player.SleepState.AWAKE:
 		if player.combat_mode: player.toggle_combat_mode()
 		if player.is_lying_down: toggle_lying_down()
-		player.sleep_state = player.SleepState.FALLING_ASLEEP
-		player.sleep_timer = 10.0
+		apply_sleep_state(player.SleepState.FALLING_ASLEEP)
 		Sidebar.add_message("[color=#aaccff]You start falling asleep...[/color]")
 		sync_sleep_state_update(player.sleep_state)
 	elif player.sleep_state == player.SleepState.FALLING_ASLEEP:
-		player.sleep_state = player.SleepState.AWAKE
-		player.sleep_timer = 0.0
+		apply_sleep_state(player.SleepState.AWAKE)
 		Sidebar.add_message("[color=#aaccff]You jolt awake.[/color]")
 		sync_sleep_state_update(player.sleep_state)
 	elif player.sleep_state == player.SleepState.ASLEEP:
-		player.sleep_state = player.SleepState.WAKING_UP
-		player.sleep_timer = 10.0
+		apply_sleep_state(player.SleepState.WAKING_UP)
 		Sidebar.add_message("[color=#aaccff]You start waking up...[/color]")
 		sync_sleep_state_update(player.sleep_state)
+
+func apply_sleep_state(new_state: int) -> void:
+	player.sleep_state = new_state
+	if new_state == player.SleepState.FALLING_ASLEEP:
+		player.sleep_timer = FALL_ASLEEP_DURATION
+	elif new_state == player.SleepState.WAKING_UP:
+		player.sleep_timer = WAKE_UP_DURATION
+	else:
+		player.sleep_timer = 0.0
+	set_lying_down_visuals(new_state != player.SleepState.AWAKE)
+
+func is_valid_requested_transition(new_state: int) -> bool:
+	if player.sleep_state == player.SleepState.AWAKE:
+		return new_state == player.SleepState.FALLING_ASLEEP
+	if player.sleep_state == player.SleepState.FALLING_ASLEEP:
+		return new_state == player.SleepState.AWAKE
+	if player.sleep_state == player.SleepState.ASLEEP:
+		return new_state == player.SleepState.WAKING_UP
+	return false
 
 func is_on_bed() -> bool:
 	for obj in player.get_tree().get_nodes_in_group("bed"):
@@ -39,7 +58,6 @@ func is_on_bed() -> bool:
 	return false
 
 func sync_sleep_state_update(new_state) -> void:
-	set_lying_down_visuals(new_state != player.SleepState.AWAKE)
 	if player.multiplayer.has_multiplayer_peer():
 		if player.multiplayer.is_server(): player.rpc("_sync_sleep_state", new_state)
 		else: player.rpc_id(1, "_sync_sleep_state", new_state)
@@ -129,20 +147,22 @@ func update(delta: float, is_local: bool) -> void:
 	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
 	if player.sleep_state != player.SleepState.AWAKE and not player.dead and player.is_possessed:
 		if player.sleep_state == player.SleepState.FALLING_ASLEEP:
-			if simulation_authority:
-				player.sleep_timer -= delta
+			if simulation_authority or is_local:
+				player.sleep_timer = maxf(player.sleep_timer - delta, 0.0)
 			if simulation_authority and player.sleep_timer <= 0.0:
-				player.sleep_state = player.SleepState.ASLEEP
+				apply_sleep_state(player.SleepState.ASLEEP)
 				player._sleeping_on_bed = is_on_bed()
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are now fast asleep.[/color]")
+				sync_sleep_state_update(player.sleep_state)
 		elif player.sleep_state == player.SleepState.WAKING_UP:
-			if simulation_authority:
-				player.sleep_timer -= delta
+			if simulation_authority or is_local:
+				player.sleep_timer = maxf(player.sleep_timer - delta, 0.0)
 			if simulation_authority and player.sleep_timer <= 0.0:
-				player.sleep_state = player.SleepState.AWAKE
+				apply_sleep_state(player.SleepState.AWAKE)
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are fully awake.[/color]")
+				sync_sleep_state_update(player.sleep_state)
 		elif player.sleep_state == player.SleepState.ASLEEP:
 			if simulation_authority:
 				var regen_rate = 4.0 if player._sleeping_on_bed else 2.0
@@ -163,6 +183,6 @@ func update(delta: float, is_local: bool) -> void:
 
 	if is_local and player._sleep_blackout != null:
 		if   player.sleep_state == player.SleepState.AWAKE:          player._sleep_blackout.color.a = 0.0
-		elif player.sleep_state == player.SleepState.FALLING_ASLEEP: player._sleep_blackout.color.a = clamp(1.0 - (player.sleep_timer / 10.0), 0.0, 1.0)
+		elif player.sleep_state == player.SleepState.FALLING_ASLEEP: player._sleep_blackout.color.a = clamp(1.0 - (player.sleep_timer / FALL_ASLEEP_DURATION), 0.0, 1.0)
 		elif player.sleep_state == player.SleepState.ASLEEP:         player._sleep_blackout.color.a = 1.0
-		elif player.sleep_state == player.SleepState.WAKING_UP:      player._sleep_blackout.color.a = 1.0 if player.sleep_timer > 2.0 else 0.0
+		elif player.sleep_state == player.SleepState.WAKING_UP:      player._sleep_blackout.color.a = clamp(player.sleep_timer / WAKE_UP_DURATION, 0.0, 1.0)
