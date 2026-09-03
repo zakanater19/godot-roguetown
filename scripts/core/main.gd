@@ -250,6 +250,8 @@ func _spawn_runtime_grass_decor() -> void:
 		_grass_decor_layers[z] = decor_layer
 
 		for cell in world_layer.get_used_cells_by_id(0, GRASS_FLOOR_ATLAS_COORDS):
+			if not Regions.allows_grass_decor_at(self, cell, z):
+				continue
 			if occupied_tiles[z].has(cell):
 				continue
 			var spawn_roll := posmod(_get_grass_decor_hash(cell, z, 0), 10000)

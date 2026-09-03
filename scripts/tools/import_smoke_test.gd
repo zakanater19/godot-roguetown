@@ -757,6 +757,21 @@ func _validate_regions() -> void:
 	elif absf(region_image.get_pixel(10, 10).a - 0.4) > 0.02:
 		_fail("Town region texture must render at 40% opacity.")
 
+	var test_root := Node2D.new()
+	var test_layer := TileMapLayer.new()
+	test_layer.name = Regions.REGION_LAYER_PREFIX + "3"
+	test_layer.tile_set = region_tileset
+	test_root.add_child(test_layer)
+	var town_cell := Vector2i(2, 3)
+	test_layer.set_cell(town_cell, 0, Vector2i.ZERO)
+	if Regions.get_region_at(test_root, town_cell, 3) != Regions.TOWN:
+		_fail("Town region lookup did not resolve the painted town cell.")
+	if Regions.allows_grass_decor_at(test_root, town_cell, 3):
+		_fail("Town regions must reject grass decoration placement.")
+	if not Regions.allows_grass_decor_at(test_root, town_cell + Vector2i.RIGHT, 3):
+		_fail("Unpainted cells must allow grass decoration placement.")
+	test_root.free()
+
 # GAMEPLAY: clothing_offsets.json must parse and have a complete entry (all 4
 # directions, valid offset array and positive scale) for every item_type key.
 func _validate_clothing_offsets() -> void:
