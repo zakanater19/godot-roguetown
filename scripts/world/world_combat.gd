@@ -6,14 +6,14 @@ var world: Node
 func _init(p_world: Node) -> void:
 	world = p_world
 
-func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_sword_attack: bool) -> Dictionary:
+func calculate_combat_roll(attacker: Combatant, defender: Combatant, base_amount: int, is_sword_attack: bool) -> Dictionary:
 	var result = {"damage": base_amount, "blocked": false, "block_type": ""}
 	if defender == null or world.utils.is_ghost(defender):
 		return {"damage": 0, "blocked": false, "block_type": ""}
 	if not defender.is_in_group("player"): return result
 	var d_has_sword = false
-	if "hands" in defender and defender.get("hands") != null:
-		for h in defender.get("hands"):
+	if defender.hands != null:
+		for h in defender.hands:
 			if h != null:
 				var i_type = h.get("item_type")
 				if i_type != null:
@@ -23,30 +23,30 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 						break
 	var a_skill = 0
 	if attacker != null and attacker.is_in_group("player") and is_sword_attack:
-		if "skills" in attacker: a_skill = attacker.get("skills").get("sword_fighting", 0)
-	var d_stance: String = defender.get("combat_stance") if defender.get("combat_stance") != null else "dodge"
+		a_skill = attacker.skills.get("sword_fighting", 0)
+	var d_stance: String = defender.combat_stance
 	var avoidance_chance = 0.0
 	var valid_dodge_tiles =[]
 	var can_defend = true
-	if "stamina" in defender and defender.get("stamina") < CombatDefs.STAMINA_MIN_TO_DEFEND: can_defend = false
-	if "exhausted" in defender and defender.get("exhausted"): can_defend = false
-	if "grabbed_by" in defender and defender.get("grabbed_by") != null and is_instance_valid(defender.get("grabbed_by")): can_defend = false
+	if defender.stamina < CombatDefs.STAMINA_MIN_TO_DEFEND: can_defend = false
+	if defender.exhausted: can_defend = false
+	if defender.grabbed_by != null and is_instance_valid(defender.grabbed_by): can_defend = false
 	
 	# Corpses (dead or unpossessed) cannot defend
-	if defender.get("dead") == true or defender.get("is_possessed") == false: can_defend = false
+	if defender.dead or not defender.is_possessed: can_defend = false
 	
 	if can_defend:
 		if d_stance == "parry" and d_has_sword:
 			var d_skill = 0
-			if "skills" in defender: d_skill = defender.get("skills").get("sword_fighting", 0)
+			d_skill = defender.skills.get("sword_fighting", 0)
 			avoidance_chance = clamp(float(d_skill - a_skill) * CombatDefs.PARRY_AVOIDANCE_SCALE, 0.0, CombatDefs.PARRY_AVOIDANCE_MAX)
 			result.block_type = "parried"
 		else:
 			for dir in[Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-				var check_tile = defender.get("tile_pos") + dir
+				var check_tile = defender.tile_pos + dir
 				if check_tile.x < 0 or check_tile.x >= world.GRID_WIDTH or check_tile.y < 0 or check_tile.y >= world.GRID_HEIGHT: continue
-				if world.tiles.is_solid(check_tile, defender.get("z_level")): continue
-				var occupants = world.utils.get_entities_at_tile(check_tile, defender.get("z_level"))
+				if world.tiles.is_solid(check_tile, defender.z_level): continue
+				var occupants = world.utils.get_entities_at_tile(check_tile, defender.z_level)
 				var blocked = false
 				for ent in occupants:
 					if world.utils.is_tangible_player(ent):
@@ -57,18 +57,17 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 				avoidance_chance = 0.0
 				result.block_type = ""
 			else:
-				var d_agility = 10
-				if "stats" in defender: d_agility = defender.get("stats").get("agility", 10)
+				var d_agility = defender.stats.get("agility", 10)
 				avoidance_chance = clamp((d_agility - 10) * CombatDefs.DODGE_AGILITY_SCALE + CombatDefs.DODGE_BASE_CHANCE, 0.0, CombatDefs.DODGE_AVOIDANCE_MAX)
 				result.block_type = "dodged"
 				
 	if attacker != null and (attacker.is_in_group("player") or attacker.is_in_group("npc")):
-		var diff = attacker.get("tile_pos") - defender.get("tile_pos")
+		var diff = attacker.tile_pos - defender.tile_pos
 		var attack_dir = -1
 		if abs(diff.x) > abs(diff.y): attack_dir = 2 if diff.x > 0 else 3
 		elif abs(diff.x) < abs(diff.y) or diff.y != 0: attack_dir = 0 if diff.y > 0 else 1
 		if attack_dir != -1:
-			var d_facing = defender.get("facing") if defender.get("facing") != null else 0
+			var d_facing = defender.facing
 			if attack_dir == d_facing: avoidance_chance *= 1.0
 			else:
 				var is_back = false
@@ -77,7 +76,7 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 				elif d_facing == 2 and attack_dir == 3: is_back = true
 				elif d_facing == 3 and attack_dir == 2: is_back = true
 				if is_back:
-					if not defender.get("combat_mode"): avoidance_chance = 0.0
+					if not defender.combat_mode: avoidance_chance = 0.0
 					else: avoidance_chance *= CombatDefs.BACK_ATTACK_AVOIDANCE_MULT
 				else: avoidance_chance *= CombatDefs.SIDE_ATTACK_AVOIDANCE_MULT
 				
@@ -91,12 +90,14 @@ func calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_
 
 func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id: int = 0, is_sword_attack: bool = false) -> Dictionary:
 	var results = {}
-	var attacker = world.utils.find_player_by_peer(attacker_id)
+	var attacker := world.utils.find_player_by_peer(attacker_id) as Combatant
 	var entities = world.utils.get_entities_at_tile(tile, z_level, attacker_id)
 	for entity in entities:
 		if world.utils.is_ghost(entity):
 			continue
-		var roll = calculate_combat_roll(attacker, entity, amount, is_sword_attack)
+		var roll = {"damage": amount, "blocked": false, "block_type": ""}
+		if entity is Combatant:
+			roll = calculate_combat_roll(attacker, entity as Combatant, amount, is_sword_attack)
 		results[entity] = roll
 		if roll.damage > 0:
 			if entity.is_in_group("player"):
@@ -223,7 +224,9 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 	for entity in entities:
 		if world.utils.is_ghost(entity):
 			continue
-		var roll = calculate_combat_roll(attacker, entity, amount, is_sword)
+		var roll = {"damage": amount, "blocked": false, "block_type": ""}
+		if entity is Combatant:
+			roll = calculate_combat_roll(attacker as Combatant, entity as Combatant, amount, is_sword)
 		var t_name = ""
 		if entity.is_in_group("player"):
 			t_name = (entity as Node2D).get("character_name")

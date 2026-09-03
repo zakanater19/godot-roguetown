@@ -1,5 +1,5 @@
 # res://npcs/spider.gd
-extends Node2D
+extends Combatant
 
 const MOVE_TIME:       float = 0.5
 const DETECTION_RANGE: int   = 8
@@ -11,37 +11,33 @@ const WANDER_INTERVAL: float = 10.0
 
 const BloodSpray = preload("res://npcs/blood_spray.gd")
 
-@export var z_level: int = 3
 var blocks_fov: bool = false
 
 var health:       int   = 80
-var dead: bool = false :
-	set(val):
-		dead = val
-		if dead:
-			# Unregister from solid grid and flip to dead sprite on all peers
-			World.unregister_solid(tile_pos, z_level, self)
-			var sprite: Sprite2D = get_node_or_null("Sprite2D")
-			if sprite != null:
-				sprite.region_rect = Rect2(128, 0, 64, 64)
-				sprite.flip_v = true
-
-var tile_pos:     Vector2i
 var pixel_pos:    Vector2
 var moving:       bool  = false
 var move_elapsed: float = 0.0
 var move_from:    Vector2
 var move_to:      Vector2
-var facing: int = 0 :
-	set(val):
-		facing = val
-		_update_sprite()
 var attack_timer: float = 0.0
 var move_timer:   float = 0.0
 var wander_timer: float = 0.0
 
 var ai_timer: float = 0.0
-var current_target: Node2D = null
+var current_target: Combatant = null
+
+func _on_facing_changed() -> void:
+	_update_sprite()
+
+func _on_dead_changed() -> void:
+	if not dead:
+		return
+	# Unregister from solid grid and flip to dead sprite on all peers.
+	World.unregister_solid(tile_pos, z_level, self)
+	var sprite: Sprite2D = get_node_or_null("Sprite2D")
+	if sprite != null:
+		sprite.region_rect = Rect2(128, 0, 64, 64)
+		sprite.flip_v = true
 
 func get_description() -> String:
 	if dead:
@@ -167,14 +163,17 @@ func _find_target() -> void:
 	var min_dist = INF
 	current_target = null
 
-	for p in players:
+	for node in players:
+		if not node is Combatant:
+			continue
+		var p := node as Combatant
 		if p.dead or p.z_level != z_level or p.get("is_ghost") == true: continue
 		var d = (p.tile_pos - tile_pos).length_squared()
 		if d < min_dist:
 			min_dist = d
 			current_target = p
 
-func _attack_player(player: Node) -> void:
+func _attack_player(player: Combatant) -> void:
 	attack_timer = ATTACK_COOLDOWN
 	
 	var roll = World._calculate_combat_roll(self, player, ATTACK_DAMAGE, false)
@@ -192,7 +191,7 @@ func _attack_player(player: Node) -> void:
 	var target_name: String = player.character_name
 	World.rpc_broadcast_damage_log.rpc("Spider", target_name, roll.damage, tile_pos, z_level, roll.blocked, false, "", roll.get("block_type", ""))
 
-func _move_toward_player(player: Node) -> void:
+func _move_toward_player(player: Combatant) -> void:
 	var path: Array[Vector2i] = World.find_path(tile_pos, player.tile_pos, z_level)
 
 	if path.size() > 0:

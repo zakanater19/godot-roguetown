@@ -277,6 +277,15 @@ class _SmokeTableStub:
 
 	var z_level: int = 3
 
+
+class _SmokeCraftingRefreshStub:
+	extends RefCounted
+
+	var refresh_count: int = 0
+
+	func on_tile_pos_changed() -> void:
+		refresh_count += 1
+
 func run() -> Dictionary:
 	var item_types := {}
 	var material_ids := {}
@@ -357,6 +366,10 @@ func run() -> Dictionary:
 	await _validate_player_object_interactions()
 	_end_section()
 
+	_begin_section("gameplay: crafting menu stability")
+	_validate_crafting_menu_refresh_stability()
+	_end_section()
+
 	_begin_section("net: resource patching")
 	_validate_resource_patching()
 	_end_section()
@@ -386,6 +399,27 @@ func _end_section() -> void:
 		"errors": _errors.size() - _section_error_start,
 	})
 	_section_name = ""
+
+func _validate_crafting_menu_refresh_stability() -> void:
+	var test_player := Player.new()
+	var crafting_stub := _SmokeCraftingRefreshStub.new()
+	test_player.crafting = crafting_stub
+
+	# Replication mode ALWAYS can assign an unchanged tile repeatedly. Those
+	# assignments must not rebuild the crafting panel and replace its buttons.
+	test_player.tile_pos = Vector2i.ZERO
+	if crafting_stub.refresh_count != 0:
+		_fail("Player.tile_pos: unchanged assignments refresh the crafting menu.")
+
+	test_player.tile_pos = Vector2i.RIGHT
+	if crafting_stub.refresh_count != 1:
+		_fail("Player.tile_pos: a real tile transition did not refresh the crafting menu once.")
+
+	test_player.tile_pos = Vector2i.RIGHT
+	if crafting_stub.refresh_count != 1:
+		_fail("Player.tile_pos: replicated duplicate values refresh the crafting menu repeatedly.")
+
+	test_player.free()
 
 # NEW: Automatically pull, scan and test EVERY scene in the project to catch _ready() crashes dynamically.
 func _validate_all_instantiations() -> void:

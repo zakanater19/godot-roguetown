@@ -328,7 +328,7 @@ func handle_runtime_tile_change(tile_pos: Vector2i, z_level: int, source_id: int
 	if multiplayer.has_multiplayer_peer() and multiplayer.is_server():
 		LateJoin.register_grass_cut(tile_pos, z_level)
 
-func _calculate_combat_roll(attacker: Node, defender: Node, base_amount: int, is_sword_attack: bool) -> Dictionary:
+func _calculate_combat_roll(attacker: Combatant, defender: Combatant, base_amount: int, is_sword_attack: bool) -> Dictionary:
 	return combat.calculate_combat_roll(attacker, defender, base_amount, is_sword_attack)
 
 func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id: int = 0, is_sword_attack: bool = false) -> Dictionary:

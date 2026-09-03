@@ -1,5 +1,6 @@
 # res://scripts/core/player.gd
-extends Node2D
+class_name Player
+extends Combatant
 
 const MOVE_TIME:   float = PlayerDefs.MOVE_TIME
 const THROW_TILES:    int   = PlayerDefs.THROW_TILES
@@ -25,8 +26,6 @@ var input    = null
 var inspect  = null
 
 # ── State ─────────────────────────────────────────────────────────────────────
-var is_possessed: bool = true
-
 enum SleepState { AWAKE, FALLING_ASLEEP, ASLEEP, WAKING_UP }
 var sleep_state: SleepState = SleepState.AWAKE
 var sleep_timer: float = 0.0
@@ -38,18 +37,7 @@ var _sleeping_on_bed: bool = false
 
 @export var character_name: String = "noob"
 @export var character_class: String = "peasant"
-@export var z_level: int = 3
 var view_z_level: int = 3
-
-var tile_pos: Vector2i = Vector2i.ZERO :
-	set(val):
-		var diff := (val - tile_pos).abs()
-		tile_pos = val
-		if diff.x > 1 or diff.y > 1:
-			pixel_pos = World.tile_to_pixel(val)
-			position = pixel_pos
-		if misc != null:    misc.on_tile_pos_changed()
-		if crafting != null: crafting.on_tile_pos_changed()
 
 var pixel_pos:    Vector2
 var moving:       bool    = false
@@ -57,17 +45,11 @@ var move_elapsed: float   = 0.0
 var move_from:    Vector2
 var move_to:      Vector2
 var current_move_duration: float = MOVE_TIME
-var facing:       int     = 0 :
-	set(val):
-		facing = val
-		_update_sprite()
 var action_cooldown: float    = 0.0
 var buffered_dir:    Vector2i = Vector2i.ZERO
 var camera:          Camera2D = null
 
 var intent: String = "help"
-var combat_mode: bool = false
-var combat_stance: String = "dodge"
 var _awaiting_move_confirm: bool = false
 var _predicted_move_active: bool = false
 var _predicted_move_tile: Vector2i = Vector2i.ZERO
@@ -78,15 +60,6 @@ var _stand_up_timer: float = -1.0
 @warning_ignore("unused_private_class_variable")
 var _stand_up_label: Label = null
 
-var exhausted: bool = false :
-	set(val):
-		if exhausted != val:
-			exhausted = val
-			if is_inside_tree():
-				_update_water_submerge()
-
-var skills: Dictionary = {"sword_fighting": 0, "blacksmithing": 0, "sneaking": 0}
-
 var is_sneaking: bool = false
 var sneak_alpha: float = 1.0
 @warning_ignore("unused_private_class_variable")
@@ -94,19 +67,11 @@ var _last_synced_sneak_alpha: float = 1.0
 @warning_ignore("unused_private_class_variable")
 var _sneak_was_hidden: bool = false
 var prices_shown: bool = false
-var stats: Dictionary = {"strength": 10, "agility": 10}
 var health: int = PlayerDefs.DEFAULT_HEALTH
-var stamina: float = CombatDefs.STAMINA_MAX
 var max_stamina: float = CombatDefs.STAMINA_MAX
 var last_exertion_time: float = 0.0
 var _blood_drip_timer: float = 0.0
 
-var dead: bool = false :
-	set(val):
-		dead = val
-		if dead: _die_visuals()
-
-var hands:        Array[Node] = [null, null]
 var active_hand:  int         = 0
 @warning_ignore("unused_private_class_variable")
 var _is_throwing: bool        = false
@@ -138,8 +103,28 @@ const DRAG_THRESHOLD: float   = PlayerDefs.DRAG_THRESHOLD
 var _dragging_player: Node = null
 
 var grabbed_target: Node = null
-var grabbed_by:     Node = null
 var grab_hand_idx:  int  = -1
+
+func _on_tile_pos_changed(previous: Vector2i, value: Vector2i) -> void:
+	var diff := (value - previous).abs()
+	if diff.x > 1 or diff.y > 1:
+		pixel_pos = World.tile_to_pixel(value)
+		position = pixel_pos
+	if misc != null:
+		misc.on_tile_pos_changed()
+	if crafting != null:
+		crafting.on_tile_pos_changed()
+
+func _on_facing_changed() -> void:
+	_update_sprite()
+
+func _on_exhausted_changed() -> void:
+	if is_inside_tree():
+		_update_water_submerge()
+
+func _on_dead_changed() -> void:
+	if dead:
+		_die_visuals()
 
 # ── Character name sync ───────────────────────────────────────────────────────
 
