@@ -20,7 +20,19 @@ func can_player_interact(player: Node) -> bool:
 func is_tangible_player(entity: Node) -> bool:
 	return entity != null and is_instance_valid(entity) and entity.is_in_group("player") and not is_ghost(entity) and entity.get("dead") != true and not (entity.get("is_lying_down") == true or entity.get("sleep_state") != 0)
 
-func server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool:
+func server_consume_stamina(player: Node, amount: float) -> bool:
+	if player == null or amount <= 0.0:
+		return true
+	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+		return false
+	if bool(player.get("exhausted")):
+		return false
+	# Match the existing "one last effort" behavior: an action is accepted when
+	# stamina is low, but that action exhausts the player on the server.
+	player.rpc_consume_stamina(amount)
+	return true
+
+func server_check_action_cooldown(player: Node, is_attack: bool = false, stamina_cost: float = 0.0) -> bool:
 	var current_time = Time.get_ticks_msec()
 	var peer_id = player.get_multiplayer_authority()
 	var next_allowed = world.server_action_cooldowns.get(peer_id, 0)
@@ -30,6 +42,8 @@ func server_check_action_cooldown(player: Node, is_attack: bool = false) -> bool
 	if held_item != null and held_item.has_method("get_use_delay"): delay = held_item.get_use_delay()
 	if is_attack and delay < CombatDefs.MIN_ATTACK_DELAY: delay = CombatDefs.MIN_ATTACK_DELAY
 	if player.exhausted: delay *= CombatDefs.EXHAUSTED_DELAY_MULT
+	if stamina_cost > 0.0 and not server_consume_stamina(player, stamina_cost):
+		return false
 	world.server_action_cooldowns[peer_id] = current_time + int(delay * 1000)
 	return true
 

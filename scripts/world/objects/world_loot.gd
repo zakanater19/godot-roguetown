@@ -37,15 +37,17 @@ func handle_rpc_request_loot_item(sender_id: int, target_id: String, looter_peer
 		var idx: int  = int(slot_index)
 		var obj: Node = target.hands[idx]
 		if obj == null or not is_instance_valid(obj): return
-		world.rpc_drop_item_at.rpc(target.get_multiplayer_authority(), world.get_entity_id(obj), drop_tile, SPREAD, idx)
+		world.objects.server_drop_item_at(target.get_multiplayer_authority(), world.get_entity_id(obj), drop_tile, SPREAD, idx, target.z_level)
 	elif slot_type == "equip":
 		var equip_slot: String = str(slot_index)
 		var item_name: String  = target.equipped.get(equip_slot, "")
 		if item_name == "": return
 		var new_entity_id: String = world._make_entity_id("loot")
-		world.rpc_confirm_loot_unequip_drop.rpc(target_id, equip_slot, new_entity_id, drop_tile, SPREAD)
+		var land_z: int = world.calculate_gravity_z(drop_tile, target.z_level)
+		var drop_position: Vector2 = world.objects.make_authoritative_drop_position(drop_tile, SPREAD)
+		world.rpc_confirm_loot_unequip_drop.rpc(target_id, equip_slot, new_entity_id, drop_position, land_z)
 
-func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_tile: Vector2i, spread: float) -> void:
+func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_position: Vector2, land_z: int) -> void:
 	var target: Node2D = world.get_entity(target_id) as Node2D
 	if target == null: return
 	var item_name: String = target.equipped.get(equip_slot, "")
@@ -64,9 +66,7 @@ func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String,
 			target._hud.update_clothing_display(target.equipped, target.equipped_data)
 
 	var item: Node2D = scene.instantiate()
-	item.position    = world.utils.tile_to_pixel(drop_tile)
-
-	var land_z = world.calculate_gravity_z(drop_tile, target.z_level)
+	item.position = drop_position
 	item.set("z_level", land_z)
 
 	if "equipped_data" in target and target.equipped_data.get(equip_slot) != null:
@@ -85,6 +85,6 @@ func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String,
 	if item.has_method("_update_sprite"):
 		item._update_sprite()
 	world.register_entity(item, new_entity_id)
-	world.objects.drop_item_at(item, drop_tile, spread)
+	item.global_position = drop_position
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = false

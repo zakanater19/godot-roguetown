@@ -336,6 +336,9 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
 	objects.drop_item_at(obj, tile, spread)
 
+func server_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int, source_z: int = -1) -> void:
+	objects.server_drop_item_at(player_peer_id, item_id, tile, spread, hand_index, source_z)
+
 func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
 	return physics.calculate_gravity_z(tile_pos, current_z)
 
@@ -456,7 +459,7 @@ func rpc_request_cut_grass(tile_pos: Vector2i, z_level: int) -> void:
 		return
 	if not has_runtime_grass_decor_at(tile_pos, z_level):
 		return
-	if not utils.server_check_action_cooldown(player):
+	if not utils.server_check_action_cooldown(player, false, 5.0):
 		return
 	LateJoin.register_grass_cut(tile_pos, z_level)
 	rpc_confirm_cut_grass.rpc(tile_pos, z_level)
@@ -800,8 +803,8 @@ func rpc_request_drop(item_id: String, tile: Vector2i, spread: float, hand_index
 	objects.handle_rpc_request_drop(sender_id, item_id, tile, spread, hand_index)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:
-	objects.handle_rpc_drop_item_at(player_peer_id, item_id, tile, spread, hand_index)
+func rpc_drop_item_at(player_peer_id: int, item_id: String, drop_position: Vector2, land_z: int, hand_index: int) -> void:
+	objects.handle_rpc_drop_item_at(player_peer_id, item_id, drop_position, land_z, hand_index)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_throw(item_id: String, hand_index: int, dir: Vector2, throw_range: int, interaction_z: int) -> void:
@@ -810,8 +813,8 @@ func rpc_request_throw(item_id: String, hand_index: int, dir: Vector2, throw_ran
 	objects.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range, interaction_z)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, travel_z: int, land_z: int) -> void:
-	objects.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_pixel, travel_z, land_z)
+func rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_tile: Vector2i, final_position: Vector2, travel_z: int, land_z: int) -> void:
+	objects.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_tile, final_position, travel_z, land_z)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_send_chat(message: String) -> void:
@@ -885,8 +888,8 @@ func rpc_request_loot_item(target_id: String, looter_peer_id: int, slot_type: St
 	objects.handle_rpc_request_loot_item(sender_id, target_id, looter_peer_id, slot_type, slot_index)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_tile: Vector2i, spread: float) -> void:
-	objects.handle_rpc_confirm_loot_unequip_drop(target_id, equip_slot, new_entity_id, drop_tile, spread)
+func rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_position: Vector2, land_z: int) -> void:
+	objects.handle_rpc_confirm_loot_unequip_drop(target_id, equip_slot, new_entity_id, drop_position, land_z)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
@@ -895,8 +898,8 @@ func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 	objects.handle_rpc_request_craft(sender_id, looter_peer_id, recipe_id)
 
 @rpc("authority", "call_local", "reliable")
-func rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_tile: Vector2i) -> void:
-	objects.handle_rpc_confirm_craft_item(peer_id, consumed_paths, scene_path, result_name, drop_tile)
+func rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_position: Vector2, land_z: int) -> void:
+	objects.handle_rpc_confirm_craft_item(peer_id, consumed_paths, scene_path, result_name, drop_position, land_z)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:

@@ -331,9 +331,23 @@ func handle_rpc_request_drop(sender_id: int, item_id: String, tile: Vector2i, sp
 	var item = world.get_entity(item_id)
 	if item == null or player.hands[hand_index] != item: return
 	if not Defs.is_within_tile_reach(player.tile_pos, tile): return
-	world.rpc_drop_item_at.rpc(sender_id, item_id, tile, spread, hand_index)
+	broadcast_authoritative_drop(sender_id, item_id, tile, spread, hand_index, player.z_level)
 
-func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:
+func broadcast_authoritative_drop(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int, source_z: int = -1) -> void:
+	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+		return
+	var obj: Node = world.get_entity(item_id)
+	if obj == null:
+		return
+	var resolved_source_z := source_z
+	if resolved_source_z < 1:
+		var player: Node = world.utils.find_player_by_peer(player_peer_id)
+		resolved_source_z = int(player.get("z_level")) if player != null else int(obj.get("z_level"))
+	var land_z: int = world.calculate_gravity_z(tile, resolved_source_z)
+	var drop_position: Vector2 = world.objects.make_authoritative_drop_position(tile, spread)
+	world.rpc_drop_item_at.rpc(player_peer_id, item_id, drop_position, land_z, hand_index)
+
+func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, drop_position: Vector2, land_z: int, hand_index: int) -> void:
 	var obj: Node = world.get_entity(item_id)
 	var player: Node2D = _find_hand_holder(obj, hand_index, player_peer_id)
 	if player != null:
@@ -346,11 +360,10 @@ func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2
 		sprite.rotation_degrees = 0.0
 		sprite.scale = Vector2(abs(sprite.scale.x), abs(sprite.scale.y))
 
-	var land_z = world.calculate_gravity_z(tile, player.z_level if player else obj.get("z_level"))
-	world.rpc_set_object_z_level.rpc(item_id, land_z)
+	obj.set("z_level", land_z)
 	obj.z_index = Defs.get_z_index(land_z, Defs.Z_OFFSET_ITEMS)
 
-	world.objects.drop_item_at(obj, tile, spread)
+	obj.global_position = drop_position
 	for child in obj.get_children():
 		if child is CollisionShape2D: child.disabled = false
 
@@ -369,10 +382,10 @@ func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, 
 	var land_tile = world.utils.cast_throw(player.tile_pos, player.pixel_pos, requested_z, dir, safe_range)
 	var travel_z = requested_z
 	var land_z = world.calculate_gravity_z(land_tile, travel_z)
-	var land_pixel = world.utils.tile_to_pixel(land_tile)
-	world.rpc_confirm_throw.rpc(sender_id, item_id, hand_index, land_pixel, travel_z, land_z)
+	var final_position: Vector2 = world.objects.make_authoritative_drop_position(land_tile, player.DROP_SPREAD)
+	world.rpc_confirm_throw.rpc(sender_id, item_id, hand_index, land_tile, final_position, travel_z, land_z)
 
-func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, travel_z: int, land_z: int) -> void:
+func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_tile: Vector2i, final_position: Vector2, travel_z: int, land_z: int) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 	var obj    = world.get_entity(item_id)
 	if player == null or obj == null: return
@@ -386,10 +399,8 @@ func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, la
 	if sprite != null:
 		sprite.rotation_degrees = 0.0
 		sprite.scale = Vector2(abs(sprite.scale.x), abs(sprite.scale.y))
-	var spread_offset := Vector2(randf_range(-player.DROP_SPREAD, player.DROP_SPREAD), randf_range(-player.DROP_SPREAD, player.DROP_SPREAD))
-	var final_pos := land_pixel + spread_offset
 	var tween = world.get_tree().create_tween()
-	tween.tween_property(obj, "global_position", final_pos, player.THROW_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(obj, "global_position", final_position, player.THROW_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(func():
 		if player and player._is_local_authority(): player._is_throwing = false
 
@@ -399,12 +410,11 @@ func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, la
 		for child in obj.get_children():
 			if child is CollisionShape2D: child.disabled = false
 		if world.multiplayer.is_server():
-			var land_tile_check = Vector2i(int(land_pixel.x / world.TILE_SIZE), int(land_pixel.y / world.TILE_SIZE))
 			var dmg = player._get_weapon_damage(obj) if player else 0
 			var attacker_p    := world.utils.find_player_by_peer(peer_id) as Node2D
-			var src_tile: Vector2i = attacker_p.tile_pos if attacker_p != null else land_tile_check
-			var hit_results = world.combat.deal_damage_at_tile(land_tile_check, travel_z, dmg, peer_id, false)
-			var throw_targets = world.utils.get_entities_at_tile(land_tile_check, travel_z, peer_id)
+			var src_tile: Vector2i = attacker_p.tile_pos if attacker_p != null else land_tile
+			var hit_results = world.combat.deal_damage_at_tile(land_tile, travel_z, dmg, peer_id, false)
+			var throw_targets = world.utils.get_entities_at_tile(land_tile, travel_z, peer_id)
 			for entity in throw_targets:
 				if world.utils.is_ghost(entity):
 					continue

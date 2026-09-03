@@ -227,19 +227,9 @@ func _build_tileset() -> void:
 			tm.tile_set = ts
 
 func _spawn_runtime_foliage() -> void:
-	if not _grass_decor_layers.is_empty():
+	_ensure_runtime_grass_layers()
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
 		return
-
-	var decor_tileset := TileSet.new()
-	decor_tileset.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-
-	var decor_atlas := TileSetAtlasSource.new()
-	decor_atlas.resource_name = "Runtime Grass Decorations"
-	decor_atlas.texture = _compose_atlas_texture(GRASS_DECOR_TILE_PATHS)
-	decor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
-	for i in GRASS_DECOR_TILE_PATHS.size():
-		decor_atlas.create_tile(Vector2i(i, 0))
-	decor_tileset.add_source(decor_atlas, 0)
 
 	var occupied_tiles := _collect_runtime_occupied_tiles()
 
@@ -248,14 +238,9 @@ func _spawn_runtime_foliage() -> void:
 		if world_layer == null:
 			continue
 
-		var decor_layer := TileMapLayer.new()
-		decor_layer.name = "RuntimeGrassDecor_Z" + str(z)
-		decor_layer.tile_set = decor_tileset
-		decor_layer.z_as_relative = false
-		decor_layer.z_index = Defs.get_z_index(z, GRASS_DECOR_Z_OFFSET)
-		decor_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(decor_layer)
-		_grass_decor_layers[z] = decor_layer
+		var decor_layer := _grass_decor_layers.get(z) as TileMapLayer
+		if decor_layer == null:
+			continue
 
 		for cell in world_layer.get_used_cells_by_id(0, GRASS_FLOOR_ATLAS_COORDS):
 			if occupied_tiles[z].has(cell):
@@ -276,6 +261,64 @@ func _spawn_runtime_foliage() -> void:
 			var variant := posmod(_get_foliage_hash(cell, z, 1), GRASS_DECOR_TILE_PATHS.size())
 			decor_layer.set_cell(cell, 0, Vector2i(variant, 0))
 
+func _ensure_runtime_grass_layers() -> void:
+	if not _grass_decor_layers.is_empty():
+		return
+
+	var decor_tileset := TileSet.new()
+	decor_tileset.tile_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+	var decor_atlas := TileSetAtlasSource.new()
+	decor_atlas.resource_name = "Runtime Grass Decorations"
+	decor_atlas.texture = _compose_atlas_texture(GRASS_DECOR_TILE_PATHS)
+	decor_atlas.texture_region_size = Vector2i(World.TILE_SIZE, World.TILE_SIZE)
+	for i in GRASS_DECOR_TILE_PATHS.size():
+		decor_atlas.create_tile(Vector2i(i, 0))
+	decor_tileset.add_source(decor_atlas, 0)
+
+	for z in range(1, 6):
+		var decor_layer := TileMapLayer.new()
+		decor_layer.name = "RuntimeGrassDecor_Z" + str(z)
+		decor_layer.tile_set = decor_tileset
+		decor_layer.z_as_relative = false
+		decor_layer.z_index = Defs.get_z_index(z, GRASS_DECOR_Z_OFFSET)
+		decor_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(decor_layer)
+		_grass_decor_layers[z] = decor_layer
+
+func capture_runtime_grass_snapshot() -> Array:
+	_ensure_runtime_grass_layers()
+	var snapshot: Array = []
+	for z in range(1, 6):
+		var decor_layer := _grass_decor_layers.get(z) as TileMapLayer
+		if decor_layer == null:
+			continue
+		for cell in decor_layer.get_used_cells():
+			snapshot.append({
+				"tile_pos": cell,
+				"z_level": z,
+				"variant": decor_layer.get_cell_atlas_coords(cell).x,
+			})
+	return snapshot
+
+func apply_runtime_grass_snapshot(snapshot: Array) -> void:
+	_ensure_runtime_grass_layers()
+	for z in range(1, 6):
+		var decor_layer := _grass_decor_layers.get(z) as TileMapLayer
+		if decor_layer != null:
+			decor_layer.clear()
+	for raw_entry in snapshot:
+		if not (raw_entry is Dictionary):
+			continue
+		var entry: Dictionary = raw_entry
+		var z := clampi(int(entry.get("z_level", 3)), 1, 5)
+		var decor_layer := _grass_decor_layers.get(z) as TileMapLayer
+		if decor_layer != null:
+			decor_layer.set_cell(
+				Vector2i(entry.get("tile_pos", Vector2i.ZERO)),
+				0,
+				Vector2i(int(entry.get("variant", 0)), 0)
+			)
+
 func _spawn_runtime_bush(cell: Vector2i, z_level: int) -> void:
 	var bush := BUSH_SCENE.instantiate() as Node2D
 	if bush == null:
@@ -284,7 +327,9 @@ func _spawn_runtime_bush(cell: Vector2i, z_level: int) -> void:
 	bush.name = "RuntimeBush_Z%d_X%d_Y%d" % [z_level, cell.x, cell.y]
 	bush.position = Defs.tile_to_pixel(cell)
 	bush.set("z_level", z_level)
+	bush.set_meta("entity_id", "world:%s" % bush.name)
 	add_child(bush)
+	World.register_entity(bush, "world:%s" % bush.name)
 
 func _collect_runtime_occupied_tiles() -> Dictionary:
 	var occupied: Dictionary = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}}

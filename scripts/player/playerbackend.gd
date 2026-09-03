@@ -36,9 +36,10 @@ func apply_class_defaults() -> void:
 
 	var base_stats = class_data.get("stats", {})
 	player.stats = {}
+	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
 	for stat_name in base_stats:
 		var base_val = base_stats[stat_name]
-		var variation = randi_range(-1, 1)
+		var variation := randi_range(-1, 1) if simulation_authority else 0
 		player.stats[stat_name] = clamp(base_val + variation, 0, 20)
 
 	player.equipped      = {}
@@ -67,14 +68,16 @@ func spend_stamina(amount: float) -> void:
 	player.last_exertion_time = Time.get_ticks_msec() / 1000.0
 
 func check_stamina_regen(delta: float) -> void:
-	if not player._is_local_authority():
+	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
+	if not simulation_authority:
 		return
 
 	if player.combat_mode:
 		player.stamina = clamp(player.stamina - (delta * 0.25), 0.0, player.max_stamina)
 		if player.stamina <= 0.0 and not player.exhausted:
 			player.exhausted = true
-			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
+			if player._is_local_authority():
+				Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
 	else:
 		var current_time = Time.get_ticks_msec() / 1000.0
 		if current_time - player.last_exertion_time >= CombatDefs.STAMINA_REGEN_DELAY:
@@ -82,7 +85,8 @@ func check_stamina_regen(delta: float) -> void:
 				player.stamina = clamp(player.stamina + (delta * CombatDefs.STAMINA_REGEN_RATE), 0.0, player.max_stamina)
 				if player.exhausted and player.stamina >= CombatDefs.STAMINA_EXHAUSTION_THRESHOLD:
 					player.exhausted = false
-					Sidebar.add_message("[color=#aaffaa]You have caught your breath.[/color]")
+					if player._is_local_authority():
+						Sidebar.add_message("[color=#aaffaa]You have caught your breath.[/color]")
 
 # ===========================================================================
 # Offsets Loading

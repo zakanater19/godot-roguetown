@@ -108,8 +108,7 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 		elif roll.blocked:
 			if entity.is_in_group("player") and entity.get("is_possessed") == true:
 				if entity.has_method("rpc_consume_stamina"):
-					var tgt_peer: int = entity.get_multiplayer_authority()
-					if tgt_peer == 1 or tgt_peer in world.multiplayer.get_peers(): entity.rpc_consume_stamina.rpc_id(tgt_peer, CombatDefs.STAMINA_BLOCK_COST)
+					world.utils.server_consume_stamina(entity, CombatDefs.STAMINA_BLOCK_COST)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):
 					entity.set("tile_pos", roll.dodge_tile)
 					world.rpc_confirm_move.rpc(entity.get_multiplayer_authority(), roll.dodge_tile, false)
@@ -170,10 +169,8 @@ func server_try_resist(peer_id: int) -> void:
 	var break_chance = (float(grabbed.get("stats").get("strength", 10)) / total_str) * 100.0
 	if grabbed.get("is_lying_down"): break_chance *= CombatDefs.LYING_DOWN_RESIST_MULT
 	
-	var tgt_peer: int = grabbed.get_multiplayer_authority()
-	if tgt_peer == 1 or tgt_peer in world.multiplayer.get_peers(): grabbed.rpc_consume_stamina.rpc_id(tgt_peer, resist_cost)
-	var g_tgt_peer: int = grabber.get_multiplayer_authority()
-	if g_tgt_peer == 1 or g_tgt_peer in world.multiplayer.get_peers(): grabber.rpc_consume_stamina.rpc_id(g_tgt_peer, grabber_cost)
+	grabbed.rpc_consume_stamina(resist_cost)
+	grabber.rpc_consume_stamina(grabber_cost)
 	
 	if randf() * 100.0 < break_chance:
 		release_grab_for_peer(grabber_peer_id, true)
@@ -186,7 +183,7 @@ func handle_rpc_request_shove(sender_id: int, target_tile: Vector2i) -> void:
 	if not world.utils.can_player_interact(attacker) or not attacker.get("combat_mode"): return
 	if attacker.get("body") != null and attacker.body.is_arm_broken(attacker.get("active_hand")): return
 	if (target_tile - attacker.get("tile_pos")).abs().x > 1 or (target_tile - attacker.get("tile_pos")).abs().y > 1: return
-	if not world.utils.server_check_action_cooldown(attacker, true): return
+	if not world.utils.server_check_action_cooldown(attacker, true, 5.0): return
 	var occupants = world.utils.get_entities_at_tile(target_tile, attacker.get("z_level"))
 	var target_player: Node2D = null
 	for ent in occupants:
@@ -216,7 +213,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 	if not world.utils.can_player_interact(attacker): return
 	if attacker.get("body") != null and attacker.body.is_arm_broken(attacker.get("active_hand")): return
 	if (tile - attacker.get("tile_pos")).abs().x > 1 or (tile - attacker.get("tile_pos")).abs().y > 1: return
-	if not world.utils.server_check_action_cooldown(attacker, true): return
+	if not world.utils.server_check_action_cooldown(attacker, true, 5.0): return
 	var held_item = attacker.hands[attacker.get("active_hand")]
 	var amount: int = attacker._get_weapon_damage(held_item)
 	var _held_itype = held_item.get("item_type") if held_item != null else null
@@ -232,7 +229,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 			t_name = (entity as Node2D).get("character_name")
 			if roll.damage > 0: entity.receive_damage.rpc(roll.damage, targeted_limb)
 			elif roll.blocked:
-				if entity.has_method("rpc_consume_stamina"): entity.rpc_consume_stamina.rpc_id(entity.get_multiplayer_authority(), CombatDefs.STAMINA_BLOCK_COST)
+				if entity.has_method("rpc_consume_stamina"): world.utils.server_consume_stamina(entity, CombatDefs.STAMINA_BLOCK_COST)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):
 					entity.set("tile_pos", roll.dodge_tile)
 					if entity.get("is_possessed") == true:

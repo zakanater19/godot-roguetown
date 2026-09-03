@@ -92,7 +92,7 @@ func die() -> void:
 	if player.multiplayer.is_server():
 		for i in range(2):
 			if player.hands[i] != null:
-				World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), World.get_entity_id(player.hands[i]), player.tile_pos, player.DROP_SPREAD, i)
+				World.server_drop_item_at(player.get_multiplayer_authority(), World.get_entity_id(player.hands[i]), player.tile_pos, player.DROP_SPREAD, i, player.z_level)
 
 	if player.misc:
 		player.misc.close_menus()

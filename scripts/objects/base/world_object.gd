@@ -6,6 +6,41 @@ extends Area2D
 
 var _registered_solid_tiles: Array[Vector2i] = []
 
+# Gameplay state that is allowed to cross the network boundary.  Keeping this
+# list explicit prevents UI nodes, Resources, animation timers, and other
+# client-only presentation details from accidentally becoming authoritative.
+const AUTHORITATIVE_STATE_FIELDS: Array[String] = [
+	"hits",
+	"state",
+	"is_on",
+	"has_torch",
+	"direction_rotation",
+	"_coal_count",
+	"_ironore_count",
+	"_ore_item_type",
+	"_fuel_type",
+	"_smelting",
+	"contents",
+	"amount",
+	"metal_type",
+	"stored_balance",
+	"items_picked",
+	"key_id",
+	"is_locked",
+	"tree_id",
+	"piece_kind",
+	"support_segment_name",
+	"hits_to_break",
+	"drop_count",
+	"atlas_index",
+	"z_offset",
+	"solid_piece",
+	"blocks_fov",
+	"decor_configs",
+	"max_items",
+	"loot_item_types",
+]
+
 func _ready() -> void:
 	z_index = Defs.get_z_index(z_level, get_z_offset())
 	add_to_group(Defs.GROUP_Z_ENTITY)
@@ -81,6 +116,50 @@ func set_solid_enabled(enabled: bool) -> void:
 		register_solid_tiles()
 	else:
 		unregister_solid_tiles()
+
+func capture_authoritative_state() -> Dictionary:
+	var state: Dictionary = {}
+	for field_name in AUTHORITATIVE_STATE_FIELDS:
+		if not (field_name in self):
+			continue
+		var value: Variant = get(field_name)
+		if value is Array or value is Dictionary:
+			state[field_name] = value.duplicate(true)
+		else:
+			state[field_name] = value
+	return state
+
+func apply_authoritative_state(state: Dictionary, refresh_presentation: bool = true) -> void:
+	for field_name in AUTHORITATIVE_STATE_FIELDS:
+		if not state.has(field_name) or not (field_name in self):
+			continue
+		var value: Variant = state[field_name]
+		if value is Array or value is Dictionary:
+			set(field_name, value.duplicate(true))
+		else:
+			set(field_name, value)
+
+	if refresh_presentation and is_inside_tree():
+		_refresh_from_authoritative_state(state)
+
+func _refresh_from_authoritative_state(state: Dictionary) -> void:
+	# These hooks update local presentation/caches from server-owned values.  In
+	# particular, lighting rendering remains local even though is_on/blocks_fov
+	# are authoritative gameplay inputs.
+	if has_method("rebuild_decor") and state.has("decor_configs"):
+		call("rebuild_decor")
+	if has_method("_update_sprite"):
+		call("_update_sprite")
+	if has_method("_update_solidity"):
+		call("_update_solidity")
+	else:
+		set_solid_enabled(starts_solid())
+	if has_method("_set_sprite") and state.has("is_on"):
+		call("_set_sprite", bool(state["is_on"]))
+	if has_method("_apply_visual_state"):
+		call("_apply_visual_state")
+	if has_method("_update_merchant_balance") and state.has("stored_balance"):
+		call("_update_merchant_balance", int(state["stored_balance"]))
 
 func get_shake_tiles() -> Array[Vector2i]:
 	var tiles := get_solid_tiles()

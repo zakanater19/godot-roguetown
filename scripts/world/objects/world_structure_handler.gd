@@ -40,7 +40,7 @@ func resolve_interaction(sender_id: int, structure_path: NodePath) -> String:
 	var hit_strength := MaterialRegistry.get_tool_efficiency(structure, held_item)
 	if hit_strength <= 0.0:
 		return ""
-	if not world.utils.server_check_action_cooldown(player):
+	if not world.utils.server_check_action_cooldown(player, false, 5.0):
 		return ""
 	if not structure.has_method("apply_structure_damage"):
 		return ""

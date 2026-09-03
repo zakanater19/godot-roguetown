@@ -39,7 +39,7 @@ func try_move(from: Vector2i, z_level: int, dir: Vector2i) -> Vector2i:
 	if is_solid(next, z_level): return from
 	return next
 
-func _build_break_drop_payload(def: Dictionary) -> Array:
+func _build_break_drop_payload(def: Dictionary, drop_tile: Vector2i) -> Array:
 	var payload: Array = []
 	var drop_specs = def.get("break_drops", [])
 	if not (drop_specs is Array):
@@ -57,6 +57,7 @@ func _build_break_drop_payload(def: Dictionary) -> Array:
 			payload.append({
 				"type": drop_type,
 				"name": Defs.make_runtime_name("Drop"),
+				"position": world.objects.make_authoritative_drop_position(drop_tile, Defs.DROP_SPREAD),
 			})
 	return payload
 
@@ -69,29 +70,34 @@ func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "
 	if scene:
 		var rock: Node2D = scene.instantiate()
 		rock.z_level = z_level
-		if rock_name != "": rock.name = rock_name
+		if rock_name != "":
+			rock.name = rock_name
+			rock.set_meta("entity_id", "world:%s" % rock_name)
 		rock.position = world.utils.tile_to_pixel(pos)
 		parent.add_child(rock)
+		if rock_name != "":
+			world.register_entity(rock, "world:%s" % rock_name)
 	var center: Vector2 = world.utils.tile_to_pixel(pos)
 	for raw_data in drops_data:
 		if not (raw_data is Dictionary):
 			continue
 		var data: Dictionary = raw_data
-		ObjectSpawnUtils.spawn_drop_with_seed(
-			parent,
-			String(data.get("type", "")),
-			String(data.get("name", "")),
-			z_level,
-			center,
-			Defs.DROP_SPREAD
-		)
+		if data.has("position"):
+			ObjectSpawnUtils.spawn_drop_at(parent, String(data.get("type", "")), String(data.get("name", "")), z_level, Vector2(data["position"]))
+		else:
+			ObjectSpawnUtils.spawn_drop_with_seed(parent, String(data.get("type", "")), String(data.get("name", "")), z_level, center, Defs.DROP_SPREAD)
 
 func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return TileDefs.get_description(source_id, atlas_coords)
 
 func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> void:
+	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+		return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return
+	if dir not in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		world.rpc_confirm_move.rpc(sender_id, player.tile_pos, false)
+		return
 	if world.utils.is_ghost(player):
 		var ghost_next_tile: Vector2i = player.tile_pos + dir
 		if ghost_next_tile.x < 0 or ghost_next_tile.x >= world.GRID_WIDTH or ghost_next_tile.y < 0 or ghost_next_tile.y >= world.GRID_HEIGHT:
@@ -189,7 +195,8 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 				blocking_player.rpc_sync_z_level(old_z)
 				blocking_player.rpc_sync_z_level.rpc(old_z)
 			world.combat.drag_grabbed_entity(sender_id, old_tile)
-			world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
+			var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
+			world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, resolved_sprint)
 			world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), old_tile, false)
 			world.apply_gravity_to_player(blocking_player)
 			world.apply_gravity_to_player(player)
@@ -215,7 +222,8 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 							blocking_player.rpc_sync_z_level.rpc(next_z)
 						world.combat.drag_grabbed_entity(sender_id, old_tile)
 						world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), push_dest, false)
-						world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, is_sprinting)
+						var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
+						world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, resolved_sprint)
 						world.apply_gravity_to_player(blocking_player)
 						world.apply_gravity_to_player(player)
 						return
@@ -226,7 +234,8 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			player.rpc_sync_z_level(next_z)
 			player.rpc_sync_z_level.rpc(next_z)
 		world.combat.drag_grabbed_entity(sender_id, old_tile)
-		world.rpc_confirm_move.rpc(sender_id, next_tile, is_sprinting)
+		var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
+		world.rpc_confirm_move.rpc(sender_id, next_tile, resolved_sprint)
 		world.apply_gravity_to_player(player)
 
 func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool) -> void:
@@ -235,7 +244,6 @@ func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool
 	player.is_sprinting = is_sprinting
 	player.tile_pos = new_pos
 	if player.has_method("_start_move_lerp"): player._start_move_lerp()
-	LateJoin.update_player_state(peer_id, {"position": player.position})
 
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if not world.multiplayer.is_server(): return
@@ -246,11 +254,11 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	var atlas_coords: Vector2i = tm.get_cell_atlas_coords(pos)
 	if attacker.body != null and attacker.body.is_arm_broken(attacker.active_hand): return
 	if (pos - attacker.tile_pos).abs().x > 1 or (pos - attacker.tile_pos).abs().y > 1: return
-	if not world.utils.server_check_action_cooldown(attacker): return
 	var def: Dictionary = TileDefs.get_def(1, atlas_coords)
 	if def.is_empty(): return
 	var hit_strength := MaterialRegistry.get_tool_efficiency(TileDefs.get_material_id(1, atlas_coords), attacker.hands[attacker.active_hand])
 	if hit_strength <= 0.0: return
+	if not world.utils.server_check_action_cooldown(attacker, false, 5.0): return
 	var hits_needed: int = def["break_hits"]
 	if not world.tile_hit_counts[attacker.z_level].has(pos): world.tile_hit_counts[attacker.z_level][pos] = 0
 	world.tile_hit_counts[attacker.z_level][pos] += hit_strength
@@ -262,7 +270,7 @@ func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 				attacker.z_level,
 				"WallRock_" + str(Time.get_ticks_usec()) + "_" + str(randi() % 1000),
 				def["break_floor"],
-				_build_break_drop_payload(def)
+				_build_break_drop_payload(def, pos)
 			)
 		else:
 			world.rpc_confirm_replace_tile.rpc(pos, attacker.z_level, 0, def["break_floor"])

@@ -28,13 +28,25 @@ func _init(p_world: Node) -> void:
 	merchant   = preload("res://scripts/world/objects/world_merchant.gd").new(world)
 	foraging   = preload("res://scripts/world/objects/world_foraging.gd").new(world)
 
-# Shared utility used by items, loot, crafting, storage sub-modules.
-func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
+# Shared utility used only while the server is resolving a drop.  Clients are
+# given the resulting position; they never roll their own gameplay outcome.
+func make_authoritative_drop_position(tile: Vector2i, spread: float) -> Vector2:
+	var center: Vector2 = world.utils.tile_to_pixel(tile)
+	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+		return center
 	var drop_offset := Vector2(
 		randf_range(-spread, spread),
 		randf_range(-spread, spread)
 	)
-	obj.global_position = world.utils.tile_to_pixel(tile) + drop_offset
+	return center + drop_offset
+
+func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
+	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+		return
+	obj.global_position = make_authoritative_drop_position(tile, spread)
+
+func server_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int, source_z: int = -1) -> void:
+	items.broadcast_authoritative_drop(player_peer_id, item_id, tile, spread, hand_index, source_z)
 
 # ── Harvesting ────────────────────────────────────────────────────────────────
 func handle_rpc_request_hit_rock(sender_id: int, rock_path: NodePath) -> void:      harvesting.handle_rpc_request_hit_rock(sender_id, rock_path)
@@ -85,9 +97,9 @@ func handle_rpc_confirm_auto_extinguish_torch(torch_id: String) -> void:        
 func handle_rpc_request_pickup(sender_id: int, item_id: String, hand_index: int) -> void:                                                 items.handle_rpc_request_pickup(sender_id, item_id, hand_index)
 func handle_rpc_confirm_pickup(peer_id: int, item_id: String, hand_index: int) -> void:                                                   items.handle_rpc_confirm_pickup(peer_id, item_id, hand_index)
 func handle_rpc_request_drop(sender_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:                    items.handle_rpc_request_drop(sender_id, item_id, tile, spread, hand_index)
-func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:               items.handle_rpc_drop_item_at(player_peer_id, item_id, tile, spread, hand_index)
+func handle_rpc_drop_item_at(player_peer_id: int, item_id: String, drop_position: Vector2, land_z: int, hand_index: int) -> void:         items.handle_rpc_drop_item_at(player_peer_id, item_id, drop_position, land_z, hand_index)
 func handle_rpc_request_throw(sender_id: int, item_id: String, hand_index: int, dir: Vector2, throw_range: int, interaction_z: int) -> void: items.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range, interaction_z)
-func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_pixel: Vector2, travel_z: int, land_z: int) -> void:   items.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_pixel, travel_z, land_z)
+func handle_rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_tile: Vector2i, final_position: Vector2, travel_z: int, land_z: int) -> void: items.handle_rpc_confirm_throw(peer_id, item_id, hand_index, land_tile, final_position, travel_z, land_z)
 
 # ── Coins ─────────────────────────────────────────────────────────────────────
 func handle_rpc_request_split_coins(sender_id: int, from_hand: int, to_hand: int, split_amount: int) -> void:                             coins.handle_rpc_request_split_coins(sender_id, from_hand, to_hand, split_amount)
@@ -101,11 +113,11 @@ func handle_rpc_confirm_combine_ground_coin(peer_id: int, coin_id: String, hand_
 func handle_rpc_notify_loot_warning(target_id: String, looter_peer_id: int, item_desc: String) -> void:                                   loot.handle_rpc_notify_loot_warning(target_id, looter_peer_id, item_desc)
 func handle_rpc_deliver_loot_warning(looter_peer_id: int, item_desc: String) -> void:                                                     loot.handle_rpc_deliver_loot_warning(looter_peer_id, item_desc)
 func handle_rpc_request_loot_item(sender_id: int, target_id: String, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void: loot.handle_rpc_request_loot_item(sender_id, target_id, looter_peer_id, slot_type, slot_index)
-func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_tile: Vector2i, spread: float) -> void: loot.handle_rpc_confirm_loot_unequip_drop(target_id, equip_slot, new_entity_id, drop_tile, spread)
+func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_position: Vector2, land_z: int) -> void: loot.handle_rpc_confirm_loot_unequip_drop(target_id, equip_slot, new_entity_id, drop_position, land_z)
 
 # ── Crafting ──────────────────────────────────────────────────────────────────
 func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: String) -> void:                                            crafting.handle_rpc_request_craft(sender_id, looter_peer_id, recipe_id)
-func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_tile: Vector2i) -> void: crafting.handle_rpc_confirm_craft_item(peer_id, consumed_paths, scene_path, result_name, drop_tile)
+func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_position: Vector2, land_z: int) -> void: crafting.handle_rpc_confirm_craft_item(peer_id, consumed_paths, scene_path, result_name, drop_position, land_z)
 func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void: crafting.handle_rpc_confirm_craft_tile(peer_id, consumed_paths, tile_pos, z_level, source_id, atlas_coords)
 
 # ── Storage (satchel / table) ─────────────────────────────────────────────────

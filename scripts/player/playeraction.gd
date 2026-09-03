@@ -58,7 +58,7 @@ func drop_item_from_hand(hand_idx: int) -> void:
 	var obj = player.hands[hand_idx]
 	var obj_id := World.get_entity_id(obj)
 	if player.multiplayer.is_server():
-		World.rpc_drop_item_at.rpc(player.get_multiplayer_authority(), obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx)
+		World.server_drop_item_at(player.get_multiplayer_authority(), obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx, player.z_level)
 	else:
 		World.rpc_request_drop.rpc_id(1, obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx)
 
@@ -194,10 +194,6 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 		if player.exhausted:
 			Sidebar.add_message("[color=#ffaaaa]You are too exhausted to act![/color]")
 			return
-		if player.stamina < 5.0:
-			player.exhausted = true
-			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
-		player.backend.spend_stamina(5.0)
 
 	apply_action_cooldown(held_item, is_attack_action)
 

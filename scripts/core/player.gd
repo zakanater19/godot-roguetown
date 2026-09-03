@@ -69,6 +69,8 @@ var intent: String = "help"
 var combat_mode: bool = false
 var combat_stance: String = "dodge"
 var _awaiting_move_confirm: bool = false
+var _predicted_move_active: bool = false
+var _predicted_move_tile: Vector2i = Vector2i.ZERO
 
 var is_sprinting: bool = false
 var is_lying_down: bool = false
@@ -80,13 +82,8 @@ var exhausted: bool = false :
 	set(val):
 		if exhausted != val:
 			exhausted = val
-			if _is_local_authority() and multiplayer.has_multiplayer_peer():
-				_sync_exhausted.rpc(val)
-
-@rpc("authority", "call_remote", "reliable")
-func _sync_exhausted(val: bool) -> void:
-	exhausted = val
-	_update_water_submerge()
+			if is_inside_tree():
+				_update_water_submerge()
 
 var skills: Dictionary = {"sword_fighting": 0, "blacksmithing": 0, "sneaking": 0}
 
@@ -148,6 +145,8 @@ var grab_hand_idx:  int  = -1
 
 @rpc("any_peer", "call_local", "reliable")
 func _sync_character_name(p_name: String, p_class: String) -> void:
+	if not _is_server_state_message():
+		return
 	var class_changed = (character_class != p_class)
 	character_name = p_name
 	character_class = p_class
@@ -232,9 +231,19 @@ func show_remote_chat(sender_name: String, message: String) -> void: if chat: ch
 
 # ── Sneak RPCs (stubs on the node; logic lives in playersneak.gd) ─────────────
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func _rpc_sync_sneak_mode(val: bool) -> void:
-	if sneak: sneak.set_sneak_mode_local(val)
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	if multiplayer.is_server():
+		if sender_id != get_multiplayer_authority():
+			return
+		if sneak:
+			sneak.set_sneak_mode_local(val)
+		rpc("_rpc_sync_sneak_mode", val)
+	elif sender_id == 1 and sneak:
+		sneak.set_sneak_mode_local(val)
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_sync_sneak_alpha(alpha: float) -> void:
@@ -246,10 +255,13 @@ func _apply_sneak_alpha(alpha: float) -> void: if sneak: sneak.apply_sneak_alpha
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_consume_stamina(amount: float) -> void:
-	if _is_local_authority():
+	if not _is_server_state_message():
+		return
+	if multiplayer.is_server() or _is_local_authority() or not multiplayer.has_multiplayer_peer():
 		if stamina < amount:
 			exhausted = true
-			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself defending![/color]")
+			if _is_local_authority():
+				Sidebar.add_message("[color=#ffaaaa]You overexerted yourself defending![/color]")
 		_spend_stamina(amount)
 
 # ── Combat mode / stance RPCs ─────────────────────────────────────────────────
@@ -362,6 +374,8 @@ func _rpc_sync_lying_down(val: bool) -> void:
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_sync_z_level(new_z: int) -> void:
+	if not _is_server_state_message():
+		return
 	z_level = new_z
 	view_z_level = new_z
 	z_index = Defs.get_z_index(z_level, Defs.Z_OFFSET_PLAYERS)
@@ -400,6 +414,8 @@ func rpc_make_corpse() -> void:
 
 @rpc("any_peer", "call_local", "reliable")
 func receive_damage(amount: int, limb: String = "chest") -> void:
+	if not _is_server_state_message():
+		return
 	if body:   body.receive_limb_damage(limb, amount)
 	if combat: combat.receive_damage(amount)
 	if multiplayer.is_server():
@@ -453,6 +469,11 @@ func _ready() -> void:
 	view_z_level = z_level
 	z_index = Defs.get_z_index(z_level, Defs.Z_OFFSET_PLAYERS)
 	add_to_group("z_entity")
+	# The player node keeps peer authority for authenticated input RPCs, while
+	# replicated state always originates from the server.
+	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
+	if state_sync != null:
+		state_sync.set_multiplayer_authority(1)
 	backend  = preload("res://scripts/player/playerbackend.gd").new(self)
 	misc     = preload("res://scripts/player/playermisc.gd").new(self)
 	combat   = preload("res://scripts/player/playercombat.gd").new(self)
@@ -494,11 +515,30 @@ func _is_local_authority() -> bool:
 	if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED: return false
 	return multiplayer.get_unique_id() == get_multiplayer_authority()
 
+func _is_server_state_message() -> bool:
+	if not multiplayer.has_multiplayer_peer():
+		return true
+	var sender_id := multiplayer.get_remote_sender_id()
+	return sender_id == 1 or (sender_id == 0 and multiplayer.is_server())
+
 # ── Movement ──────────────────────────────────────────────────────────────────
 
 func _start_move_lerp() -> void:
 	_awaiting_move_confirm = false
 	var new_pixel: Vector2 = World.tile_to_pixel(tile_pos)
+	if _predicted_move_active and _is_local_authority():
+		var prediction_matched := tile_pos == _predicted_move_tile
+		_predicted_move_active = false
+		if prediction_matched:
+			var progress := clampf(move_elapsed / maxf(current_move_duration, 0.001), 0.0, 1.0)
+			_update_water_submerge()
+			move_elapsed = progress * current_move_duration
+			move_to = new_pixel
+			if pixel_pos.distance_squared_to(new_pixel) <= 0.01:
+				pixel_pos = new_pixel
+				position = new_pixel
+				moving = false
+			return
 	if new_pixel == pixel_pos: return
 
 	if dead:
@@ -506,17 +546,21 @@ func _start_move_lerp() -> void:
 		position  = pixel_pos
 		return
 
-	if is_sprinting and _is_local_authority():
-		if stamina < PlayerDefs.SPRINT_STAMINA_COST:
-			exhausted = true
-			Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
-		_spend_stamina(PlayerDefs.SPRINT_STAMINA_COST)
-
 	_update_water_submerge()
 	move_from    = pixel_pos
 	move_to      = new_pixel
 	move_elapsed = 0.0
 	moving       = true
+
+func _start_predicted_move(target_tile: Vector2i, sprint_intent: bool) -> void:
+	_predicted_move_active = true
+	_predicted_move_tile = target_tile
+	is_sprinting = sprint_intent
+	_update_water_submerge()
+	move_from = pixel_pos
+	move_to = World.tile_to_pixel(target_tile)
+	move_elapsed = 0.0
+	moving = true
 
 func _try_move(dir: Vector2i) -> void:
 	if dir == Vector2i.ZERO or _awaiting_move_confirm: return
@@ -525,11 +569,13 @@ func _try_move(dir: Vector2i) -> void:
 		elif dir.y < 0: facing = 1
 		elif dir.x > 0: facing = 2
 		elif dir.x < 0: facing = 3
-		_update_sprite()
+	_update_sprite()
 	_awaiting_move_confirm = true
 	var sprint_intent = Input.is_key_pressed(KEY_SPACE) and not exhausted and not (body != null and body.are_legs_broken())
 	if multiplayer.is_server(): World.rpc_try_move(dir, sprint_intent)
-	else: World.rpc_try_move.rpc_id(1, dir, sprint_intent)
+	else:
+		_start_predicted_move(tile_pos + dir, sprint_intent)
+		World.rpc_try_move.rpc_id(1, dir, sprint_intent)
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 

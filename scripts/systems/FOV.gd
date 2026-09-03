@@ -1,6 +1,9 @@
 extends Node
 
 const FOV_RADIUS := 12
+const FOV_DIAMETER := FOV_RADIUS * 2 + 1
+const FOV_MASK_BITS := FOV_DIAMETER * FOV_DIAMETER
+const FOV_MASK_BYTES: int = (FOV_MASK_BITS + 7) >> 3
 const SOURCE_OFFSETS: Array =[
 	Vector2( 0.0,   0.0),
 	Vector2( 0.3,   0.3),
@@ -37,20 +40,28 @@ func _process(delta: float) -> void:
 	var p_z = player.z_level
 	var v_z = player.get("view_z_level") if "view_z_level" in player else p_z
 	
-	if tile != _player_tile or p_z != _player_z or v_z != _view_z or _time_since_update >= 0.5:
+	var context_changed: bool = tile != _player_tile or p_z != _player_z or v_z != _view_z
+	if context_changed or _time_since_update >= 0.5:
 		_player_tile = tile
 		_player_z = p_z
 		_view_z = v_z
 		_time_since_update = 0.0
-		_compute_fov()
-		_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
+		if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+			# Keep the last authoritative mask visible until the next one arrives.
+			# Clearing it here caused a full-screen black flash on every step.
+			request_authoritative_fov.rpc_id(1, int(v_z))
+		else:
+			_compute_fov()
+			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
 
-func refresh_local_fov() -> void:
-	_player_tile = Vector2i(-9999, -9999)
-	_player_z = -1
-	_view_z = -1
+func refresh_local_fov(clear_stale_visibility: bool = true) -> void:
+	if clear_stale_visibility:
+		_player_tile = Vector2i(-9999, -9999)
+		_player_z = -1
+		_view_z = -1
 	_time_since_update = 0.5
-	_visible_tiles.clear()
+	if clear_stale_visibility:
+		_visible_tiles.clear()
 	var player = World.get_local_player()
 	if player == null:
 		if _draw_node != null:
@@ -59,9 +70,114 @@ func refresh_local_fov() -> void:
 	_player_tile = player.tile_pos
 	_player_z = player.z_level
 	_view_z = player.get("view_z_level") if "view_z_level" in player else _player_z
-	_compute_fov()
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		_apply_fov_hiding()
+		if _draw_node != null:
+			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
+		request_authoritative_fov.rpc_id(1, int(_view_z))
+	else:
+		_compute_fov()
+		if _draw_node != null:
+			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
+
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func request_authoritative_fov(requested_view_z: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	var player := World._find_player_by_peer(sender_id)
+	if player == null:
+		return
+	var player_z := clampi(int(player.get("z_level")), 1, 5)
+	var is_ghost: bool = player.get("is_ghost") == true
+	var validated_view_z := player_z
+	if not is_ghost:
+		validated_view_z = clampi(requested_view_z, player_z, mini(5, player_z + 1))
+	var origin: Vector2i = player.get("tile_pos")
+	if validated_view_z > player_z:
+		var view_map := World.get_tilemap(validated_view_z)
+		var view_blocked := false
+		if view_map != null:
+			var source_id := view_map.get_cell_source_id(origin)
+			if source_id != -1 and source_id != 2:
+				view_blocked = true
+		if World.is_opaque(origin, validated_view_z):
+			view_blocked = true
+		if view_blocked:
+			validated_view_z = player_z
+	if "view_z_level" in player:
+		player.set("view_z_level", validated_view_z)
+	var visible := _calculate_visible_tiles(origin, player_z, validated_view_z, is_ghost)
+	var packed := PackedByteArray()
+	packed.resize(FOV_MASK_BYTES)
+	packed.fill(0)
+	for tile in visible:
+		var offset: Vector2i = Vector2i(tile) - origin
+		if abs(offset.x) > FOV_RADIUS or abs(offset.y) > FOV_RADIUS:
+			continue
+		var bit_index := (offset.y + FOV_RADIUS) * FOV_DIAMETER + offset.x + FOV_RADIUS
+		var byte_index := bit_index >> 3
+		packed[byte_index] = packed[byte_index] | (1 << (bit_index & 7))
+	receive_authoritative_fov.rpc_id(sender_id, origin, player_z, validated_view_z, packed)
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func receive_authoritative_fov(
+	 origin: Vector2i,
+	 player_z: int,
+	 view_z: int,
+	 packed_visible_tiles: PackedByteArray
+) -> void:
+	if packed_visible_tiles.size() != FOV_MASK_BYTES:
+		return
+	var local_player := World.get_local_player()
+	if local_player == null or local_player.get("tile_pos") != origin:
+		return
+	_player_tile = origin
+	_player_z = player_z
+	_view_z = view_z
+	if "view_z_level" in local_player:
+		local_player.set("view_z_level", view_z)
+	_visible_tiles.clear()
+	for bit_index in range(FOV_MASK_BITS):
+		var byte_index := bit_index >> 3
+		if (packed_visible_tiles[byte_index] & (1 << (bit_index & 7))) == 0:
+			continue
+		var local_x := bit_index % FOV_DIAMETER
+		var local_y: int = int(float(bit_index) / float(FOV_DIAMETER))
+		_visible_tiles[origin + Vector2i(
+			int(local_x) - FOV_RADIUS,
+			int(local_y) - FOV_RADIUS
+		)] = true
+	_apply_fov_hiding()
 	if _draw_node != null:
 		_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
+
+func _calculate_visible_tiles(
+	 origin: Vector2i,
+	 player_z: int,
+	 view_z: int,
+	 is_ghost: bool
+) -> Dictionary:
+	var saved_player_tile := _player_tile
+	var saved_player_z := _player_z
+	var saved_view_z := _view_z
+	var saved_visible := _visible_tiles
+	var saved_cache := _solid_cache
+	_player_tile = origin
+	_player_z = player_z
+	_view_z = view_z
+	_visible_tiles = {}
+	_solid_cache = {}
+	_compute_fov(false, is_ghost, true)
+	var result := _visible_tiles.duplicate()
+	_player_tile = saved_player_tile
+	_player_z = saved_player_z
+	_view_z = saved_view_z
+	_visible_tiles = saved_visible
+	_solid_cache = saved_cache
+	return result
 
 func _is_turf_opaque(tile: Vector2i) -> bool:
 	if _solid_cache.has(tile):
@@ -184,11 +300,15 @@ func _has_los(from_tile: Vector2i, to_tile: Vector2i) -> bool:
 			
 	return false
 
-func _compute_fov() -> void:
+func _compute_fov(
+	 apply_local_hiding: bool = true,
+	 ghost_override: bool = false,
+	 has_ghost_override: bool = false
+) -> void:
 	_solid_cache.clear()
 	_visible_tiles.clear()
 	var local_player = World.get_local_player()
-	var local_is_ghost: bool = local_player != null and local_player.get("is_ghost") == true
+	var local_is_ghost: bool = ghost_override if has_ghost_override else (local_player != null and local_player.get("is_ghost") == true)
 	var r2: int = FOV_RADIUS * FOV_RADIUS
 	for dy in range(-FOV_RADIUS, FOV_RADIUS + 1):
 		for dx in range(-FOV_RADIUS, FOV_RADIUS + 1):
@@ -219,7 +339,8 @@ func _compute_fov() -> void:
 		for tile in to_remove:
 			_visible_tiles.erase(tile)
 	
-	_apply_fov_hiding()
+	if apply_local_hiding:
+		_apply_fov_hiding()
 
 func _apply_fov_hiding() -> void:
 	var local_player = World.get_local_player()

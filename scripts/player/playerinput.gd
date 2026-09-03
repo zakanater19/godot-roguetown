@@ -124,10 +124,6 @@ func handle_input(event: InputEvent) -> void:
 				if player.action_cooldown > 0.0: return
 				if player.exhausted: Sidebar.add_message("[color=#ffaaaa]You are too exhausted to shove![/color]")
 				else:
-					if player.stamina < 5.0:
-						player.exhausted = true
-						Sidebar.add_message("[color=#ffaaaa]You overexerted yourself![/color]")
-					player._spend_stamina(5.0)
 					player._face_toward(mouse_world)
 					player._apply_action_cooldown(null, true)
 					if player.multiplayer.is_server(): World.rpc_request_shove(target_tile)

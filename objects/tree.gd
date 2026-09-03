@@ -47,6 +47,9 @@ func get_solid_tile_offsets() -> Array[Vector2i]:
 		return []
 	return [Vector2i.ZERO]
 
+func get_drop_spread() -> float:
+	return DROP_SPREAD
+
 func get_movement_slow_multiplier() -> float:
 	if state == "stump":
 		return STUMP_SLOW_MULTIPLIER
@@ -68,16 +71,14 @@ func build_break_payload() -> Dictionary:
 		},
 	}
 
-func perform_break(log_names: Array) -> void:
-	for log_name in log_names:
-		ObjectSpawnUtils.spawn_drop_with_seed(
-			get_parent(),
-			"log",
-			log_name,
-			z_level,
-			position,
-			DROP_SPREAD
-		)
+func perform_break(log_names: Array, drop_positions: Array = [], land_z_override: int = -1) -> void:
+	var land_z := land_z_override if land_z_override >= 1 else z_level
+	for index in range(log_names.size()):
+		var log_name := String(log_names[index])
+		if index < drop_positions.size():
+			ObjectSpawnUtils.spawn_drop_at(get_parent(), "log", log_name, land_z, Vector2(drop_positions[index]))
+		else:
+			ObjectSpawnUtils.spawn_drop_with_seed(get_parent(), "log", log_name, land_z, position, DROP_SPREAD)
 
 	if state != "stump":
 		state = "stump"

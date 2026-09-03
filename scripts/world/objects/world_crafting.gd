@@ -51,11 +51,13 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 		var scene_path: String = ItemRegistry.get_scene_path(result_item_type)
 		if scene_path == "":
 			return
-		world.rpc_confirm_craft_item.rpc(sender_id, consumed_paths, scene_path, result_name, player.tile_pos)
+		var land_z: int = world.calculate_gravity_z(player.tile_pos, player.z_level)
+		var drop_position: Vector2 = world.objects.make_authoritative_drop_position(player.tile_pos, Defs.DROP_SPREAD)
+		world.rpc_confirm_craft_item.rpc(sender_id, consumed_paths, scene_path, result_name, drop_position, land_z)
 	elif recipe.result_type == Defs.RECIPE_RESULT_TILE:
 		world.rpc_confirm_craft_tile.rpc(sender_id, consumed_paths, player.tile_pos, player.z_level, recipe.result_tile_source, recipe.result_tile_coords)
 
-func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_tile: Vector2i) -> void:
+func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_position: Vector2, land_z: int) -> void:
 	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
 	for p in consumed_paths:
 		var n = world.get_node_or_null(p)
@@ -72,15 +74,16 @@ func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_pa
 	if scene == null: return
 	var item: Node2D = scene.instantiate()
 	item.name = result_name
+	var result_entity_id := "world:%s" % result_name
+	item.set_meta("entity_id", result_entity_id)
 
-	if player != null:
-		var land_z: int = world.calculate_gravity_z(drop_tile, player.z_level)
-		item.set("z_level", land_z)
+	item.set("z_level", land_z)
 
 	var main = World.main_scene
 	if main:
 		main.add_child(item)
-		world.objects.drop_item_at(item, drop_tile, Defs.DROP_SPREAD)
+		world.register_entity(item, result_entity_id)
+		item.global_position = drop_position
 		for child in item.get_children():
 			if child is CollisionShape2D: child.disabled = false
 

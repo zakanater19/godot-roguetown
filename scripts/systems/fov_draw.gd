@@ -19,9 +19,6 @@ func _ready() -> void:
 	_rgba_data.resize(W * H * 4)
 
 func update_fov(player_tile: Vector2i, visible_tiles: Dictionary, fov_radius: int) -> void:
-	if visible_tiles.is_empty():
-		return
-		
 	# Center view around player
 	position = Vector2((player_tile.x - 16) * TILE_SIZE, (player_tile.y - 11) * TILE_SIZE)
 	

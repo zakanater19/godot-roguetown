@@ -22,12 +22,8 @@ func get_runtime_groups() -> Array[String]:
 func perform_break(drops_data: Array) -> void:
 	var center: Vector2 = position
 	for data in drops_data:
-		ObjectSpawnUtils.spawn_drop_with_seed(
-			get_parent(),
-			String(data.type),
-			String(data.name),
-			z_level,
-			center,
-			DROP_SPREAD
-		)
+		if data.has("position"):
+			ObjectSpawnUtils.spawn_drop_at(get_parent(), String(data.type), String(data.name), z_level, Vector2(data.position))
+		else:
+			ObjectSpawnUtils.spawn_drop_with_seed(get_parent(), String(data.type), String(data.name), z_level, center, DROP_SPREAD)
 	queue_free()

@@ -56,6 +56,11 @@ func _ready() -> void:
 	if preview != null:
 		preview.visible = false
 
+	# Runtime tree pieces are gameplay objects.  Only the server/offline host may
+	# construct them; network clients receive them from the world snapshot.
+	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		return
+
 	call_deferred("_spawn_runtime_tree")
 
 func _spawn_runtime_tree() -> void:
@@ -197,7 +202,9 @@ func _spawn_segment(parent_node: Node, segment_config: Dictionary) -> void:
 	segment.solid_piece = bool(segment_config.get("solid_piece", true))
 	segment.blocks_fov = bool(segment_config.get("blocks_fov", true))
 	segment.decor_configs = segment_config["decor_configs"].duplicate(true)
+	segment.set_meta("entity_id", "world:%s" % piece_name)
 	parent_node.add_child(segment)
+	World.register_entity(segment, "world:%s" % piece_name)
 
 func _make_canopy_branch_leaf_configs(
 	rng: RandomNumberGenerator,

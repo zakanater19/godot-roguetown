@@ -11,7 +11,10 @@ func toggle_sneak_mode() -> void:
 	if not player._is_local_authority(): return
 	var new_val: bool = not player.is_sneaking
 	if player.multiplayer.has_multiplayer_peer():
-		player._rpc_sync_sneak_mode.rpc(new_val)
+		if player.multiplayer.is_server():
+			player._rpc_sync_sneak_mode(new_val)
+		else:
+			player._rpc_sync_sneak_mode.rpc_id(1, new_val)
 	else:
 		set_sneak_mode_local(new_val)
 

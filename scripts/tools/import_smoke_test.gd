@@ -17,6 +17,7 @@ const NET_SPAWNABLE_SCENES: Array[String] =[
 # Each configured property NodePath must resolve to a real property on the target node.
 const NET_SYNCED_SCENES: Array[String] =[
 	"res://scenes/player.tscn",
+	"res://core/ghost.tscn",
 	"res://npcs/spider.tscn",
 ]
 
@@ -342,6 +343,10 @@ func run() -> Dictionary:
 
 	_begin_section("net: sync behavior")
 	_validate_network_sync_behavior()
+	_end_section()
+
+	_begin_section("net: authoritative snapshots")
+	_validate_authoritative_snapshot_codec()
 	_end_section()
 
 	_begin_section("net: reconnect behavior")
@@ -932,7 +937,10 @@ func _validate_replication_configs() -> void:
 			instance.free()
 			continue
 
-		for prop_path: NodePath in config.get_properties():
+		var replicated_properties := config.get_properties()
+		if NodePath(".:position") in replicated_properties:
+			_fail("%s: position must not be replicated while authoritative movement interpolation is active." % scene_path)
+		for prop_path: NodePath in replicated_properties:
 			_validate_replication_property(scene_path, instance, prop_path)
 
 		instance.free()
@@ -1220,6 +1228,47 @@ func _validate_network_sync_behavior() -> void:
 	if temp_root.get_parent() == World:
 		World.remove_child(temp_root)
 	temp_root.free()
+
+func _validate_authoritative_snapshot_codec() -> void:
+	if int(FOV.FOV_MASK_BYTES) != 79 or int(FOV.FOV_MASK_BYTES) >= 1200:
+		_fail("FOV: authoritative visibility payload is not the expected MTU-safe 79-byte mask.")
+
+	var latejoin := _SmokeLateJoinStub.new()
+	latejoin._reconnect = _SmokeReconnectStub.new()
+	var sync = preload("res://scripts/net/latejoin_sync.gd").new(latejoin)
+	var snapshot := {
+		"schema_version": 1,
+		"tiles": PackedInt32Array(),
+		"grass": [],
+		"objects": [],
+		"players": {},
+		"mobs": [],
+	}
+	var raw: PackedByteArray = var_to_bytes(snapshot)
+	var checksum: String = sync._checksum_bytes(raw)
+	var compressed := raw.compress(FileAccess.COMPRESSION_GZIP)
+	if not sync.handle_receive_world_snapshot(1, 1, raw.size(), checksum, compressed):
+		_fail("LateJoinSync: a valid compressed authoritative snapshot was rejected.")
+	if sync._last_applied_snapshot_revision != 1:
+		_fail("LateJoinSync: a valid snapshot did not advance the applied revision.")
+	var altered := raw.duplicate()
+	altered[0] = altered[0] ^ 1
+	if sync._checksum_bytes(altered) == checksum:
+		_fail("LateJoinSync: snapshot checksum did not detect altered bytes.")
+
+	var stump := TreeSegment.new()
+	stump.piece_kind = "stump"
+	stump.hits = 2.5
+	stump.solid_piece = false
+	var state := stump.capture_authoritative_state()
+	stump.piece_kind = "trunk"
+	stump.hits = 0.0
+	stump.solid_piece = true
+	stump.apply_authoritative_state(state, false)
+	if stump.piece_kind != "stump" or not is_equal_approx(stump.hits, 2.5) or stump.solid_piece:
+		_fail("WorldObject: explicit authoritative state did not round-trip.")
+	stump.free()
+	latejoin.free()
 
 func _validate_reconnection_behavior() -> void:
 	var previous_host_peers: Dictionary = Host.peers.duplicate()

@@ -123,24 +123,25 @@ func update_stand_up(delta: float, buffered_dir: Vector2i) -> void:
 # ---------------------------------------------------------------------------
 
 func update(delta: float, is_local: bool) -> void:
+	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
 	if player.sleep_state != player.SleepState.AWAKE and not player.dead and player.is_possessed:
 		if player.sleep_state == player.SleepState.FALLING_ASLEEP:
-			player.sleep_timer -= delta
-			if player.sleep_timer <= 0.0:
+			if simulation_authority:
+				player.sleep_timer -= delta
+			if simulation_authority and player.sleep_timer <= 0.0:
 				player.sleep_state = player.SleepState.ASLEEP
 				player._sleeping_on_bed = is_on_bed()
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are now fast asleep.[/color]")
-					sync_sleep_state_update(player.sleep_state)
 		elif player.sleep_state == player.SleepState.WAKING_UP:
-			player.sleep_timer -= delta
-			if player.sleep_timer <= 0.0:
+			if simulation_authority:
+				player.sleep_timer -= delta
+			if simulation_authority and player.sleep_timer <= 0.0:
 				player.sleep_state = player.SleepState.AWAKE
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are fully awake.[/color]")
-					sync_sleep_state_update(player.sleep_state)
 		elif player.sleep_state == player.SleepState.ASLEEP:
-			if is_local:
+			if simulation_authority:
 				var regen_rate = 4.0 if player._sleeping_on_bed else 2.0
 				player.health_regen_accumulator += regen_rate * delta
 				if player.health_regen_accumulator >= 1.0:
@@ -154,8 +155,8 @@ func update(delta: float, is_local: bool) -> void:
 						else:
 							player.health = 100
 							heal_amount -= missing
-					if heal_amount > 0:
-						player.rpc_heal_limbs.rpc(heal_amount)
+					if heal_amount > 0 and player.body != null:
+						player.body.heal_limbs(heal_amount)
 
 	if is_local and player._sleep_blackout != null:
 		if   player.sleep_state == player.SleepState.AWAKE:          player._sleep_blackout.color.a = 0.0

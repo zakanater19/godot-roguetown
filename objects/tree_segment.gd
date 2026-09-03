@@ -45,6 +45,9 @@ func _ready() -> void:
 func get_hits_to_break() -> float:
 	return hits_to_break
 
+func get_drop_spread() -> float:
+	return DROP_SPREAD
+
 func get_z_offset() -> int:
 	return z_offset
 
@@ -139,20 +142,17 @@ func get_supported_segments() -> Array:
 
 	return results
 
-func perform_break(log_names: Array) -> void:
+func perform_break(log_names: Array, drop_positions: Array = [], land_z_override: int = -1) -> void:
 	set_solid_enabled(false)
 	var drop_tile: Vector2i = get_anchor_tile()
 	var drop_center: Vector2 = Defs.tile_to_pixel(drop_tile)
-	var land_z: int = World.calculate_gravity_z(drop_tile, z_level)
-	for log_name in log_names:
-		ObjectSpawnUtils.spawn_drop_with_seed(
-			get_parent(),
-			"log",
-			String(log_name),
-			land_z,
-			drop_center,
-			DROP_SPREAD
-		)
+	var land_z: int = land_z_override if land_z_override >= 1 else World.calculate_gravity_z(drop_tile, z_level)
+	for index in range(log_names.size()):
+		var log_name := String(log_names[index])
+		if index < drop_positions.size():
+			ObjectSpawnUtils.spawn_drop_at(get_parent(), "log", log_name, land_z, Vector2(drop_positions[index]))
+		else:
+			ObjectSpawnUtils.spawn_drop_with_seed(get_parent(), "log", log_name, land_z, drop_center, DROP_SPREAD)
 
 	if piece_kind == "trunk" and support_segment_name.is_empty():
 		become_stump()

@@ -2,105 +2,236 @@
 # Handles world-state synchronisation for late-joining clients.
 extends RefCounted
 
+const WORLD_SNAPSHOT_SCHEMA_VERSION: int = 1
+const TILE_RECORD_SIZE: int = 7
+
 var lj: Node  # reference to the LateJoin autoload node
+var _snapshot_revision: int = 0
+var _last_snapshot_checksum: String = ""
+var _last_snapshot_packet: Dictionary = {}
+var _last_applied_snapshot_revision: int = 0
+var _last_applied_tile_checksum: String = ""
+var _last_applied_grass_checksum: String = ""
 
 func _init(latejoin_node: Node) -> void:
 	lj = latejoin_node
+
+func reset_snapshot_state() -> void:
+	_last_applied_snapshot_revision = 0
+	_last_snapshot_checksum = ""
+	_last_snapshot_packet.clear()
+	_last_applied_tile_checksum = ""
+	_last_applied_grass_checksum = ""
 
 # ---------------------------------------------------------------------------
 # Server-side: push world state to a joining peer
 # ---------------------------------------------------------------------------
 
 func send_world_state_to_peer(peer_id: int) -> void:
-	var tile_changes = lj._world_state["tiles"]
-	if not tile_changes.is_empty():
-		lj.rpc_id(peer_id, "receive_tile_changes", tile_changes)
-
-	var grass_cuts = lj._world_state.get("grass_cuts", {})
-	if not grass_cuts.is_empty():
-		lj.rpc_id(peer_id, "receive_grass_cuts", grass_cuts)
-
-	var object_states = lj._world_state["objects"]
-	if not object_states.is_empty():
-		lj.rpc_id(peer_id, "receive_object_states", object_states)
-
-	sync_objects_for_late_joiner(peer_id)
-
-	var player_states = {
-		"by_peer": {},
-		"by_entity": {},
-	}
-	for p in lj.get_tree().get_nodes_in_group("player"):
-		var node = p as Node2D
-		if node == null:
-			continue
-		var entity_id = World.get_entity_id(node)
-		if node.get("is_possessed") == false:
-			# Corpses can share a peer ID with an active ghost, so sync them by stable entity ID.
-			if entity_id != "":
-				player_states["by_entity"][entity_id] = lj._reconnect.capture_player_state(node)
-			continue
-		var sync_state = _build_player_sync_state(node)
-		var pid  = node.get_multiplayer_authority()
-		if pid == peer_id:
-			continue
-		player_states["by_peer"][pid] = sync_state
-
-	if not player_states["by_peer"].is_empty() or not player_states["by_entity"].is_empty():
-		lj.rpc_id(peer_id, "receive_player_states", player_states)
-
+	send_world_snapshot_to_peer(peer_id)
 	lj.rpc_id(peer_id, "receive_laws", World.current_laws)
 
-func _build_player_sync_state(node: Node2D) -> Dictionary:
-	var hand_ids = []
-	var hand_states = lj._reconnect.capture_hands_state(node)
-	for h in node.get("hands"):
-		hand_ids.append(World.get_entity_id(h) if (h != null and is_instance_valid(h)) else "")
-	var equipped_data = lj._reconnect.capture_equipped_state(node)
-	var eq_data_state = node.get("equipped_data").duplicate(true) if "equipped_data" in node else {}
-	return {
-		"position":       node.position,
-		"z_level":        node.get("z_level"),
-		"disconnected":   false,
-		"health":         node.get("health"),
-		"dead":           node.get("dead") == true,
-		"limb_hp":        node.get("body").limb_hp.duplicate() if node.get("body") != null else {},
-		"limb_broken":    node.get("body").limb_broken.duplicate() if node.get("body") != null else {},
-		"hands":          hand_ids,
-		"hand_states":    hand_states,
-		"equipped":       equipped_data,
-		"equipped_data":  eq_data_state,
-		"is_lying_down":  node.get("is_lying_down") == true,
-		"is_sneaking":    node.get("is_sneaking") == true,
-		"sneak_alpha":    node.get("sneak_alpha") if "sneak_alpha" in node else 1.0
-	}
-
-func sync_objects_for_late_joiner(peer_id: int) -> void:
-	var main_node = World.main_scene
-	if main_node == null:
+func send_world_snapshot_to_peer(peer_id: int) -> void:
+	var packet := _build_snapshot_packet()
+	if packet.is_empty():
 		return
+	# Existing peers receive live reliable deltas. A late-join snapshot is large
+	# and must only be sent/applied by the peer that requested it.
+	_send_snapshot_packet(peer_id, packet)
 
-	var objects_to_sync   = []
-	var valid_object_ids = []
+func broadcast_world_snapshot_if_changed(force: bool = false) -> void:
+	if not lj.multiplayer.is_server():
+		return
+	var previous_checksum := _last_snapshot_checksum
+	var packet := _build_snapshot_packet()
+	if packet.is_empty():
+		return
+	if not force and previous_checksum == str(packet.get("checksum", "")):
+		return
+	for peer_id in lj.multiplayer.get_peers():
+		_send_snapshot_packet(int(peer_id), packet)
+
+func _build_snapshot_packet() -> Dictionary:
+	if World.main_scene == null:
+		return {}
+	var tile_snapshot := _capture_full_tile_snapshot()
+	var grass_snapshot := _capture_grass_snapshot()
+	var snapshot := {
+		"schema_version": WORLD_SNAPSHOT_SCHEMA_VERSION,
+		"tiles": tile_snapshot,
+		"tile_checksum": _checksum_bytes(var_to_bytes(tile_snapshot)),
+		"grass": grass_snapshot,
+		"grass_checksum": _checksum_bytes(var_to_bytes(grass_snapshot)),
+		"objects": _capture_world_objects(),
+		"players": _capture_player_states(),
+		"mobs": _capture_mob_states(),
+	}
+	var raw: PackedByteArray = var_to_bytes(snapshot)
+	var checksum := _checksum_bytes(raw)
+	if checksum != _last_snapshot_checksum or _last_snapshot_packet.is_empty():
+		_snapshot_revision += 1
+		_last_snapshot_checksum = checksum
+		_last_snapshot_packet = {
+			"schema_version": WORLD_SNAPSHOT_SCHEMA_VERSION,
+			"revision": _snapshot_revision,
+			"raw_size": raw.size(),
+			"checksum": checksum,
+			"payload": raw.compress(FileAccess.COMPRESSION_GZIP),
+		}
+	return _last_snapshot_packet
+
+func _send_snapshot_packet(peer_id: int, packet: Dictionary) -> void:
+	lj.rpc_id(
+		peer_id,
+		"receive_world_snapshot",
+		int(packet["schema_version"]),
+		int(packet["revision"]),
+		int(packet["raw_size"]),
+		str(packet["checksum"]),
+		packet["payload"]
+	)
+
+func _checksum_bytes(bytes: PackedByteArray) -> String:
+	var hashing := HashingContext.new()
+	hashing.start(HashingContext.HASH_SHA256)
+	hashing.update(bytes)
+	return hashing.finish().hex_encode()
+
+func _capture_full_tile_snapshot() -> PackedInt32Array:
+	var records: Array = []
+	for z in range(1, 6):
+		var tilemap := World.get_tilemap(z)
+		if tilemap == null:
+			continue
+		for cell in tilemap.get_used_cells():
+			records.append({
+				"z": z,
+				"cell": cell,
+				"source": tilemap.get_cell_source_id(cell),
+				"atlas": tilemap.get_cell_atlas_coords(cell),
+				"alternative": tilemap.get_cell_alternative_tile(cell),
+			})
+	records.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["z"]) != int(b["z"]):
+			return int(a["z"]) < int(b["z"])
+		var a_cell: Vector2i = a["cell"]
+		var b_cell: Vector2i = b["cell"]
+		if a_cell.y != b_cell.y:
+			return a_cell.y < b_cell.y
+		return a_cell.x < b_cell.x
+	)
+
+	var packed := PackedInt32Array()
+	packed.resize(records.size() * TILE_RECORD_SIZE)
+	var cursor := 0
+	for record in records:
+		var cell: Vector2i = record["cell"]
+		var atlas: Vector2i = record["atlas"]
+		packed[cursor] = int(record["z"])
+		packed[cursor + 1] = cell.x
+		packed[cursor + 2] = cell.y
+		packed[cursor + 3] = int(record["source"])
+		packed[cursor + 4] = atlas.x
+		packed[cursor + 5] = atlas.y
+		packed[cursor + 6] = int(record["alternative"])
+		cursor += TILE_RECORD_SIZE
+	return packed
+
+func _capture_grass_snapshot() -> Array:
+	var main_node := World.main_scene
+	if main_node == null or not main_node.has_method("capture_runtime_grass_snapshot"):
+		return []
+	var grass: Array = main_node.call("capture_runtime_grass_snapshot")
+	grass.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a.get("z_level", 3)) != int(b.get("z_level", 3)):
+			return int(a.get("z_level", 3)) < int(b.get("z_level", 3))
+		var a_cell: Vector2i = a.get("tile_pos", Vector2i.ZERO)
+		var b_cell: Vector2i = b.get("tile_pos", Vector2i.ZERO)
+		if a_cell.y != b_cell.y:
+			return a_cell.y < b_cell.y
+		return a_cell.x < b_cell.x
+	)
+	return grass
+
+func _capture_world_objects() -> Array:
+	var objects_to_sync: Array = []
 	var held_object_ids := _collect_held_object_ids()
-	var sync_groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
+	for obj in _collect_world_objects():
+		var obj_id := World.register_entity(obj)
+		if held_object_ids.has(obj_id):
+			continue
+		var obj_data := get_object_sync_data(obj)
+		if not obj_data.is_empty():
+			objects_to_sync.append(obj_data)
+	objects_to_sync.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("entity_id", "")) < str(b.get("entity_id", ""))
+	)
+	return objects_to_sync
 
+func _collect_world_objects() -> Array:
+	var main_node := World.main_scene
+	var results: Array = []
+	if main_node == null:
+		return results
+	var sync_groups = ["pickable", "minable_object", "choppable_object", "inspectable", "door", "gate", "breakable_object"]
 	for group in sync_groups:
 		for obj in lj.get_tree().get_nodes_in_group(group):
-			if obj is Node2D and obj.get_parent() == main_node:
-				var obj_id := World.register_entity(obj)
-				if held_object_ids.has(obj_id):
-					continue
-				if not objects_to_sync.has(obj):
-					objects_to_sync.append(obj)
-					valid_object_ids.append(obj_id)
+			if obj is Node2D and obj.get_parent() == main_node and not results.has(obj):
+				results.append(obj)
+	return results
 
-	lj.rpc_id(peer_id, "purge_missing_objects", valid_object_ids)
+func _capture_player_states() -> Dictionary:
+	var states: Dictionary = {}
+	for player_node in lj.get_tree().get_nodes_in_group("player"):
+		if not (player_node is Node2D):
+			continue
+		var entity_id := World.register_entity(player_node)
+		states[entity_id] = _build_player_sync_state(player_node)
+	return states
 
-	for obj in objects_to_sync:
-		var obj_data = get_object_sync_data(obj)
-		if obj_data != null:
-			lj.rpc_id(peer_id, "spawn_object_for_late_join", obj_data)
+func _capture_mob_states() -> Array:
+	var mobs: Array = []
+	for mob in lj.get_tree().get_nodes_in_group("npc"):
+		if not (mob is Node2D) or mob.get_parent() != World.main_scene:
+			continue
+		var entity_id := World.register_entity(mob)
+		mobs.append({
+			"entity_id": entity_id,
+			"name": str(mob.name),
+			"scene_file_path": mob.scene_file_path,
+			"position": mob.position,
+			"z_level": mob.get("z_level"),
+			"tile_pos": mob.get("tile_pos"),
+			"facing": mob.get("facing"),
+			"health": mob.get("health"),
+			"dead": mob.get("dead") == true,
+		})
+	mobs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("entity_id", "")) < str(b.get("entity_id", ""))
+	)
+	return mobs
+
+func _build_player_sync_state(node: Node2D) -> Dictionary:
+	var state: Dictionary = lj._reconnect.capture_player_state(node)
+	var hand_states: Array = lj._reconnect.capture_hands_state(node)
+	var hand_ids: Array = []
+	for hand_item in node.get("hands"):
+		hand_ids.append(World.get_entity_id(hand_item) if hand_item != null and is_instance_valid(hand_item) else "")
+	state["hands"] = hand_ids
+	state["hand_states"] = hand_states
+	state["equipped"] = lj._reconnect.capture_equipped_state(node)
+	state["entity_id"] = World.get_entity_id(node)
+	state["peer_id"] = node.get_multiplayer_authority()
+	state["is_ghost"] = node.get("is_ghost") == true
+	state["is_possessed"] = node.get("is_possessed") != false
+	state["is_sneaking"] = node.get("is_sneaking") == true
+	state["sneak_alpha"] = node.get("sneak_alpha") if "sneak_alpha" in node else 1.0
+	state["equipped_data"] = node.get("equipped_data").duplicate(true) if "equipped_data" in node else {}
+	state["stats"] = node.get("stats").duplicate(true) if "stats" in node else {}
+	return state
+
+func sync_objects_for_late_joiner(peer_id: int) -> void:
+	send_world_snapshot_to_peer(peer_id)
 
 func _collect_held_object_ids() -> Dictionary:
 	var held_object_ids := {}
@@ -131,6 +262,8 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 
 	if obj.get_script() != null:
 		data["script_path"] = obj.get_script().resource_path
+	if obj.has_method("capture_authoritative_state"):
+		data["authoritative_state"] = obj.call("capture_authoritative_state")
 
 	if "z_level"       in obj: data["z_level"]       = obj.get("z_level")
 	if "z_index"       in obj: data["z_index"]       = obj.get("z_index")
@@ -170,6 +303,9 @@ func get_object_sync_data(obj: Node) -> Dictionary:
 	return data
 
 func _apply_pre_add_object_state(obj: Node, obj_data: Dictionary) -> void:
+	if obj_data.has("authoritative_state") and obj.has_method("apply_authoritative_state"):
+		obj.call("apply_authoritative_state", obj_data["authoritative_state"], false)
+
 	var pre_add_keys := [
 		"z_level",
 		"direction_rotation",
@@ -201,6 +337,140 @@ func _apply_pre_add_object_state(obj: Node, obj_data: Dictionary) -> void:
 # ---------------------------------------------------------------------------
 # Client-side: receive and apply world state
 # ---------------------------------------------------------------------------
+
+func handle_receive_world_snapshot(
+	 schema_version: int,
+	 revision: int,
+	 raw_size: int,
+	 checksum: String,
+	 payload: PackedByteArray
+) -> bool:
+	if schema_version != WORLD_SNAPSHOT_SCHEMA_VERSION:
+		push_error("LateJoin: unsupported world snapshot schema %d" % schema_version)
+		return false
+	if revision <= _last_applied_snapshot_revision:
+		return true
+	if raw_size <= 0 or payload.is_empty():
+		push_error("LateJoin: received an empty world snapshot")
+		return false
+
+	var raw := payload.decompress(raw_size, FileAccess.COMPRESSION_GZIP)
+	if raw.size() != raw_size:
+		push_error("LateJoin: world snapshot decompression failed")
+		return false
+	if _checksum_bytes(raw) != checksum:
+		push_error("LateJoin: world snapshot checksum mismatch")
+		return false
+	var decoded: Variant = bytes_to_var(raw)
+	if not (decoded is Dictionary):
+		push_error("LateJoin: invalid world snapshot payload")
+		return false
+	var snapshot: Dictionary = decoded
+	if int(snapshot.get("schema_version", -1)) != WORLD_SNAPSHOT_SCHEMA_VERSION:
+		push_error("LateJoin: decoded world snapshot schema mismatch")
+		return false
+
+	# Apply the complete payload in one handler, so no gameplay frame can observe
+	# a purge from one RPC and the replacements from later RPCs.
+	var tile_geometry_changed := false
+	var tile_checksum := str(snapshot.get("tile_checksum", ""))
+	if tile_checksum == "" or tile_checksum != _last_applied_tile_checksum:
+		_apply_full_tile_snapshot(snapshot.get("tiles", PackedInt32Array()))
+		_last_applied_tile_checksum = tile_checksum
+		tile_geometry_changed = true
+	var grass_checksum := str(snapshot.get("grass_checksum", ""))
+	if grass_checksum == "" or grass_checksum != _last_applied_grass_checksum:
+		_apply_grass_snapshot(snapshot.get("grass", []))
+		_last_applied_grass_checksum = grass_checksum
+	_apply_world_object_snapshot(snapshot.get("objects", []))
+	_apply_mob_snapshot(snapshot.get("mobs", []))
+	handle_receive_player_states({"by_entity": snapshot.get("players", {})})
+	_last_applied_snapshot_revision = revision
+
+	# Visibility is requested from the authority after its world data is in
+	# place. Lighting remains a local rendering system over the synced state.
+	if tile_geometry_changed and Lighting != null and Lighting.has_method("rebuild_roof_map"):
+		Lighting.call_deferred("rebuild_roof_map")
+	if FOV != null and FOV.has_method("refresh_local_fov"):
+		FOV.call_deferred("refresh_local_fov", false)
+	return true
+
+func _apply_full_tile_snapshot(packed: PackedInt32Array) -> void:
+	if packed.size() % TILE_RECORD_SIZE != 0:
+		push_error("LateJoin: invalid tile record count in world snapshot")
+		return
+	for z in range(1, 6):
+		var tilemap := World.get_tilemap(z)
+		if tilemap != null:
+			tilemap.clear()
+	for cursor in range(0, packed.size(), TILE_RECORD_SIZE):
+		var z := int(packed[cursor])
+		var tilemap := World.get_tilemap(z)
+		if tilemap == null:
+			continue
+		tilemap.set_cell(
+			Vector2i(int(packed[cursor + 1]), int(packed[cursor + 2])),
+			int(packed[cursor + 3]),
+			Vector2i(int(packed[cursor + 4]), int(packed[cursor + 5])),
+			int(packed[cursor + 6])
+		)
+
+func _apply_grass_snapshot(grass_snapshot: Array) -> void:
+	var main_node := World.main_scene
+	if main_node != null and main_node.has_method("apply_runtime_grass_snapshot"):
+		main_node.call("apply_runtime_grass_snapshot", grass_snapshot)
+
+func _apply_world_object_snapshot(object_snapshot: Array) -> void:
+	var valid_ids: Array = []
+	for raw_data in object_snapshot:
+		if raw_data is Dictionary:
+			valid_ids.append(str(raw_data.get("entity_id", "")))
+	handle_purge_missing_objects(valid_ids)
+	for raw_data in object_snapshot:
+		if raw_data is Dictionary:
+			handle_spawn_object_for_late_join(raw_data)
+
+func _apply_mob_snapshot(mob_snapshot: Array) -> void:
+	if not lj.is_inside_tree():
+		return
+	var scene_tree := lj.get_tree()
+	var valid_ids: Array = []
+	for raw_data in mob_snapshot:
+		if raw_data is Dictionary:
+			valid_ids.append(str(raw_data.get("entity_id", "")))
+
+	for local_mob in scene_tree.get_nodes_in_group("npc"):
+		if local_mob is Node2D and local_mob.get_parent() == World.main_scene:
+			if not valid_ids.has(World.get_entity_id(local_mob)):
+				local_mob.queue_free()
+
+	for raw_data in mob_snapshot:
+		if not (raw_data is Dictionary):
+			continue
+		var data: Dictionary = raw_data
+		var entity_id := str(data.get("entity_id", ""))
+		var mob := World.get_entity(entity_id) as Node2D
+		if mob == null:
+			var scene_path := str(data.get("scene_file_path", ""))
+			var scene := load(scene_path) as PackedScene if not scene_path.is_empty() else null
+			if scene != null:
+				mob = scene.instantiate() as Node2D
+				mob.name = str(data.get("name", "Mob"))
+				mob.set_meta("entity_id", entity_id)
+				World.main_scene.add_child(mob)
+				World.register_entity(mob, entity_id)
+		if mob == null:
+			continue
+		var old_tile: Vector2i = mob.get("tile_pos") if "tile_pos" in mob else Defs.world_to_tile(mob.global_position)
+		var old_z: int = int(mob.get("z_level")) if "z_level" in mob else 3
+		World.unregister_solid(old_tile, old_z, mob)
+		for field_name in ["z_level", "tile_pos", "facing", "health", "dead"]:
+			if data.has(field_name) and field_name in mob:
+				mob.set(field_name, data[field_name])
+		if data.has("position"):
+			mob.position = data["position"]
+		if data.get("dead", false) != true:
+			World.register_solid(mob.get("tile_pos"), int(mob.get("z_level")), mob)
 
 func handle_receive_tile_changes(tile_changes: Dictionary) -> void:
 	for key in tile_changes:
@@ -308,7 +578,10 @@ func _resolve_player_sync_target(state_id: Variant) -> Node2D:
 
 func _apply_synced_player_state(node: Node2D, p_data: Dictionary, limit_far_position_fix: bool) -> void:
 	if not limit_far_position_fix:
-		lj._reconnect.restore_player_state(node, p_data)
+		var restore_state := p_data.duplicate(true)
+		if restore_state.has("hand_states"):
+			restore_state["hands"] = restore_state["hand_states"].duplicate(true)
+		lj._reconnect.restore_player_state(node, restore_state)
 		return
 	if p_data.has("position"):
 		if limit_far_position_fix:
@@ -507,3 +780,5 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			if obj.has_method("_update_sprite"):
 				obj.call("_update_sprite")
 		if obj.has_method("_set_sprite") and obj_data.has("is_on"): obj.call("_set_sprite", obj_data["is_on"])
+		if obj_data.has("authoritative_state") and obj.has_method("apply_authoritative_state"):
+			obj.call("apply_authoritative_state", obj_data["authoritative_state"], true)

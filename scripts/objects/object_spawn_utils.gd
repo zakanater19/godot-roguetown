@@ -33,14 +33,17 @@ static func spawn_node(parent: Node, obj: Node2D, node_name: String, z_level: in
 	obj.name = node_name
 	if "z_level" in obj:
 		obj.set("z_level", z_level)
-	if not entity_id.is_empty():
-		obj.set_meta("entity_id", entity_id)
+	var resolved_entity_id := entity_id
+	if resolved_entity_id.is_empty() and not node_name.is_empty():
+		resolved_entity_id = "world:%s" % node_name
+	if not resolved_entity_id.is_empty():
+		obj.set_meta("entity_id", resolved_entity_id)
 
 	parent.add_child(obj)
 	obj.global_position = global_position
 
-	if not entity_id.is_empty():
-		World.register_entity(obj, entity_id)
+	if not resolved_entity_id.is_empty():
+		World.register_entity(obj, resolved_entity_id)
 	return obj
 
 static func spawn_item_type(parent: Node, item_type: String, node_name: String, z_level: int, global_position: Vector2, entity_id: String = "") -> Node2D:
@@ -59,3 +62,7 @@ static func spawn_drop_with_seed(parent: Node, drop_type: String, node_name: Str
 		rng.randf_range(-spread, spread)
 	)
 	return spawn_node(parent, obj, node_name, z_level, center + offset)
+
+static func spawn_drop_at(parent: Node, drop_type: String, node_name: String, z_level: int, global_position: Vector2) -> Node2D:
+	var obj := instantiate_drop(drop_type)
+	return spawn_node(parent, obj, node_name, z_level, global_position)

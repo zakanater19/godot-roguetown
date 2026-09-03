@@ -155,8 +155,10 @@ func capture_player_state(player_node: Node2D) -> Dictionary:
 		"limb_hp":         player_node.get("body").limb_hp.duplicate() if player_node.get("body") != null else {},
 		"limb_broken":     player_node.get("body").limb_broken.duplicate() if player_node.get("body") != null else {},
 		"stamina":         player_node.get("stamina"),
+		"max_stamina":     player_node.get("max_stamina") if "max_stamina" in player_node else player_node.get("stamina"),
 		"dead":            player_node.get("dead"),
 		"combat_mode":     player_node.get("combat_mode"),
+		"combat_stance":   player_node.get("combat_stance") if "combat_stance" in player_node else "dodge",
 		"exhausted":       player_node.get("exhausted"),
 		"active_hand":     player_node.get("active_hand"),
 		"hands":           capture_hands_state(player_node),
@@ -174,7 +176,12 @@ func capture_player_state(player_node: Node2D) -> Dictionary:
 		"intent":          player_node.get("intent"),
 		"sleep_state":     player_node.get("sleep_state") if player_node.has_method("toggle_sleep") else 0,
 		"is_lying_down":   player_node.get("is_lying_down") == true,
+		"is_sneaking":     player_node.get("is_sneaking") == true,
+		"sneak_alpha":     player_node.get("sneak_alpha") if "sneak_alpha" in player_node else 1.0,
+		"is_possessed":    player_node.get("is_possessed") != false,
+		"view_z_level":    player_node.get("view_z_level") if "view_z_level" in player_node else player_node.get("z_level"),
 		"skills":          player_node.get("skills").duplicate() if player_node.get("skills") else {},
+		"stats":           player_node.get("stats").duplicate(true) if "stats" in player_node else {},
 		"grabbed_by_peer": player_node.get("grabbed_by").get_multiplayer_authority() if (player_node.get("grabbed_by") != null and is_instance_valid(player_node.get("grabbed_by"))) else -1
 	}
 
@@ -244,8 +251,12 @@ func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void
 		player_node.get("body").limb_broken = player_state["limb_broken"].duplicate()
 
 	player_node.set("stamina",              player_state["stamina"])
+	if player_state.has("max_stamina") and "max_stamina" in player_node:
+		player_node.set("max_stamina", player_state["max_stamina"])
 	player_node.set("dead",                 player_state["dead"])
 	player_node.set("combat_mode",          player_state["combat_mode"])
+	if player_state.has("combat_stance") and "combat_stance" in player_node:
+		player_node.set("combat_stance", player_state["combat_stance"])
 	if player_state.has("exhausted"):       player_node.set("exhausted",       player_state["exhausted"])
 	player_node.set("active_hand",          player_state["active_hand"])
 	player_node.set("pixel_pos",            player_state["pixel_pos"])
@@ -265,7 +276,18 @@ func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void
 			player_node.call("_set_lying_down_visuals", true)
 
 	if player_state.has("is_lying_down"):  player_node.set("is_lying_down", player_state["is_lying_down"])
+	if player_state.has("is_sneaking"):    player_node.set("is_sneaking", player_state["is_sneaking"])
+	if player_state.has("sneak_alpha") and "sneak_alpha" in player_node:
+		player_node.set("sneak_alpha", player_state["sneak_alpha"])
+		if player_node.has_method("_apply_sneak_alpha"):
+			player_node.call("_apply_sneak_alpha", player_state["sneak_alpha"])
+	if player_state.has("is_possessed") and "is_possessed" in player_node:
+		player_node.set("is_possessed", player_state["is_possessed"])
+	if player_state.has("view_z_level") and "view_z_level" in player_node:
+		player_node.set("view_z_level", player_state["view_z_level"])
 	if player_state.has("skills"):         player_node.set("skills",        player_state["skills"].duplicate())
+	if player_state.has("stats") and "stats" in player_node:
+		player_node.set("stats", player_state["stats"].duplicate(true))
 	if player_state.has("equipped_data"):  player_node.set("equipped_data", player_state["equipped_data"].duplicate(true))
 
 	if lj.multiplayer.is_server() and player_state.has("grabbed_by_peer"):
@@ -375,6 +397,9 @@ func retry_update_authority(player_path: NodePath, new_peer_id: int, retries: in
 	var player = lj.get_node_or_null(player_path)
 	if player != null:
 		player.set_multiplayer_authority(new_peer_id)
+		var state_sync := player.get_node_or_null("StateSync") as MultiplayerSynchronizer
+		if state_sync != null:
+			state_sync.set_multiplayer_authority(1)
 		if player.has_method("_on_authority_changed"): player.call("_on_authority_changed")
 	elif retries > 0:
 		await lj.get_tree().create_timer(0.1).timeout

@@ -29,6 +29,8 @@ var move_from: Vector2 = Vector2.ZERO
 var move_to: Vector2 = Vector2.ZERO
 var current_move_duration: float = GHOST_MOVE_TIME
 var _awaiting_move_confirm: bool = false
+var _predicted_move_active: bool = false
+var _predicted_move_tile: Vector2i = Vector2i.ZERO
 var buffered_dir: Vector2i = Vector2i.ZERO
 var facing: int = 0
 var is_sprinting: bool = false
@@ -87,6 +89,9 @@ func _ready() -> void:
 	view_z_level = z_level
 	z_index = Defs.get_z_index(z_level, GHOST_Z_OFFSET)
 	current_move_duration = GHOST_MOVE_TIME
+	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
+	if state_sync != null:
+		state_sync.set_multiplayer_authority(1)
 	add_to_group("player")
 	add_to_group("z_entity")
 	World.register_entity(self, "player:%s" % name)
@@ -325,11 +330,27 @@ func _try_move(dir: Vector2i) -> void:
 	if multiplayer.is_server():
 		World.rpc_try_move(dir, false)
 	else:
+		_predicted_move_active = true
+		_predicted_move_tile = tile_pos + dir
+		move_from = pixel_pos
+		move_to = World.tile_to_pixel(_predicted_move_tile)
+		move_elapsed = 0.0
+		moving = true
 		World.rpc_try_move.rpc_id(1, dir, false)
 
 func _start_move_lerp() -> void:
 	_awaiting_move_confirm = false
 	var new_pixel: Vector2 = World.tile_to_pixel(tile_pos)
+	if _predicted_move_active and _is_local_authority():
+		var prediction_matched := tile_pos == _predicted_move_tile
+		_predicted_move_active = false
+		if prediction_matched:
+			move_to = new_pixel
+			if pixel_pos.distance_squared_to(new_pixel) <= 0.01:
+				pixel_pos = new_pixel
+				position = new_pixel
+				moving = false
+			return
 	if new_pixel == pixel_pos:
 		return
 	current_move_duration = GHOST_MOVE_TIME
@@ -358,6 +379,9 @@ func rpc_sync_ghost_state(p_name: String, p_class: String, spawn_tile: Vector2i,
 
 @rpc("any_peer", "call_local", "reliable")
 func rpc_sync_z_level(new_z: int) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if multiplayer.has_multiplayer_peer() and sender_id != 1 and not (sender_id == 0 and multiplayer.is_server()):
+		return
 	z_level = new_z
 	view_z_level = new_z
 	z_index = Defs.get_z_index(z_level, GHOST_Z_OFFSET)

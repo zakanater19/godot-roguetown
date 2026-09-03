@@ -4,8 +4,6 @@
 
 extends Node
 
-const SYNC_INTERVAL: float = 1.0
-
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -25,7 +23,6 @@ var _world_state: Dictionary = {
 
 var _pending_joins: Array[int] = []
 var _state_dirty: bool = false
-var _sync_timer: float = 0.0
 
 var client_connected: bool = false
 var map_loaded: bool = false
@@ -72,27 +69,23 @@ func _on_server_disconnected() -> void:
 	is_manual_reconnect = false
 	LoadingScreen.hide_loading()
 	BootstrapNet.reset_client_state(true)
+	if _sync != null and _sync.has_method("reset_snapshot_state"):
+		_sync.call("reset_snapshot_state")
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
 		return
 
 	if not multiplayer.is_server() and Input.is_key_pressed(KEY_F5):
 		_attempt_manual_reconnection()
 
-	if not multiplayer.is_server():
-		if client_connected and map_loaded and BootstrapNet.version_checked and not sync_requested:
-			sync_requested = true
-			request_sync.rpc_id(1)
-
-	_sync_timer += delta
-	if _sync_timer >= SYNC_INTERVAL:
-		_sync_timer = 0.0
-		if _state_dirty and multiplayer.is_server():
-			_broadcast_state_updates()
-			_state_dirty = false
+	if not multiplayer.is_server() and client_connected and map_loaded and BootstrapNet.version_checked and not sync_requested:
+		sync_requested = true
+		request_sync.rpc_id(1)
 
 func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	if not _can_write_authoritative_state():
+		return
 	var key: String = str(tile_pos.x) + "_" + str(tile_pos.y) + "_" + str(z_level)
 	_world_state["tiles"][key] = {
 		"tile_pos": tile_pos,
@@ -103,6 +96,8 @@ func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atla
 	_state_dirty = true
 
 func register_grass_cut(tile_pos: Vector2i, z_level: int) -> void:
+	if not _can_write_authoritative_state():
+		return
 	if not _world_state.has("grass_cuts"):
 		_world_state["grass_cuts"] = {}
 	var key := "%d_%d_%d" % [tile_pos.x, tile_pos.y, z_level]
@@ -113,16 +108,25 @@ func register_grass_cut(tile_pos: Vector2i, z_level: int) -> void:
 	_state_dirty = true
 
 func register_object_state(object_path: NodePath, object_data: Dictionary) -> void:
+	if not _can_write_authoritative_state():
+		return
 	_world_state["objects"][object_path] = object_data
 	_state_dirty = true
 
 func unregister_object(object_path: NodePath) -> void:
+	if not _can_write_authoritative_state():
+		return
 	_world_state["objects"].erase(object_path)
 	_state_dirty = true
 
 func update_player_state(peer_id: int, player_data: Dictionary) -> void:
+	if not _can_write_authoritative_state():
+		return
 	_world_state["players"][peer_id] = player_data
 	_state_dirty = true
+
+func _can_write_authoritative_state() -> bool:
+	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
 
 func get_world_state() -> Dictionary:
 	return _world_state.duplicate(true)
@@ -172,7 +176,10 @@ func _on_bootstrap_ready_to_enter_game() -> void:
 	ready_to_enter_game.emit()
 
 func _broadcast_state_updates() -> void:
-	pass
+	# Live state is already delivered by server-owned synchronizers and reliable
+	# confirmation RPCs. Full snapshots are reserved for join/reconnect so normal
+	# movement never serializes and reapplies the entire map.
+	_state_dirty = false
 
 @rpc("any_peer", "call_remote", "reliable")
 func request_sync() -> void:
@@ -202,6 +209,22 @@ func receive_grass_cuts(grass_cuts: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func receive_object_states(object_states: Dictionary) -> void:
 	_sync.handle_receive_object_states(object_states)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_world_snapshot(
+	 schema_version: int,
+	 revision: int,
+	 raw_size: int,
+	 checksum: String,
+	 payload: PackedByteArray
+) -> void:
+	_sync.handle_receive_world_snapshot(
+		schema_version,
+		revision,
+		raw_size,
+		checksum,
+		payload
+	)
 
 @rpc("authority", "call_remote", "reliable")
 func receive_player_states(player_states: Dictionary) -> void:

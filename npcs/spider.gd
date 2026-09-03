@@ -61,6 +61,10 @@ func get_inspect_font_size() -> int:
 func _ready() -> void:
 	z_index = (z_level - 1) * 200 + z_index
 	add_to_group("z_entity")
+	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
+	if state_sync != null:
+		state_sync.set_multiplayer_authority(1)
+	World.register_entity(self)
 	
 	# Ensure the spider is in the NPC group for targeting
 	if not is_in_group("npc"):
@@ -72,6 +76,10 @@ func _ready() -> void:
 	position  = pixel_pos
 	_update_sprite()
 	World.register_solid(tile_pos, z_level, self)
+
+func _exit_tree() -> void:
+	World.unregister_solid(tile_pos, z_level, self)
+	World.unregister_entity(self)
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_sync_spider_z_level(new_z: int) -> void:
@@ -98,6 +106,9 @@ func receive_damage(amount: int) -> void:
 func _process(delta: float) -> void:
 	# Spider AI is server-authoritative only
 	if not multiplayer.is_server():
+		var target_position := World.tile_to_pixel(tile_pos)
+		position = position.move_toward(target_position, (float(World.TILE_SIZE) / MOVE_TIME) * delta)
+		pixel_pos = position
 		return
 
 	if dead:
@@ -173,9 +184,7 @@ func _attack_player(player: Node) -> void:
 			player.receive_damage.rpc(roll.damage)
 	elif roll.blocked:
 		if player.has_method("rpc_consume_stamina"):
-			var tgt_peer = player.get_multiplayer_authority()
-			if tgt_peer == 1 or tgt_peer in multiplayer.get_peers():
-				player.rpc_consume_stamina.rpc_id(tgt_peer, 3.0)
+			World.utils.server_consume_stamina(player, 3.0)
 		if roll.block_type == "dodged" and roll.has("dodge_tile"):
 			player.tile_pos = roll.dodge_tile
 			World.rpc_confirm_move.rpc(player.get_multiplayer_authority(), roll.dodge_tile, false)
