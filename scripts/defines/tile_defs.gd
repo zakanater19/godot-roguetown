@@ -86,6 +86,10 @@ const DEFS: Dictionary = {
 			"break_floor"       : Vector2i(3, 0),
 			"material_id"       : "wood",
 		},
+		Vector2i(4, 0): {
+			"opaque"            : true,
+			"description"       : "an indestructible barrier marking the edge of the world",
+		},
 	},
 	# -------------------------------------------------------------------------
 	# Source 2 — Stairs (4 orientations share one description)

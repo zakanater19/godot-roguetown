@@ -17,6 +17,7 @@ const SOLID_TILE_PATHS: PackedStringArray = [
 	"res://assets/tiles/tile_06_wall_stone.png",
 	"res://assets/tiles/tile_07_wall_wood.png",
 	"res://assets/tiles/tile_10_wooden_window.png",
+	"res://assets/tiles/tile_11_barrierwall.png",
 ]
 
 func _initialize() -> void:
