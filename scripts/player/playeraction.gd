@@ -25,11 +25,14 @@ func apply_action_cooldown(item: Node, is_attack: bool = false) -> void:
 
 func face_toward(world_pos: Vector2) -> void:
 	var delta: Vector2 = world_pos - player.pixel_pos
+	if delta.length_squared() < 1.0:
+		return
+	var new_facing: int
 	if abs(delta.x) >= abs(delta.y):
-		player.facing = 2 if delta.x >= 0 else 3
+		new_facing = 2 if delta.x >= 0 else 3
 	else:
-		player.facing = 0 if delta.y >= 0 else 1
-	player._update_sprite()
+		new_facing = 0 if delta.y >= 0 else 1
+	player._set_facing_from_input(new_facing)
 
 func on_object_picked_up(object_node: Node) -> void:
 	if not player._is_local_authority():
@@ -139,12 +142,16 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 	var breakable_target = _find_object_at_tile(Defs.GROUP_BREAKABLE, target_tile)
 	var minable_target = _find_object_at_tile(Defs.GROUP_MINABLE, target_tile)
 	var grass_decor_target := Defs.is_tool_sword(held_item) and World.has_runtime_grass_decor_at(target_tile, player.z_level)
+	var spider_corpse_target := _find_butcherable_spider_at_tile(target_tile)
 
 	var target_found = false
 	var is_exerting = false
 	var is_attack_action = false
 
-	if can_attack:
+	if spider_corpse_target != null and Defs.is_spider_butchering_tool(held_item):
+		target_found = true
+		is_exerting = true
+	elif can_attack:
 		var entities_at := World.get_entities_at_tile(target_tile, player.z_level, player.multiplayer.get_unique_id())
 		if not entities_at.is_empty():
 			target_found = true
@@ -196,6 +203,11 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 			return
 
 	apply_action_cooldown(held_item, is_attack_action)
+
+	if spider_corpse_target != null and Defs.is_spider_butchering_tool(held_item):
+		if player.misc != null:
+			player.misc.request_spider_butchering(spider_corpse_target)
+		return
 
 	if is_attack_action:
 		var limb = "chest"
@@ -277,4 +289,14 @@ func _find_gate_at_tile(target_tile: Vector2i) -> Node:
 			return obj
 		if target_tile == Vector2i(obj_tile_x + 1, obj_tile_y):
 			return obj
+	return null
+
+func _find_butcherable_spider_at_tile(target_tile: Vector2i) -> Node:
+	for npc in player.get_tree().get_nodes_in_group(Defs.GROUP_NPC):
+		if npc.get("z_level") == null or int(npc.get("z_level")) != player.z_level:
+			continue
+		if not npc.has_method("can_be_butchered") or not npc.can_be_butchered():
+			continue
+		if Vector2i(npc.get("tile_pos")) == target_tile:
+			return npc
 	return null

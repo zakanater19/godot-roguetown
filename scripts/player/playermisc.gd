@@ -10,6 +10,7 @@ var loot_panel: Control = null
 var loot_target: Node = null
 var loot_slot_controls: Dictionary = {}
 var active_loot_attempts: Array = []
+var active_spider_butcher_attempt: Dictionary = {}
 
 func _init(p_player: Node2D) -> void:
 	player = p_player
@@ -24,6 +25,7 @@ func update(delta: float) -> void:
 			close_target_inventory()
 
 	_update_loot_attempts(delta)
+	_update_spider_butcher_attempt(delta)
 
 func on_tile_pos_changed() -> void:
 	pass
@@ -31,6 +33,139 @@ func on_tile_pos_changed() -> void:
 func close_menus() -> void:
 	if loot_panel != null:
 		close_target_inventory()
+
+# ===========================================================================
+# Spider Butchering
+# ===========================================================================
+
+func request_spider_butchering(target: Node) -> void:
+	if not active_spider_butcher_attempt.is_empty():
+		return
+	if target == null or not is_instance_valid(target):
+		return
+	if not target.has_method("can_be_butchered") or not target.can_be_butchered():
+		return
+	if not Defs.is_within_tile_reach(player.tile_pos, target.tile_pos) or target.z_level != player.z_level:
+		return
+	var held_item: Node = player.hands[player.active_hand]
+	if not Defs.is_spider_butchering_tool(held_item):
+		return
+
+	var corpse_id := World.get_entity_id(target)
+	if player.multiplayer.is_server():
+		World.rpc_request_begin_spider_butcher(corpse_id, player.active_hand)
+	else:
+		World.rpc_request_begin_spider_butcher.rpc_id(1, corpse_id, player.active_hand)
+
+func begin_spider_butchering(corpse_id: String, hand_idx: int, weapon_id: String) -> void:
+	if not active_spider_butcher_attempt.is_empty() or not Defs.is_valid_hand_index(hand_idx):
+		return
+	var target: Node = World.get_entity(corpse_id)
+	var held_item: Node = player.hands[hand_idx]
+	if target == null or held_item == null:
+		return
+	if World.get_entity_id(held_item) != weapon_id or not Defs.is_spider_butchering_tool(held_item):
+		return
+	if not target.has_method("can_be_butchered") or not target.can_be_butchered():
+		return
+
+	var prog_lbl := _create_action_indicator(target, "ButcherProg")
+	active_spider_butcher_attempt = {
+		"target": target,
+		"corpse_id": corpse_id,
+		"hand_idx": hand_idx,
+		"weapon": held_item,
+		"weapon_id": weapon_id,
+		"elapsed": 0.0,
+		"blink_elapsed": 0.0,
+		"prog_label": prog_lbl,
+	}
+	Sidebar.add_message("[color=#aaaaaa]You begin butchering the spider...[/color]")
+
+func _update_spider_butcher_attempt(delta: float) -> void:
+	if active_spider_butcher_attempt.is_empty():
+		return
+
+	var target: Node = active_spider_butcher_attempt["target"]
+	var hand_idx: int = active_spider_butcher_attempt["hand_idx"]
+	var weapon: Node = active_spider_butcher_attempt["weapon"]
+	var valid: bool = (
+		not player.dead
+		and is_instance_valid(target)
+		and target.has_method("can_be_butchered")
+		and target.can_be_butchered()
+		and target.z_level == player.z_level
+		and Defs.is_within_tile_reach(player.tile_pos, target.tile_pos)
+		and Defs.is_valid_hand_index(hand_idx)
+		and player.active_hand == hand_idx
+		and is_instance_valid(weapon)
+		and player.hands[hand_idx] == weapon
+		and Defs.is_spider_butchering_tool(weapon)
+	)
+	if not valid:
+		_cancel_spider_butchering(true)
+		return
+
+	active_spider_butcher_attempt["elapsed"] += delta
+	active_spider_butcher_attempt["blink_elapsed"] += delta
+	var progress: float = clamp(
+		float(active_spider_butcher_attempt["elapsed"]) / Defs.SPIDER_BUTCHER_DURATION,
+		0.0,
+		1.0
+	)
+	var dot_count: int = clamp(int(progress * 5.0) + 1, 1, 5)
+	var prog_lbl: Label = active_spider_butcher_attempt["prog_label"]
+	if float(active_spider_butcher_attempt["blink_elapsed"]) >= Defs.LOOT_BLINK_INTERVAL:
+		active_spider_butcher_attempt["blink_elapsed"] = 0.0
+		prog_lbl.visible = not prog_lbl.visible
+	if prog_lbl.visible:
+		prog_lbl.text = ".".repeat(dot_count)
+
+	if float(active_spider_butcher_attempt["elapsed"]) >= Defs.SPIDER_BUTCHER_DURATION:
+		_complete_spider_butchering()
+
+func _complete_spider_butchering() -> void:
+	if active_spider_butcher_attempt.is_empty():
+		return
+	var corpse_id: String = active_spider_butcher_attempt["corpse_id"]
+	var hand_idx: int = active_spider_butcher_attempt["hand_idx"]
+	var weapon_id: String = active_spider_butcher_attempt["weapon_id"]
+	_remove_active_spider_butcher_indicator()
+	active_spider_butcher_attempt.clear()
+	if player.multiplayer.is_server():
+		World.rpc_request_finish_spider_butcher(corpse_id, hand_idx, weapon_id)
+	else:
+		World.rpc_request_finish_spider_butcher.rpc_id(1, corpse_id, hand_idx, weapon_id)
+
+func _cancel_spider_butchering(notify_server: bool) -> void:
+	if active_spider_butcher_attempt.is_empty():
+		return
+	var corpse_id: String = active_spider_butcher_attempt["corpse_id"]
+	_remove_active_spider_butcher_indicator()
+	active_spider_butcher_attempt.clear()
+	if not notify_server:
+		return
+	if player.multiplayer.is_server():
+		World.rpc_cancel_spider_butcher(corpse_id)
+	else:
+		World.rpc_cancel_spider_butcher.rpc_id(1, corpse_id)
+
+func _remove_active_spider_butcher_indicator() -> void:
+	var label = active_spider_butcher_attempt.get("prog_label", null)
+	if label != null and is_instance_valid(label):
+		label.queue_free()
+
+func _create_action_indicator(target: Node, prefix: String) -> Label:
+	var lbl := Label.new()
+	lbl.name = prefix + "_" + str(player.multiplayer.get_unique_id())
+	lbl.text = "."
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", Color.WHITE)
+	lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+	lbl.add_theme_constant_override("outline_size", 4)
+	lbl.position = Vector2(-20, -64)
+	target.add_child(lbl)
+	return lbl
 
 # ===========================================================================
 # Looting

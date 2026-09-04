@@ -24,6 +24,7 @@ const Z_OFFSET_PLAYERS: int = 10   # players render above items
 const DROP_SPREAD:        float = 14.0   # pixel radius items scatter on drop
 const LOOT_DURATION:      float = 4.0    # seconds to complete a loot action
 const LOOT_BLINK_INTERVAL: float = 0.25  # progress indicator blink rate (s)
+const SPIDER_BUTCHER_DURATION: float = 5.0
 const HAND_COUNT:         int = 2
 const SATCHEL_SLOT_COUNT: int = 10
 const MAX_COIN_STACK:     int = 20
@@ -151,6 +152,11 @@ static func is_tool_sword(item: Node) -> bool:
 	if item == null: return false
 	var t_type = item.get("tool_type")
 	return t_type == TOOL_SLASHING or t_type == TOOL_STABBING
+
+static func is_spider_butchering_tool(item: Node) -> bool:
+	if item == null or not is_instance_valid(item):
+		return false
+	return str(item.get("item_type")) in ["Sword", "Dirk"]
 
 static func is_tool_pickaxe(item: Node) -> bool:
 	if item == null: return false

@@ -21,6 +21,7 @@ const PRICES: Dictionary = {
 	"Keyring": 2,
 	"KingCloak": 25,
 	"Lamp": 8,
+	"Leather": 8,
 	"LeatherBoots": 2,
 	"LeatherTrousers": 3,
 	"Log": 3,
@@ -29,6 +30,7 @@ const PRICES: Dictionary = {
 	"Pickaxe": 15,
 	"Plate": 150,
 	"Satchel": 8,
+	"SpiderMeat": 2,
 	"Sword": 25,
 	"Undershirt": 3,
 }

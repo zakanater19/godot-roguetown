@@ -54,6 +54,9 @@ func get_inspect_font_size() -> int:
 		return 11
 	return 14
 
+func can_be_butchered() -> bool:
+	return dead and not is_queued_for_deletion()
+
 func _ready() -> void:
 	z_index = (z_level - 1) * 200 + z_index
 	add_to_group("z_entity")

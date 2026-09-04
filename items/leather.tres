@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://wuy5ccgl378c"]
+
+[ext_resource type="Script" uid="uid://1iatci8lrfaj" path="res://scripts/defines/item_data.gd" id="1_leather_data"]
+
+[resource]
+script = ExtResource("1_leather_data")
+item_type = "Leather"
+scene_path = "res://objects/leather.tscn"
+description = "a piece of leather"
+use_delay = 0.3
+pickable = true
+hud_texture_path = "res://objects/natural/leather.png"

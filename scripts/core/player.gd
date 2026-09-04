@@ -573,8 +573,38 @@ func _try_move(dir: Vector2i) -> void:
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 
+func _input(event: InputEvent) -> void:
+	if input:
+		input.handle_pointer_facing(event)
+
 func _unhandled_input(event: InputEvent) -> void:
 	if input: input.handle_input(event)
+
+func _set_facing_from_input(new_facing: int) -> void:
+	if new_facing < 0 or new_facing >= FACING_NAMES.size() or facing == new_facing:
+		return
+	facing = new_facing
+	if not multiplayer.has_multiplayer_peer():
+		return
+	if multiplayer.is_server():
+		_rpc_sync_facing(new_facing)
+	else:
+		_rpc_sync_facing.rpc_id(1, new_facing)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_sync_facing(new_facing: int) -> void:
+	if new_facing < 0 or new_facing >= FACING_NAMES.size():
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	if multiplayer.is_server():
+		if sender_id != get_multiplayer_authority():
+			return
+		facing = new_facing
+		rpc("_rpc_sync_facing", new_facing)
+	elif sender_id == 1:
+		facing = new_facing
 
 func _on_chat_submitted(text: String) -> void:
 	if chat: chat.on_chat_submitted(text)
@@ -693,11 +723,18 @@ func _process(delta: float) -> void:
 	if is_local:
 		if sleep_state == SleepState.AWAKE:
 			if _chat_input == null or not _chat_input.has_focus():
-				if combat_mode and get_window().has_focus(): _face_toward(get_global_mouse_position())
 				if   Input.is_key_pressed(KEY_W): buffered_dir.y -= 1
 				elif Input.is_key_pressed(KEY_S): buffered_dir.y += 1
 				elif Input.is_key_pressed(KEY_A): buffered_dir.x -= 1
 				elif Input.is_key_pressed(KEY_D): buffered_dir.x += 1
+				if Input.is_key_pressed(KEY_CTRL) and buffered_dir != Vector2i.ZERO:
+					if buffered_dir.y > 0: _set_facing_from_input(0)
+					elif buffered_dir.y < 0: _set_facing_from_input(1)
+					elif buffered_dir.x > 0: _set_facing_from_input(2)
+					elif buffered_dir.x < 0: _set_facing_from_input(3)
+					buffered_dir = Vector2i.ZERO
+				elif combat_mode and get_window().has_focus():
+					_face_toward(get_global_mouse_position())
 		if buffered_dir != Vector2i.ZERO and view_z_level != z_level:
 			view_z_level = z_level
 

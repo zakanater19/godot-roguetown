@@ -893,6 +893,35 @@ func rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_en
 	objects.handle_rpc_confirm_loot_unequip_drop(target_id, equip_slot, new_entity_id, drop_position, land_z)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_begin_spider_butcher(corpse_id: String, hand_idx: int) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_begin_spider_butcher(sender_id, corpse_id, hand_idx)
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_confirm_begin_spider_butcher(corpse_id: String, hand_idx: int, weapon_id: String) -> void:
+	objects.handle_rpc_confirm_begin_spider_butcher(corpse_id, hand_idx, weapon_id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_cancel_spider_butcher(corpse_id: String) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_cancel_spider_butcher(sender_id, corpse_id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_finish_spider_butcher(corpse_id: String, hand_idx: int, weapon_id: String) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	objects.handle_rpc_request_finish_spider_butcher(sender_id, corpse_id, hand_idx, weapon_id)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_spider_butcher(corpse_id: String, drops: Array) -> void:
+	objects.handle_rpc_confirm_spider_butcher(corpse_id, drops)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	if sender_id == 0: sender_id = multiplayer.get_unique_id()

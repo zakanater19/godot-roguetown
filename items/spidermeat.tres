@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defines/item_data.gd" id="1_spidermeat_data"]
+
+[resource]
+script = ExtResource("1_spidermeat_data")
+item_type = "SpiderMeat"
+scene_path = "res://objects/spidermeat.tscn"
+sprite_col = -1
+description = "raw meat cut from a giant spider"
+slot = ""
+base_damage = 0
+use_delay = 0.3
+weaponizable = false
+too_large_for_satchel = false
+pickable = true
+has_inventory = false
+inventory_slots = 0
+is_fuel = false
+is_smeltable_ore = false
+hud_texture_path = "res://objects/food/spidermeat.png"

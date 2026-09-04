@@ -10,6 +10,7 @@ var gates      = null
 var items      = null
 var coins      = null
 var loot       = null
+var butchering = null
 var crafting   = null
 var storage    = null
 var merchant   = null
@@ -23,6 +24,7 @@ func _init(p_world: Node) -> void:
 	items      = preload("res://scripts/world/objects/world_items.gd").new(world)
 	coins      = preload("res://scripts/world/objects/world_coins.gd").new(world)
 	loot       = preload("res://scripts/world/objects/world_loot.gd").new(world)
+	butchering = preload("res://scripts/world/objects/world_butchering.gd").new(world)
 	crafting   = preload("res://scripts/world/objects/world_crafting.gd").new(world)
 	storage    = preload("res://scripts/world/objects/world_storage.gd").new(world)
 	merchant   = preload("res://scripts/world/objects/world_merchant.gd").new(world)
@@ -114,6 +116,13 @@ func handle_rpc_notify_loot_warning(target_id: String, looter_peer_id: int, item
 func handle_rpc_deliver_loot_warning(looter_peer_id: int, item_desc: String) -> void:                                                     loot.handle_rpc_deliver_loot_warning(looter_peer_id, item_desc)
 func handle_rpc_request_loot_item(sender_id: int, target_id: String, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void: loot.handle_rpc_request_loot_item(sender_id, target_id, looter_peer_id, slot_type, slot_index)
 func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_entity_id: String, drop_position: Vector2, land_z: int) -> void: loot.handle_rpc_confirm_loot_unequip_drop(target_id, equip_slot, new_entity_id, drop_position, land_z)
+
+# ── Butchering ───────────────────────────────────────────────────────────────
+func handle_rpc_request_begin_spider_butcher(sender_id: int, corpse_id: String, hand_idx: int) -> void: butchering.handle_rpc_request_begin_spider_butcher(sender_id, corpse_id, hand_idx)
+func handle_rpc_confirm_begin_spider_butcher(corpse_id: String, hand_idx: int, weapon_id: String) -> void: butchering.handle_rpc_confirm_begin_spider_butcher(corpse_id, hand_idx, weapon_id)
+func handle_rpc_cancel_spider_butcher(sender_id: int, corpse_id: String) -> void: butchering.handle_rpc_cancel_spider_butcher(sender_id, corpse_id)
+func handle_rpc_request_finish_spider_butcher(sender_id: int, corpse_id: String, hand_idx: int, weapon_id: String) -> void: butchering.handle_rpc_request_finish_spider_butcher(sender_id, corpse_id, hand_idx, weapon_id)
+func handle_rpc_confirm_spider_butcher(corpse_id: String, drops: Array) -> void: butchering.handle_rpc_confirm_spider_butcher(corpse_id, drops)
 
 # ── Crafting ──────────────────────────────────────────────────────────────────
 func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: String) -> void:                                            crafting.handle_rpc_request_craft(sender_id, looter_peer_id, recipe_id)

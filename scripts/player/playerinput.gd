@@ -7,6 +7,15 @@ var player: Node2D
 func _init(p_player: Node2D) -> void:
 	player = p_player
 
+func handle_pointer_facing(event: InputEvent) -> void:
+	if not player._is_local_authority() or player.dead:
+		return
+	if player.sleep_state != player.SleepState.AWAKE:
+		return
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+			player._face_toward(player.get_global_mouse_position())
+
 func handle_input(event: InputEvent) -> void:
 	if not player._is_local_authority(): return
 	if player.dead: return
