@@ -123,8 +123,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 					return
 
 				var satchel_id := World.get_entity_id(self)
-				if multiplayer.is_server(): World.rpc_request_satchel_insert(satchel_id, player.active_hand)
-				else: World.rpc_request_satchel_insert.rpc_id(1, satchel_id, player.active_hand)
+				World.rpc_request_satchel_insert.rpc_id(1, satchel_id, player.active_hand)
 
 			elif in_other_hand or in_active_hand:
 				if _ui_layer != null and is_instance_valid(_ui_layer): _close_ui()
@@ -256,5 +255,4 @@ func _on_slot_pressed(slot_index: int) -> void:
 		return
 
 	var satchel_id := World.get_entity_id(self)
-	if multiplayer.is_server(): World.rpc_request_satchel_extract(satchel_id, slot_index, player.active_hand)
-	else: World.rpc_request_satchel_extract.rpc_id(1, satchel_id, slot_index, player.active_hand)
+	World.rpc_request_satchel_extract.rpc_id(1, satchel_id, slot_index, player.active_hand)

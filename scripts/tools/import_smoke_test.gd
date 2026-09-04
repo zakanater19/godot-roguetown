@@ -21,6 +21,21 @@ const NET_SYNCED_SCENES: Array[String] =[
 	"res://npcs/spider.tscn",
 ]
 
+const PLAYER_REPLICATED_PROPERTIES: Array[NodePath] = [
+	NodePath(".:tile_pos"), NodePath(".:health"), NodePath(".:facing"),
+	NodePath(".:dead"), NodePath(".:stamina"), NodePath(".:character_name"),
+	NodePath(".:character_class"), NodePath(".:z_level"), NodePath(".:equipped"),
+	NodePath(".:equipped_data"), NodePath(".:combat_mode"), NodePath(".:is_lying_down"),
+	NodePath(".:is_sneaking"), NodePath(".:sneak_alpha"), NodePath(".:active_hand"),
+	NodePath(".:sleep_state"), NodePath(".:exhausted"), NodePath(".:stats"),
+	NodePath(".:skills"), NodePath(".:intent"), NodePath(".:is_possessed"),
+]
+
+const PLAYER_LARGE_REPLICATED_PROPERTIES: Array[NodePath] = [
+	NodePath(".:equipped"), NodePath(".:equipped_data"),
+	NodePath(".:stats"), NodePath(".:skills"),
+]
+
 var _errors: Array[String] =[]
 var _warnings: Array[String] =[]
 var _validated_script_paths: Dictionary = {}
@@ -1021,10 +1036,11 @@ func _validate_spawnable_scenes() -> void:
 	for scene_path in NET_SPAWNABLE_SCENES:
 		_validate_packed_scene(scene_path, "spawnable scene")
 
-# Every scene in NET_SYNCED_SCENES must have a MultiplayerSynchronizer whose
-# replication_config property paths all resolve to real properties on their
-# target nodes.  A path like NodePath(".:tile_pos") breaks silently at runtime
-# when the property is renamed; this check catches that at import time.
+# Every scene in NET_SYNCED_SCENES must have at least one MultiplayerSynchronizer,
+# and every synchronizer's replication_config paths must resolve to real
+# properties on its target node. A path like NodePath(".:tile_pos") breaks
+# silently at runtime when the property is renamed; this check catches that at
+# import time.
 func _validate_replication_configs() -> void:
 	for scene_path in NET_SYNCED_SCENES:
 		if not ResourceLoader.exists(scene_path):
@@ -1036,25 +1052,41 @@ func _validate_replication_configs() -> void:
 		if instance == null:
 			continue
 
-		var sync_node := _find_multiplayer_synchronizer(instance)
-		if sync_node == null:
+		var sync_nodes := _find_multiplayer_synchronizers(instance)
+		if sync_nodes.is_empty():
 			_fail("%s: expected a MultiplayerSynchronizer but none found." % scene_path)
 			instance.free()
 			continue
+		if scene_path == "res://scenes/player.tscn" and sync_nodes.size() != 1:
+			_fail("%s: spawned players must use exactly one MultiplayerSynchronizer." % scene_path)
 
-		var config: SceneReplicationConfig = sync_node.get("replication_config")
-		if config == null:
-			_fail("%s: MultiplayerSynchronizer '%s' has no replication_config." %[scene_path, sync_node.name])
-			instance.free()
-			continue
+		var configured_properties: Dictionary = {}
+		for sync_node: MultiplayerSynchronizer in sync_nodes:
+			var config: SceneReplicationConfig = sync_node.get("replication_config")
+			if config == null:
+				_fail("%s: MultiplayerSynchronizer '%s' has no replication_config." %[scene_path, sync_node.name])
+				continue
 
-		var replicated_properties := config.get_properties()
-		if NodePath(".:position") in replicated_properties:
-			_fail("%s: position must not be replicated while authoritative movement interpolation is active." % scene_path)
-		if scene_path == "res://scenes/player.tscn" and NodePath(".:view_z_level") in replicated_properties:
-			_fail("%s: view_z_level is client-local view intent and must not be overwritten by server state replication." % scene_path)
-		for prop_path: NodePath in replicated_properties:
-			_validate_replication_property(scene_path, instance, prop_path)
+			var replicated_properties := config.get_properties()
+			if NodePath(".:position") in replicated_properties:
+				_fail("%s: position must not be replicated while authoritative movement interpolation is active." % scene_path)
+			if scene_path == "res://scenes/player.tscn" and NodePath(".:view_z_level") in replicated_properties:
+				_fail("%s: view_z_level is client-local view intent and must not be overwritten by server state replication." % scene_path)
+			for prop_path: NodePath in replicated_properties:
+				if configured_properties.has(prop_path):
+					_fail("%s: replication property '%s' appears in both '%s' and '%s'." % [
+						scene_path, prop_path, configured_properties[prop_path], sync_node.name])
+				else:
+					configured_properties[prop_path] = sync_node.name
+				if scene_path == "res://scenes/player.tscn" and prop_path in PLAYER_LARGE_REPLICATED_PROPERTIES:
+					if config.property_get_replication_mode(prop_path) != SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE:
+						_fail("%s: large replication property '%s' must use ON_CHANGE mode to stay out of the 1350-byte continuous snapshot." % [scene_path, prop_path])
+				_validate_replication_property(scene_path, instance, prop_path)
+
+		if scene_path == "res://scenes/player.tscn":
+			for expected_path: NodePath in PLAYER_REPLICATED_PROPERTIES:
+				if not configured_properties.has(expected_path):
+					_fail("%s: required replication property '%s' is missing." % [scene_path, expected_path])
 
 		instance.free()
 
@@ -1368,6 +1400,72 @@ func _validate_authoritative_snapshot_codec() -> void:
 	altered[0] = altered[0] ^ 1
 	if sync._checksum_bytes(altered) == checksum:
 		_fail("LateJoinSync: snapshot checksum did not detect altered bytes.")
+
+	# Recreate a reconnect after the client has loaded a fresh copy of the map.
+	# The snapshot checksum may match the previous connection, but its tile data
+	# must still replace that fresh scene's original (undamaged) wall geometry.
+	var previous_main_scene: Node = World.main_scene
+	var reconnect_root := Node2D.new()
+	reconnect_root.name = "__SmokeSnapshotReconnectRoot"
+	World.add_child(reconnect_root)
+	reconnect_root.add_child(latejoin)
+
+	var tile_set := load("res://assets/tileset.tres") as TileSet
+	var stale_main := Node2D.new()
+	stale_main.name = "StaleMain"
+	reconnect_root.add_child(stale_main)
+	var stale_layer := TileMapLayer.new()
+	stale_layer.name = "TileMapLayer_Z3"
+	stale_layer.tile_set = tile_set
+	stale_main.add_child(stale_layer)
+	World.register_main(stale_main)
+	World.get_tilemap(3) # Populate the cache with the previous scene's layer.
+
+	var current_main := Node2D.new()
+	current_main.name = "CurrentMain"
+	reconnect_root.add_child(current_main)
+	var current_layer := TileMapLayer.new()
+	current_layer.name = "TileMapLayer_Z3"
+	current_layer.tile_set = tile_set
+	current_main.add_child(current_layer)
+	var wall_cell := Vector2i(2, 2)
+	current_layer.set_cell(wall_cell, 1, Vector2i(1, 0), 0)
+	World.register_main(current_main)
+	if World.get_tilemap(3) != current_layer:
+		_fail("World.get_tilemap: reconnect retained a TileMapLayer cached from the previous main scene.")
+
+	var restored_tiles := PackedInt32Array([3, wall_cell.x, wall_cell.y, 0, 4, 0, 0])
+	var matching_tile_checksum: String = sync._checksum_bytes(var_to_bytes(restored_tiles))
+	var reconnect_snapshot := {
+		"schema_version": 1,
+		"tiles": restored_tiles,
+		"tile_checksum": matching_tile_checksum,
+		"grass": [],
+		"grass_checksum": sync._checksum_bytes(var_to_bytes([])),
+		"objects": [],
+		"players": {},
+		"mobs": [],
+	}
+	var reconnect_raw: PackedByteArray = var_to_bytes(reconnect_snapshot)
+	sync._last_applied_tile_checksum = matching_tile_checksum
+	if not sync.handle_receive_world_snapshot(
+		1,
+		2,
+		reconnect_raw.size(),
+		sync._checksum_bytes(reconnect_raw),
+		reconnect_raw.compress(FileAccess.COMPRESSION_GZIP)
+	):
+		_fail("LateJoinSync: reconnect snapshot was rejected.")
+	if current_layer.get_cell_source_id(wall_cell) != 0 or current_layer.get_cell_atlas_coords(wall_cell) != Vector2i(4, 0):
+		_fail("LateJoinSync: reconnect did not restore destroyed-wall geometry when its checksum matched the prior connection.")
+
+	reconnect_root.remove_child(latejoin)
+	if previous_main_scene != null and is_instance_valid(previous_main_scene):
+		World.register_main(previous_main_scene)
+	else:
+		World.unregister_main()
+	World.remove_child(reconnect_root)
+	reconnect_root.free()
 
 	var stump := TreeSegment.new()
 	stump.piece_kind = "stump"
@@ -1821,15 +1919,17 @@ func _validate_replication_property(scene_path: String, root: Node, prop_path: N
 	if not found:
 		_fail("%s: replication property '%s' — '%s' does not exist on node '%s'." % [scene_path, path_str, prop_name, target.name])
 
-# Returns the first MultiplayerSynchronizer descendant of root, or null.
-func _find_multiplayer_synchronizer(root: Node) -> MultiplayerSynchronizer:
+# Returns every MultiplayerSynchronizer descendant of root.
+func _find_multiplayer_synchronizers(root: Node) -> Array[MultiplayerSynchronizer]:
+	var result: Array[MultiplayerSynchronizer] = []
+	_collect_multiplayer_synchronizers(root, result)
+	return result
+
+func _collect_multiplayer_synchronizers(root: Node, result: Array[MultiplayerSynchronizer]) -> void:
 	if root is MultiplayerSynchronizer:
-		return root as MultiplayerSynchronizer
+		result.append(root as MultiplayerSynchronizer)
 	for child in root.get_children():
-		var result := _find_multiplayer_synchronizer(child)
-		if result != null:
-			return result
-	return null
+		_collect_multiplayer_synchronizers(child, result)
 
 func _validate_packed_scene(scene_path: String, context: String) -> void:
 	if _validated_scene_paths.has(scene_path):

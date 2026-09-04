@@ -113,10 +113,7 @@ func _input_event(viewport: Viewport, event: InputEvent, shape_idx: int) -> void
 			if can_accept_key_item(held_item):
 				get_viewport().set_input_as_handled()
 				var keyring_id := World.get_entity_id(self)
-				if multiplayer.is_server():
-					World.rpc_request_keyring_insert(keyring_id, player.active_hand)
-				else:
-					World.rpc_request_keyring_insert.rpc_id(1, keyring_id, player.active_hand)
+				World.rpc_request_keyring_insert.rpc_id(1, keyring_id, player.active_hand)
 				return
 
 	super._input_event(viewport, event, shape_idx)

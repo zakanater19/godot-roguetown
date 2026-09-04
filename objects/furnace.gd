@@ -77,27 +77,18 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 				if _coal_count >= 1:
 					player._show_inspect_text("already has fuel", "")
 				else:
-					if multiplayer.is_server():
-						World.rpc_request_furnace_action(furnace_id, "insert_fuel:" + item_type, player.active_hand)
-					else:
-						World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_fuel:" + item_type, player.active_hand)
+					World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_fuel:" + item_type, player.active_hand)
 			elif held.get("is_smeltable_ore") == true:
 				if _ironore_count >= 1:
 					player._show_inspect_text("already has ore", "")
 				else:
-					if multiplayer.is_server():
-						World.rpc_request_furnace_action(furnace_id, "insert_ore:" + item_type, player.active_hand)
-					else:
-						World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_ore:" + item_type, player.active_hand)
+					World.rpc_request_furnace_action.rpc_id(1, furnace_id, "insert_ore:" + item_type, player.active_hand)
 			else:
 				player._show_inspect_text("that can't be added to the furnace", "")
 		else:
 			if _coal_count >= 1 and _ironore_count >= 1:
 				var furnace_id := World.get_entity_id(self)
-				if multiplayer.is_server():
-					World.rpc_request_furnace_action(furnace_id, "start_smelt", player.active_hand)
-				else:
-					World.rpc_request_furnace_action.rpc_id(1, furnace_id, "start_smelt", player.active_hand)
+				World.rpc_request_furnace_action.rpc_id(1, furnace_id, "start_smelt", player.active_hand)
 			else:
 				player._show_inspect_text("needs fuel and ore to start", "")
 
@@ -110,10 +101,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			player._show_inspect_text("the furnace is already empty", "")
 			return
 		var furnace_id := World.get_entity_id(self)
-		if multiplayer.is_server():
-			World.rpc_request_furnace_action(furnace_id, "eject", player.active_hand)
-		else:
-			World.rpc_request_furnace_action.rpc_id(1, furnace_id, "eject", player.active_hand)
+		World.rpc_request_furnace_action.rpc_id(1, furnace_id, "eject", player.active_hand)
 
 func _perform_action(action: String, player: Node, hand_idx: int, generated_names: Array) -> void:
 	if action.begins_with("insert_fuel:"):

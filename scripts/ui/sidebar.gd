@@ -293,15 +293,12 @@ func _on_toggle_time_pressed() -> void:
 	Lighting.toggle_time_of_day()
 
 func _on_time_multiplier_changed(value: float) -> void:
-	var player = World.get_local_player()
-	if player != null and player.multiplayer.is_server():
+	if multiplayer.is_server():
 		Lighting.sync_time_multiplier.rpc(value)
-	elif player != null:
-		Lighting.sync_time_multiplier.rpc_id(1, value)
 
 func _on_end_round_pressed() -> void:
 	if multiplayer.is_server():
-		World.rpc_request_round_end.rpc()
+		World.request_round_end()
 
 func _on_tab_stats_pressed() -> void:
 	if _stats_view == null: return
@@ -399,9 +396,7 @@ func _on_save_laws_pressed() -> void:
 		formatted_laws.append("LAW " + str(i + 1) + ": " + new_laws[i])
 		
 	var player = World.get_local_player()
-	if player != null and player.multiplayer.is_server():
-		World.rpc_request_update_laws(formatted_laws)
-	elif player != null:
+	if player != null:
 		World.rpc_request_update_laws.rpc_id(1, formatted_laws)
 		
 	_on_tab_laws_pressed()

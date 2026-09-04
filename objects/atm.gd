@@ -87,10 +87,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			return
 		get_viewport().set_input_as_handled()
 		var deposit_atm_id := World.get_entity_id(self)
-		if multiplayer.is_server():
-			World.rpc_request_atm_hand_deposit(deposit_atm_id, player.active_hand)
-		else:
-			World.rpc_request_atm_hand_deposit.rpc_id(1, deposit_atm_id, player.active_hand)
+		World.rpc_request_atm_hand_deposit.rpc_id(1, deposit_atm_id, player.active_hand)
 		return
 	if not Defs.is_valid_hand_index(player.active_hand) or player.hands[player.active_hand] != null:
 		player._show_inspect_text("you need an open hand to use the ATM", "")
@@ -101,10 +98,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 
 	get_viewport().set_input_as_handled()
 	var atm_id := World.get_entity_id(self)
-	if multiplayer.is_server():
-		World.rpc_request_atm_open(atm_id)
-	else:
-		World.rpc_request_atm_open.rpc_id(1, atm_id)
+	World.rpc_request_atm_open.rpc_id(1, atm_id)
 
 func _show_atm_menu(balance: int) -> void:
 	_ensure_ui()
@@ -227,10 +221,7 @@ func _request_withdraw() -> void:
 	if local_player != null and Defs.is_valid_hand_index(local_player.active_hand):
 		preferred_hand = local_player.active_hand
 
-	if multiplayer.is_server():
-		World.rpc_request_atm_withdraw(atm_id, metal_type, amount, preferred_hand)
-	else:
-		World.rpc_request_atm_withdraw.rpc_id(1, atm_id, metal_type, amount, preferred_hand)
+	World.rpc_request_atm_withdraw.rpc_id(1, atm_id, metal_type, amount, preferred_hand)
 
 func _sync_presentation() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D

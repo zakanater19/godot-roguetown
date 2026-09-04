@@ -64,7 +64,4 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 	player._face_toward(global_position)
 	player._apply_action_cooldown(null)
 	var bush_id := World.get_entity_id(self)
-	if multiplayer.is_server():
-		World.rpc_request_search_bush(bush_id, player.active_hand)
-	else:
-		World.rpc_request_search_bush.rpc_id(1, bush_id, player.active_hand)
+	World.rpc_request_search_bush.rpc_id(1, bush_id, player.active_hand)

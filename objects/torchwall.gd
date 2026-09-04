@@ -157,10 +157,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 
 func _request_action(action: String, hand_idx: int) -> void:
 	var torchwall_id := World.get_entity_id(self)
-	if multiplayer.is_server():
-		World.rpc_request_torchwall_action(torchwall_id, action, hand_idx)
-	else:
-		World.rpc_request_torchwall_action.rpc_id(1, torchwall_id, action, hand_idx)
+	World.rpc_request_torchwall_action.rpc_id(1, torchwall_id, action, hand_idx)
 
 func _perform_action(action: String, player: Node, hand_idx: int, generated_ids: Array) -> void:
 	match action:

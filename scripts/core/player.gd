@@ -142,10 +142,7 @@ func set_character_name(p_name: String, p_class: String) -> void:
 	character_name = p_name
 	character_class = p_class
 	if class_changed: _apply_class_defaults()
-	if multiplayer.has_multiplayer_peer():
-		var peer_id = get_multiplayer_authority()
-		if peer_id != 1:
-			_sync_character_name.rpc_id(peer_id, p_name, p_class)
+	_sync_character_name.rpc_id(get_multiplayer_authority(), p_name, p_class)
 
 # ── Description / inspection delegation ──────────────────────────────────────
 
@@ -219,8 +216,6 @@ func show_remote_chat(sender_name: String, message: String) -> void: if chat: ch
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_sync_sneak_mode(val: bool) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	if multiplayer.is_server():
 		if sender_id != get_multiplayer_authority():
 			return
@@ -250,7 +245,7 @@ func _apply_stamina_cost(amount: float) -> void:
 func consume_stamina_authoritative(amount: float) -> void:
 	# Server gameplay handlers can call this while an inbound client RPC is still
 	# on the stack, when get_remote_sender_id() still refers to that client.
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+	if not multiplayer.is_server():
 		return
 	_apply_stamina_cost(amount)
 
@@ -264,8 +259,7 @@ func rpc_consume_stamina(amount: float) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_combat_mode(mode: bool) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			if combat: combat.set_combat_mode_local(mode)
@@ -276,8 +270,7 @@ func _sync_combat_mode(mode: bool) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_combat_stance(stance: String) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			if combat: combat.set_combat_stance_local(stance)
@@ -298,14 +291,11 @@ func toggle_hood_state() -> void:
 	equipped_data["face"] = data
 	_update_clothing_sprites()
 	if _hud != null: _hud.update_clothing_display(equipped, equipped_data)
-	if multiplayer.has_multiplayer_peer():
-		if multiplayer.is_server(): rpc("_sync_hood_state", hood_up)
-		else: rpc_id(1, "_sync_hood_state", hood_up)
+	rpc_id(1, "_sync_hood_state", hood_up)
 
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_hood_state(hood_up: bool) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			var data = equipped_data.get("face", null)
@@ -326,7 +316,6 @@ func _sync_hood_state(hood_up: bool) -> void:
 
 func toggle_sleep() -> void:                                              if sleep_: sleep_.toggle_sleep()
 func _is_on_bed() -> bool:                                                return sleep_.is_on_bed() if sleep_ else false
-func _sync_sleep_state_update(new_state: SleepState) -> void:            if sleep_: sleep_.sync_sleep_state_update(new_state)
 func _set_lying_down_visuals(_lying_down: bool) -> void:                  if sleep_: sleep_.set_lying_down_visuals(_lying_down)
 func toggle_lying_down() -> void:                                          if sleep_: sleep_.toggle_lying_down()
 func _cancel_stand_up() -> void:                                           if sleep_: sleep_.cancel_stand_up()
@@ -335,8 +324,7 @@ func _complete_stand_up() -> void:                                         if sl
 
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_sleep_state(new_state: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority() and sleep_ != null and sleep_.is_valid_requested_transition(new_state):
 			sleep_.apply_sleep_state(new_state)
@@ -350,8 +338,7 @@ func rpc_heal_limbs(amount: int) -> void: if body != null: body.heal_limbs(amoun
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_sync_lying_down(val: bool) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			is_lying_down = val
@@ -424,8 +411,7 @@ func _die_visuals() -> void: if combat: combat.die_visuals()
 
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_active_hand(hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			active_hand = hand_idx
@@ -433,10 +419,9 @@ func _sync_active_hand(hand_idx: int) -> void:
 	else:
 		if sender_id == 1: active_hand = hand_idx
 
-@rpc("any_peer", "call_local", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_transfer_to_hand(from_idx: int, to_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	if multiplayer.is_server():
 		if sender_id != get_multiplayer_authority(): return
 		if hands[to_idx] != null or hands[from_idx] == null: return
@@ -506,12 +491,11 @@ func _is_local_authority() -> bool:
 	if not is_possessed: return false
 	if not is_inside_tree(): return false
 	if not multiplayer.has_multiplayer_peer(): return false
+	if multiplayer.is_server(): return false
 	if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED: return false
 	return multiplayer.get_unique_id() == get_multiplayer_authority()
 
 func _is_server_state_message() -> bool:
-	if not multiplayer.has_multiplayer_peer():
-		return true
 	var sender_id := multiplayer.get_remote_sender_id()
 	return sender_id == 1 or (sender_id == 0 and multiplayer.is_server())
 
@@ -566,10 +550,8 @@ func _try_move(dir: Vector2i) -> void:
 	_update_sprite()
 	_awaiting_move_confirm = true
 	var sprint_intent = Input.is_key_pressed(KEY_SPACE) and not exhausted and not (body != null and body.are_legs_broken())
-	if multiplayer.is_server(): World.rpc_try_move(dir, sprint_intent)
-	else:
-		_start_predicted_move(tile_pos + dir, sprint_intent)
-		World.rpc_try_move.rpc_id(1, dir, sprint_intent)
+	_start_predicted_move(tile_pos + dir, sprint_intent)
+	World.rpc_try_move.rpc_id(1, dir, sprint_intent)
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 
@@ -584,20 +566,13 @@ func _set_facing_from_input(new_facing: int) -> void:
 	if new_facing < 0 or new_facing >= FACING_NAMES.size() or facing == new_facing:
 		return
 	facing = new_facing
-	if not multiplayer.has_multiplayer_peer():
-		return
-	if multiplayer.is_server():
-		_rpc_sync_facing(new_facing)
-	else:
-		_rpc_sync_facing.rpc_id(1, new_facing)
+	_rpc_sync_facing.rpc_id(1, new_facing)
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_sync_facing(new_facing: int) -> void:
 	if new_facing < 0 or new_facing >= FACING_NAMES.size():
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	if multiplayer.is_server():
 		if sender_id != get_multiplayer_authority():
 			return
@@ -610,8 +585,7 @@ func _on_chat_submitted(text: String) -> void:
 	if chat: chat.on_chat_submitted(text)
 
 func _on_respawn_pressed() -> void:
-	if multiplayer.is_server(): World.rpc_request_respawn.rpc(multiplayer.get_unique_id())
-	else: World.rpc_request_respawn.rpc_id(1, multiplayer.get_unique_id())
+	World.rpc_request_respawn.rpc_id(1, multiplayer.get_unique_id())
 
 # ── Clothing / visuals ────────────────────────────────────────────────────────
 
@@ -702,9 +676,6 @@ func _process(delta: float) -> void:
 			get_parent().add_child(drip)
 
 	if is_local and _hud: _hud.update_stats(health, stamina)
-
-	if is_local and is_sneaking and not dead:
-		if sneak: sneak.process_sneak_alpha(delta)
 
 	if is_possessed:
 		if misc:     misc.update(delta)

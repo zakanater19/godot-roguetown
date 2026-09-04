@@ -702,10 +702,7 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 		var active_held: Node = player.hands[player.active_hand]
 		if clicked_item.has_method("can_accept_key_item") and clicked_item.can_accept_key_item(active_held):
 			var clicked_item_id := World.get_entity_id(clicked_item)
-			if player.multiplayer.is_server():
-				World.rpc_request_keyring_insert(clicked_item_id, player.active_hand)
-			else:
-				World.rpc_request_keyring_insert.rpc_id(1, clicked_item_id, player.active_hand)
+			World.rpc_request_keyring_insert.rpc_id(1, clicked_item_id, player.active_hand)
 			return
 
 		var itype = clicked_item.get("item_type")
@@ -715,40 +712,27 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 				Sidebar.add_message("[color=#ffaaaa]" + label + " is too large to fit in the satchel.[/color]")
 				return
 			var clicked_item_id := World.get_entity_id(clicked_item)
-			if player.multiplayer.is_server():
-				World.rpc_request_satchel_insert(clicked_item_id, player.active_hand)
-			else:
-				World.rpc_request_satchel_insert.rpc_id(1, clicked_item_id, player.active_hand)
+			World.rpc_request_satchel_insert.rpc_id(1, clicked_item_id, player.active_hand)
 			return
 
 	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] != null:
 		var active_held: Node = player.hands[player.active_hand]
 		if active_held.get("is_coin_stack") and clicked_item.get("is_coin_stack"):
 			if active_held.get("item_type") == clicked_item.get("item_type"):
-				if player.multiplayer.is_server():
-					World.rpc_request_combine_hand_coins(player.active_hand, hand_idx)
-				else:
-					World.rpc_request_combine_hand_coins.rpc_id(1, player.active_hand, hand_idx)
+				World.rpc_request_combine_hand_coins.rpc_id(1, player.active_hand, hand_idx)
 				return
 
 	if hand_idx != player.active_hand and clicked_item != null and player.hands[player.active_hand] == null:
 		if clicked_item.has_method("can_extract_key") and clicked_item.can_extract_key():
 			var clicked_item_id := World.get_entity_id(clicked_item)
-			if player.multiplayer.is_server():
-				World.rpc_request_keyring_extract(clicked_item_id, player.active_hand)
-			else:
-				World.rpc_request_keyring_extract.rpc_id(1, clicked_item_id, player.active_hand)
+			World.rpc_request_keyring_extract.rpc_id(1, clicked_item_id, player.active_hand)
 			return
 
 		if clicked_item.get("is_coin_stack"):
 			if clicked_item.get("amount") > 1:
 				_show_coin_split_dialog(hand_idx, player.active_hand, clicked_item.get("amount"))
 			else:
-				if player.multiplayer.has_multiplayer_peer():
-					if player.multiplayer.is_server():
-						player.rpc_transfer_to_hand(hand_idx, player.active_hand)
-					else:
-						player.rpc_transfer_to_hand.rpc_id(1, hand_idx, player.active_hand)
+				player.rpc_transfer_to_hand.rpc_id(1, hand_idx, player.active_hand)
 			return
 
 		if clicked_item.has_method("_open_ui"):
@@ -762,21 +746,13 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 			Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
 			return
 
-		if player.multiplayer.has_multiplayer_peer():
-			if player.multiplayer.is_server():
-				player.rpc_transfer_to_hand(hand_idx, player.active_hand)
-			else:
-				player.rpc_transfer_to_hand.rpc_id(1, hand_idx, player.active_hand)
+		player.rpc_transfer_to_hand.rpc_id(1, hand_idx, player.active_hand)
 		return
 
 	if player.active_hand != hand_idx:
 		player.active_hand = hand_idx
 		player._update_hands_ui()
-		if player.multiplayer.has_multiplayer_peer():
-			if player.multiplayer.is_server():
-				player.rpc("_sync_active_hand", hand_idx)
-			else:
-				player.rpc_id(1, "_sync_active_hand", hand_idx)
+		player.rpc_id(1, "_sync_active_hand", hand_idx)
 
 func _show_coin_split_dialog(from_idx: int, to_idx: int, max_amount: int) -> void:
 	var dialog := ConfirmationDialog.new()
@@ -797,11 +773,8 @@ func _show_coin_split_dialog(from_idx: int, to_idx: int, max_amount: int) -> voi
 
 	dialog.confirmed.connect(func():
 		var split_amt = int(spinbox.value)
-		if player != null and player.multiplayer.has_multiplayer_peer():
-			if player.multiplayer.is_server():
-				World.rpc_request_split_coins(from_idx, to_idx, split_amt)
-			else:
-				World.rpc_request_split_coins.rpc_id(1, from_idx, to_idx, split_amt)
+		if player != null:
+			World.rpc_request_split_coins.rpc_id(1, from_idx, to_idx, split_amt)
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
@@ -814,10 +787,7 @@ func _on_release_gui_input(event: InputEvent) -> void:
 		return
 	if player == null:
 		return
-	if player.multiplayer.is_server():
-		World.rpc_request_release_grab()
-	else:
-		World.rpc_request_release_grab.rpc_id(1)
+	World.rpc_request_release_grab.rpc_id(1)
 
 func _on_intent_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):

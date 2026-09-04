@@ -56,9 +56,9 @@ func _ready() -> void:
 	if preview != null:
 		preview.visible = false
 
-	# Runtime tree pieces are gameplay objects.  Only the server/offline host may
-	# construct them; network clients receive them from the world snapshot.
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+	# Runtime tree pieces are gameplay objects. Only the server constructs them;
+	# clients receive them from the world snapshot.
+	if not multiplayer.is_server():
 		return
 
 	call_deferred("_spawn_runtime_tree")

@@ -92,9 +92,7 @@ func handle_input(event: InputEvent) -> void:
 		player.active_hand = 1 - player.active_hand
 		player._update_hands_ui()
 		if player._throw_label != null: player._throw_label.visible = player.throwing_mode and player.hands[player.active_hand] != null
-		if player.multiplayer.has_multiplayer_peer():
-			if player.multiplayer.is_server(): player.rpc("_sync_active_hand", player.active_hand)
-			else: player.rpc_id(1, "_sync_active_hand", player.active_hand)
+		player.rpc_id(1, "_sync_active_hand", player.active_hand)
 		return
 	if event is InputEventKey and event.keycode == KEY_R and event.pressed and not event.echo:
 		player.throwing_mode = not player.throwing_mode
@@ -104,15 +102,13 @@ func handle_input(event: InputEvent) -> void:
 		player.throwing_mode = false
 		if player._throw_label != null: player._throw_label.visible = false
 		if player.grabbed_target != null and is_instance_valid(player.grabbed_target):
-			if player.multiplayer.is_server(): World.rpc_request_release_grab()
-			else: World.rpc_request_release_grab.rpc_id(1)
+			World.rpc_request_release_grab.rpc_id(1)
 		else: player._drop_held_object()
 		return
 	if event is InputEventKey and event.keycode == KEY_Z and event.pressed and not event.echo:
 		if player.grabbed_by != null and is_instance_valid(player.grabbed_by):
 			if player.exhausted: Sidebar.add_message("[color=#ffaaaa]You are too exhausted to resist the grab![/color]"); return
-			if player.multiplayer.is_server(): World.rpc_request_resist()
-			else: World.rpc_request_resist.rpc_id(1)
+			World.rpc_request_resist.rpc_id(1)
 		else: player._interact_held_object()
 		return
 	if event is InputEventKey and event.keycode == KEY_V and event.pressed and not event.echo:
@@ -135,8 +131,7 @@ func handle_input(event: InputEvent) -> void:
 				else:
 					player._face_toward(mouse_world)
 					player._apply_action_cooldown(null, true)
-					if player.multiplayer.is_server(): World.rpc_request_shove(target_tile)
-					else: World.rpc_request_shove.rpc_id(1, target_tile)
+					World.rpc_request_shove.rpc_id(1, target_tile)
 				player.get_viewport().set_input_as_handled()
 				return
 
@@ -165,8 +160,7 @@ func handle_input(event: InputEvent) -> void:
 				var grab_limb: String = "chest"
 				if player._hud != null: grab_limb = player._hud.targeted_limb
 				var grab_target_id := World.get_entity_id(grab_target)
-				if player.multiplayer.is_server(): World.rpc_request_grab(grab_target_id, grab_limb)
-				else: World.rpc_request_grab.rpc_id(1, grab_target_id, grab_limb)
+				World.rpc_request_grab.rpc_id(1, grab_target_id, grab_limb)
 			player.get_viewport().set_input_as_handled()
 			return
 

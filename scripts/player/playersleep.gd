@@ -21,15 +21,15 @@ func toggle_sleep() -> void:
 		if player.is_lying_down: toggle_lying_down()
 		apply_sleep_state(player.SleepState.FALLING_ASLEEP)
 		Sidebar.add_message("[color=#aaccff]You start falling asleep...[/color]")
-		sync_sleep_state_update(player.sleep_state)
+		request_sleep_state_update(player.sleep_state)
 	elif player.sleep_state == player.SleepState.FALLING_ASLEEP:
 		apply_sleep_state(player.SleepState.AWAKE)
 		Sidebar.add_message("[color=#aaccff]You jolt awake.[/color]")
-		sync_sleep_state_update(player.sleep_state)
+		request_sleep_state_update(player.sleep_state)
 	elif player.sleep_state == player.SleepState.ASLEEP:
 		apply_sleep_state(player.SleepState.WAKING_UP)
 		Sidebar.add_message("[color=#aaccff]You start waking up...[/color]")
-		sync_sleep_state_update(player.sleep_state)
+		request_sleep_state_update(player.sleep_state)
 
 func apply_sleep_state(new_state: int) -> void:
 	player.sleep_state = new_state
@@ -57,10 +57,10 @@ func is_on_bed() -> bool:
 		if obj_tile == player.tile_pos: return true
 	return false
 
-func sync_sleep_state_update(new_state) -> void:
-	if player.multiplayer.has_multiplayer_peer():
-		if player.multiplayer.is_server(): player.rpc("_sync_sleep_state", new_state)
-		else: player.rpc_id(1, "_sync_sleep_state", new_state)
+func request_sleep_state_update(new_state) -> void:
+	if not player.multiplayer.get_peers().has(1):
+		return
+	player.rpc_id(1, "_sync_sleep_state", new_state)
 
 func set_lying_down_visuals(_lying_down: bool) -> void:
 	if player.dead: return
@@ -79,9 +79,7 @@ func toggle_lying_down() -> void:
 		cancel_stand_up()
 		player._update_sprite()
 		player._update_water_submerge()
-		if player.multiplayer.has_multiplayer_peer():
-			if player.multiplayer.is_server(): player.rpc("_rpc_sync_lying_down", player.is_lying_down)
-			else: player.rpc_id(1, "_rpc_sync_lying_down", player.is_lying_down)
+		player.rpc_id(1, "_rpc_sync_lying_down", player.is_lying_down)
 	else:
 		if player._stand_up_timer < 0.0:
 			player._stand_up_timer = 0.0
@@ -116,9 +114,7 @@ func complete_stand_up() -> void:
 	player.is_lying_down = false
 	player._update_sprite()
 	player._update_water_submerge()
-	if player.multiplayer.has_multiplayer_peer():
-		if player.multiplayer.is_server(): player.rpc("_rpc_sync_lying_down", player.is_lying_down)
-		else: player.rpc_id(1, "_rpc_sync_lying_down", player.is_lying_down)
+	player.rpc_id(1, "_rpc_sync_lying_down", player.is_lying_down)
 
 func update_stand_up(delta: float, buffered_dir: Vector2i) -> void:
 	const STAND_UP_DURATION: float = 2.0
@@ -144,7 +140,7 @@ func update(delta: float, is_local: bool) -> void:
 	var peer := player.multiplayer.multiplayer_peer
 	if peer != null and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
+	var simulation_authority := player.multiplayer.is_server()
 	if player.sleep_state != player.SleepState.AWAKE and not player.dead and player.is_possessed:
 		if player.sleep_state == player.SleepState.FALLING_ASLEEP:
 			if simulation_authority or is_local:
@@ -154,7 +150,7 @@ func update(delta: float, is_local: bool) -> void:
 				player._sleeping_on_bed = is_on_bed()
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are now fast asleep.[/color]")
-				sync_sleep_state_update(player.sleep_state)
+				player.rpc("_sync_sleep_state", player.sleep_state)
 		elif player.sleep_state == player.SleepState.WAKING_UP:
 			if simulation_authority or is_local:
 				player.sleep_timer = maxf(player.sleep_timer - delta, 0.0)
@@ -162,7 +158,7 @@ func update(delta: float, is_local: bool) -> void:
 				apply_sleep_state(player.SleepState.AWAKE)
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are fully awake.[/color]")
-				sync_sleep_state_update(player.sleep_state)
+				player.rpc("_sync_sleep_state", player.sleep_state)
 		elif player.sleep_state == player.SleepState.ASLEEP:
 			if simulation_authority:
 				var regen_rate = 4.0 if player._sleeping_on_bed else 2.0

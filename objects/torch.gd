@@ -54,7 +54,7 @@ func _process(delta: float) -> void:
 	var peer := multiplayer.multiplayer_peer
 	if peer != null and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+	if not multiplayer.is_server():
 		return
 	if _is_held_by_any_player() or not _is_ground_drop():
 		_ground_burn_time = 0.0
@@ -153,7 +153,4 @@ func _request_auto_extinguish() -> void:
 	if torch_id == "":
 		_extinguish_from_world()
 		return
-	if multiplayer.has_multiplayer_peer():
-		World.rpc_confirm_auto_extinguish_torch.rpc(torch_id)
-	else:
-		_extinguish_from_world()
+	World.rpc_confirm_auto_extinguish_torch.rpc(torch_id)

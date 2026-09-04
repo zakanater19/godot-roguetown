@@ -131,19 +131,17 @@ func _on_chat_submitted(text: String) -> void:
 	if text.strip_edges() == "":
 		return
 		
-	if multiplayer.is_server():
-		rpc_send_lobby_chat(text)
-	elif multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
+	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
 		rpc_send_lobby_chat.rpc_id(1, text)
 
-@rpc("any_peer", "call_local", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_send_lobby_chat(message: String) -> void:
 	if not multiplayer.is_server():
 		return
 		
-	var peer_id = multiplayer.get_remote_sender_id()
-	if peer_id == 0:
-		peer_id = multiplayer.get_unique_id()
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id <= 1:
+		return
 		
 	var sender_name = "Unknown"
 	if ready_players.has(peer_id):
@@ -249,17 +247,13 @@ func _on_subclass_chosen(subclass: String) -> void:
 		_send_latejoin_request(p_name, subclass)
 
 func _send_ready_request(is_ready: bool, p_name: String, p_class: String) -> void:
-	if multiplayer.is_server():
-		request_set_ready(is_ready, p_name, p_class)
-	elif multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
+	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
 		request_set_ready.rpc_id(1, is_ready, p_name, p_class)
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")
 
 func _send_latejoin_request(p_name: String, p_class: String) -> void:
-	if multiplayer.is_server():
-		request_latejoin(p_name, p_class)
-	elif multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
+	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
 		request_latejoin.rpc_id(1, p_name, p_class)
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")
@@ -312,15 +306,14 @@ func _on_restart_round_pressed() -> void:
 		_update_host_stats()
 		# Use the existing synchronized round-end RPC so every client schedules
 		# its reconnect before the server closes the current ENet peer.
-		World.rpc_request_round_end()
+		World.request_round_end()
 
-@rpc("any_peer", "call_local", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
 	if not multiplayer.is_server(): return
 	if game_started: return
-	var peer_id = multiplayer.get_remote_sender_id()
-	if peer_id == 0:
-		peer_id = multiplayer.get_unique_id()
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id <= 1: return
 	
 	if _get_validation_error(p_name, peer_id) != "":
 		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
@@ -331,9 +324,6 @@ func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func sync_ready_state(peer_id: int, is_ready: bool, p_name: String, p_class: String) -> void:
-	if peer_id == 0:
-		peer_id = multiplayer.get_unique_id()
-	
 	ready_players[peer_id] = {"ready": is_ready, "name": p_name, "class": p_class}
 	if peer_id == multiplayer.get_unique_id():
 		if _ready_btn != null:
@@ -368,7 +358,7 @@ func _start_game() -> void:
 	# Spawn evaluated players
 	for peer_id in ready_players:
 		# Peer 1 is the graphical server console, never a player.
-		if int(peer_id) == multiplayer.get_unique_id():
+		if int(peer_id) <= 1:
 			continue
 		var data = ready_players[peer_id]
 		if data.get("ready", false) == true:
@@ -381,13 +371,12 @@ func _start_game() -> void:
 				Host.spawn_player(peer_id, data.get("name", "noob"), data.get("class", "peasant"), false)
 				rpc_hide_lobby.rpc_id(peer_id)
 
-@rpc("any_peer", "call_local", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func request_latejoin(p_name: String, p_class: String) -> void:
 	if not multiplayer.is_server(): return
 	if not game_started: return
-	var peer_id = multiplayer.get_remote_sender_id()
-	if peer_id == 0: peer_id = multiplayer.get_unique_id()
-	if Host.is_host_mode and peer_id == multiplayer.get_unique_id(): return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id <= 1: return
 	
 	if _get_validation_error(p_name, peer_id) != "":
 		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")

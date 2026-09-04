@@ -56,8 +56,8 @@ func request_version_check_bootstrap(
 	if not multiplayer.is_server():
 		return
 	var peer_id: int = multiplayer.get_remote_sender_id()
-	if peer_id == 0:
-		peer_id = multiplayer.get_unique_id()
+	if peer_id <= 1:
+		return
 	_handle_version_check_request(peer_id, client_version, false)
 
 func handle_legacy_request_version_check(

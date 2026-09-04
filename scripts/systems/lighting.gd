@@ -304,7 +304,6 @@ func _build_sunlight_job(player_tile: Vector2i, current_z: int, roof_data: Packe
 
 func _report_local_world_light(local_player: Node, current_z: int, force: bool = false) -> void:
 	if local_player == null or not is_instance_valid(local_player): return
-	if not multiplayer.has_multiplayer_peer(): return
 	var tile: Vector2i = local_player.tile_pos
 	var light_value: float = world_light_cache.get(tile, 1.0)
 	var now_ms := Time.get_ticks_msec()
@@ -316,8 +315,7 @@ func _report_local_world_light(local_player: Node, current_z: int, force: bool =
 	_last_reported_light_value = light_value
 	_last_light_report_ms = now_ms
 
-	if multiplayer.is_server(): World.update_client_light_sample(multiplayer.get_unique_id(), tile, current_z, light_value)
-	else: World.rpc_report_client_light_sample.rpc_id(1, tile, current_z, light_value)
+	World.rpc_report_client_light_sample.rpc_id(1, tile, current_z, light_value)
 
 func _build_leaf_light_pass_map(min_tile: Vector2i, max_tile: Vector2i, current_z: int) -> Dictionary:
 	var leaf_pass_map: Dictionary = {}
@@ -791,16 +789,6 @@ func _is_line_blocked(start_px: Vector2, end_px: Vector2, check_z: int) -> bool:
 	return false
 
 func toggle_time_of_day() -> void:
-	if multiplayer.has_multiplayer_peer():
-		if multiplayer.is_server():
-			rpc_add_time_offset.rpc(1200.0)
-		else:
-			request_toggle_time.rpc_id(1)
-	else:
-		time_offset += 1200.0
-
-@rpc("any_peer", "call_local", "reliable")
-func request_toggle_time() -> void:
 	if multiplayer.is_server():
 		rpc_add_time_offset.rpc(1200.0)
 

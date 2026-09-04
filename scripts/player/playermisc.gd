@@ -52,10 +52,7 @@ func request_spider_butchering(target: Node) -> void:
 		return
 
 	var corpse_id := World.get_entity_id(target)
-	if player.multiplayer.is_server():
-		World.rpc_request_begin_spider_butcher(corpse_id, player.active_hand)
-	else:
-		World.rpc_request_begin_spider_butcher.rpc_id(1, corpse_id, player.active_hand)
+	World.rpc_request_begin_spider_butcher.rpc_id(1, corpse_id, player.active_hand)
 
 func begin_spider_butchering(corpse_id: String, hand_idx: int, weapon_id: String) -> void:
 	if not active_spider_butcher_attempt.is_empty() or not Defs.is_valid_hand_index(hand_idx):
@@ -132,10 +129,7 @@ func _complete_spider_butchering() -> void:
 	var weapon_id: String = active_spider_butcher_attempt["weapon_id"]
 	_remove_active_spider_butcher_indicator()
 	active_spider_butcher_attempt.clear()
-	if player.multiplayer.is_server():
-		World.rpc_request_finish_spider_butcher(corpse_id, hand_idx, weapon_id)
-	else:
-		World.rpc_request_finish_spider_butcher.rpc_id(1, corpse_id, hand_idx, weapon_id)
+	World.rpc_request_finish_spider_butcher.rpc_id(1, corpse_id, hand_idx, weapon_id)
 
 func _cancel_spider_butchering(notify_server: bool) -> void:
 	if active_spider_butcher_attempt.is_empty():
@@ -145,10 +139,7 @@ func _cancel_spider_butchering(notify_server: bool) -> void:
 	active_spider_butcher_attempt.clear()
 	if not notify_server:
 		return
-	if player.multiplayer.is_server():
-		World.rpc_cancel_spider_butcher(corpse_id)
-	else:
-		World.rpc_cancel_spider_butcher.rpc_id(1, corpse_id)
+	World.rpc_cancel_spider_butcher.rpc_id(1, corpse_id)
 
 func _remove_active_spider_butcher_indicator() -> void:
 	var label = active_spider_butcher_attempt.get("prog_label", null)
@@ -391,10 +382,7 @@ func _on_loot_slot_pressed(slot_key: String) -> void:
 
 	var my_peer_id: int = player.multiplayer.get_unique_id()
 	var target_id := World.get_entity_id(loot_target)
-	if player.multiplayer.is_server():
-		World.rpc_notify_loot_warning(target_id, my_peer_id, item_desc)
-	else:
-		World.rpc_notify_loot_warning.rpc_id(1, target_id, my_peer_id, item_desc)
+	World.rpc_notify_loot_warning.rpc_id(1, target_id, my_peer_id, item_desc)
 
 func _update_loot_attempts(delta: float) -> void:
 	var completed_keys: Array = []
@@ -501,10 +489,7 @@ func _complete_loot_attempt(slot_key: String) -> void:
 		slot_type = "equip"
 		slot_index = slot_key.trim_prefix("equip_")
 
-	if player.multiplayer.is_server():
-		World.rpc_request_loot_item(target_id, my_peer_id, slot_type, slot_index)
-	else:
-		World.rpc_request_loot_item.rpc_id(1, target_id, my_peer_id, slot_type, slot_index)
+	World.rpc_request_loot_item.rpc_id(1, target_id, my_peer_id, slot_type, slot_index)
 
 func show_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 	if player.sleep_state == 2: # SleepState.ASLEEP

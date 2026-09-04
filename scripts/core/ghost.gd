@@ -119,6 +119,8 @@ func _is_local_authority() -> bool:
 		return false
 	if not multiplayer.has_multiplayer_peer():
 		return false
+	if multiplayer.is_server():
+		return false
 	if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
 		return false
 	return multiplayer.get_unique_id() == get_multiplayer_authority()
@@ -236,16 +238,10 @@ func _request_z_change(new_z: int) -> void:
 	var target_z: int = clampi(new_z, 1, 5)
 	if target_z == z_level:
 		return
-	if multiplayer.is_server():
-		World.rpc_request_ghost_z_change(target_z)
-	else:
-		World.rpc_request_ghost_z_change.rpc_id(1, target_z)
+	World.rpc_request_ghost_z_change.rpc_id(1, target_z)
 
 func _on_respawn_pressed() -> void:
-	if multiplayer.is_server():
-		World.rpc_request_respawn.rpc(multiplayer.get_unique_id())
-	else:
-		World.rpc_request_respawn.rpc_id(1, multiplayer.get_unique_id())
+	World.rpc_request_respawn.rpc_id(1, multiplayer.get_unique_id())
 
 func _on_chat_submitted(text: String) -> void:
 	if _chat_input == null:
@@ -255,10 +251,7 @@ func _on_chat_submitted(text: String) -> void:
 	_chat_input.release_focus()
 	if text.strip_edges() == "":
 		return
-	if multiplayer.is_server():
-		World.rpc_send_chat(text)
-	else:
-		World.rpc_send_chat.rpc_id(1, text)
+	World.rpc_send_chat.rpc_id(1, text)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_local_authority():
@@ -327,16 +320,13 @@ func _try_move(dir: Vector2i) -> void:
 	if dir == Vector2i.ZERO or _awaiting_move_confirm:
 		return
 	_awaiting_move_confirm = true
-	if multiplayer.is_server():
-		World.rpc_try_move(dir, false)
-	else:
-		_predicted_move_active = true
-		_predicted_move_tile = tile_pos + dir
-		move_from = pixel_pos
-		move_to = World.tile_to_pixel(_predicted_move_tile)
-		move_elapsed = 0.0
-		moving = true
-		World.rpc_try_move.rpc_id(1, dir, false)
+	_predicted_move_active = true
+	_predicted_move_tile = tile_pos + dir
+	move_from = pixel_pos
+	move_to = World.tile_to_pixel(_predicted_move_tile)
+	move_elapsed = 0.0
+	moving = true
+	World.rpc_try_move.rpc_id(1, dir, false)
 
 func _start_move_lerp() -> void:
 	_awaiting_move_confirm = false
@@ -380,7 +370,7 @@ func rpc_sync_ghost_state(p_name: String, p_class: String, spawn_tile: Vector2i,
 @rpc("any_peer", "call_local", "reliable")
 func rpc_sync_z_level(new_z: int) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
-	if multiplayer.has_multiplayer_peer() and sender_id != 1 and not (sender_id == 0 and multiplayer.is_server()):
+	if sender_id != 1 and not (sender_id == 0 and multiplayer.is_server()):
 		return
 	z_level = new_z
 	view_z_level = new_z

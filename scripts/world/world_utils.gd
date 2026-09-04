@@ -23,7 +23,7 @@ func is_tangible_player(entity: Node) -> bool:
 func server_consume_stamina(player: Node, amount: float) -> bool:
 	if player == null or amount <= 0.0:
 		return true
-	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+	if not world.multiplayer.is_server():
 		return false
 	if bool(player.get("exhausted")):
 		return false
@@ -106,7 +106,7 @@ func world_to_tile(world_pos: Vector2) -> Vector2i:
 	return Vector2i(int(world_pos.x / world.TILE_SIZE), int(world_pos.y / world.TILE_SIZE))
 
 func get_local_player() -> Node:
-	if not world.multiplayer.has_multiplayer_peer(): return null
+	if not world.multiplayer.has_multiplayer_peer() or world.multiplayer.is_server(): return null
 	var local_id = world.multiplayer.get_unique_id()
 	return find_player_by_peer(local_id)
 

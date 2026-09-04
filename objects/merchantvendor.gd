@@ -86,10 +86,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			return
 		get_viewport().set_input_as_handled()
 		var held_vendor_id := World.get_entity_id(self)
-		if multiplayer.is_server():
-			World.rpc_request_merchant_hand_interaction(held_vendor_id, player.active_hand)
-		else:
-			World.rpc_request_merchant_hand_interaction.rpc_id(1, held_vendor_id, player.active_hand)
+		World.rpc_request_merchant_hand_interaction.rpc_id(1, held_vendor_id, player.active_hand)
 		return
 
 	if not active_hand_valid or player.hands[player.active_hand] != null:
@@ -101,10 +98,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 
 	get_viewport().set_input_as_handled()
 	var vendor_id := World.get_entity_id(self)
-	if multiplayer.is_server():
-		World.rpc_request_merchant_open(vendor_id)
-	else:
-		World.rpc_request_merchant_open.rpc_id(1, vendor_id)
+	World.rpc_request_merchant_open.rpc_id(1, vendor_id)
 
 func _show_merchant_menu(balance: int) -> void:
 	_ensure_ui()
@@ -246,17 +240,11 @@ func _request_purchase(item_type: String) -> void:
 	if item_type.is_empty():
 		return
 	var vendor_id := World.get_entity_id(self)
-	if multiplayer.is_server():
-		World.rpc_request_merchant_purchase(vendor_id, item_type)
-	else:
-		World.rpc_request_merchant_purchase.rpc_id(1, vendor_id, item_type)
+	World.rpc_request_merchant_purchase.rpc_id(1, vendor_id, item_type)
 
 func _request_withdraw() -> void:
 	var vendor_id := World.get_entity_id(self)
-	if multiplayer.is_server():
-		World.rpc_request_merchant_withdraw(vendor_id)
-	else:
-		World.rpc_request_merchant_withdraw.rpc_id(1, vendor_id)
+	World.rpc_request_merchant_withdraw.rpc_id(1, vendor_id)
 
 func _close_ui() -> void:
 	_item_buttons.clear()

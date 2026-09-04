@@ -126,9 +126,13 @@ func get_entity(entity_id: String) -> Node:
 	return null
 
 func register_main(node: Node) -> void:
+	# Scene changes can leave the previous TileMapLayer nodes alive until the end
+	# of the frame. Never let a join/reconnect snapshot write into that old tree.
+	_tilemap_cache.clear()
 	main_scene = node
 
 func unregister_main() -> void:
+	_tilemap_cache.clear()
 	main_scene = null
 
 func _ready() -> void:
@@ -155,8 +159,11 @@ func _process(delta: float) -> void:
 	_update_server_sneak_visuals(step)
 
 func get_tilemap(z: int) -> TileMapLayer:
-	if _tilemap_cache.has(z) and is_instance_valid(_tilemap_cache[z]):
-		return _tilemap_cache[z]
+	if _tilemap_cache.has(z):
+		var cached := _tilemap_cache[z] as TileMapLayer
+		if cached != null and is_instance_valid(cached) and main_scene != null and main_scene.is_ancestor_of(cached):
+			return cached
+		_tilemap_cache.erase(z)
 	if main_scene != null:
 		var tm = main_scene.get_node_or_null("TileMapLayer_Z" + str(z)) as TileMapLayer
 		if tm != null:
@@ -186,8 +193,7 @@ func _push_server_sneak_alpha(player: Node, alpha: float) -> void:
 	var last_synced := float(player.get("_last_synced_sneak_alpha"))
 	if abs(clamped_alpha - last_synced) >= SERVER_SNEAK_SYNC_EPSILON or (clamped_alpha >= 0.999 and last_synced < 0.999):
 		player.set("_last_synced_sneak_alpha", clamped_alpha)
-		if multiplayer.has_multiplayer_peer():
-			rpc_sync_player_sneak_alpha.rpc(player.get_multiplayer_authority(), clamped_alpha)
+		rpc_sync_player_sneak_alpha.rpc(player.get_multiplayer_authority(), clamped_alpha)
 
 func _update_server_sneak_visuals(delta: float) -> void:
 	var now_ms := Time.get_ticks_msec()
@@ -325,7 +331,7 @@ func handle_runtime_tile_change(tile_pos: Vector2i, z_level: int, source_id: int
 	if not has_runtime_grass_decor_at(tile_pos, z_level):
 		return
 	remove_runtime_grass_decor(tile_pos, z_level)
-	if multiplayer.has_multiplayer_peer() and multiplayer.is_server():
+	if multiplayer.is_server():
 		LateJoin.register_grass_cut(tile_pos, z_level)
 
 func _calculate_combat_roll(attacker: Combatant, defender: Combatant, base_amount: int, is_sword_attack: bool) -> Dictionary:
@@ -346,19 +352,16 @@ func calculate_gravity_z(tile_pos: Vector2i, current_z: int) -> int:
 func apply_gravity_to_player(player: Node2D) -> void:
 	physics.apply_gravity_to_player(player)
 
-@rpc("any_peer", "call_local", "reliable")
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_respawn(request_peer_id: int) -> void:
 	if not multiplayer.is_server(): return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	session.handle_rpc_request_respawn(sender_id, request_peer_id)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_return_to_lobby() -> void:
 	var local_entity: Node = get_local_player()
-	if multiplayer.has_multiplayer_peer():
-		var local_id: int = multiplayer.get_unique_id()
-		Host.peers.erase(local_id)
+	Host.peers.erase(multiplayer.get_unique_id())
 	if local_entity != null and is_instance_valid(local_entity):
 		local_entity.set("is_possessed", false)
 		if local_entity.has_method("_set_fov_visibility"):
@@ -389,8 +392,7 @@ func rpc_set_object_z_level(obj_id: String, new_z: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_update_laws(new_laws: Array) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	utils.handle_rpc_request_update_laws(sender_id, new_laws)
 
 @rpc("authority", "call_local", "reliable")
@@ -399,8 +401,7 @@ func rpc_update_laws(new_laws: Array) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	tiles.handle_rpc_try_move(sender_id, dir, is_sprinting)
 
 @rpc("authority", "call_local", "reliable")
@@ -409,20 +410,17 @@ func rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool = fals
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_shove(target_tile: Vector2i) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	combat.handle_rpc_request_shove(sender_id, target_tile)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_deal_damage_at_tile(tile: Vector2i, targeted_limb: String = "chest") -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	combat.handle_rpc_deal_damage_at_tile(sender_id, tile, targeted_limb)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_damage_wall(pos: Vector2i) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	tiles.handle_rpc_damage_wall(sender_id, pos)
 
 @rpc("authority", "call_local", "reliable")
@@ -442,8 +440,6 @@ func rpc_request_cut_grass(tile_pos: Vector2i, z_level: int) -> void:
 	if not multiplayer.is_server():
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	var player: Node = utils.find_player_by_peer(sender_id)
 	if not utils.can_player_interact(player):
 		return
@@ -473,8 +469,6 @@ func rpc_confirm_cut_grass(tile_pos: Vector2i, z_level: int) -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_search_bush(bush_id: String, hand_idx: int) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_request_search_bush(sender_id, bush_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -484,8 +478,7 @@ func rpc_confirm_search_bush(bush_id: String, peer_id: int, hand_idx: int, item_
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_rock(rock_path: NodePath) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_hit_rock(sender_id, rock_path)
 
 @rpc("authority", "call_local", "reliable")
@@ -498,8 +491,7 @@ func rpc_confirm_break_rock(rock_path: NodePath, drops_data: Array) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_tree(tree_path: NodePath) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_hit_tree(sender_id, tree_path)
 
 @rpc("authority", "call_local", "reliable")
@@ -512,8 +504,7 @@ func rpc_confirm_break_tree(tree_path: NodePath, break_payload: Dictionary) -> v
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_breakable(obj_path: NodePath) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_hit_breakable(sender_id, obj_path)
 
 @rpc("authority", "call_local", "reliable")
@@ -526,8 +517,7 @@ func rpc_confirm_break_breakable(obj_path: NodePath) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_door(door_path: NodePath) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_hit_door(sender_id, door_path)
 
 @rpc("authority", "call_local", "reliable")
@@ -552,8 +542,7 @@ func rpc_confirm_remove_door(door_path: NodePath) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_hit_gate(gate_path: NodePath) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_hit_gate(sender_id, gate_path)
 
 @rpc("authority", "call_local", "reliable")
@@ -574,8 +563,7 @@ func rpc_confirm_remove_gate(gate_path: NodePath) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_interact_hand_item(hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_interact_hand_item(sender_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -585,8 +573,6 @@ func rpc_confirm_interact_hand_item(peer_id: int, hand_idx: int) -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_keyring_insert(keyring_id: String, hand_idx: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_request_keyring_insert(sender_id, keyring_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -596,8 +582,6 @@ func rpc_confirm_keyring_insert(peer_id: int, keyring_id: String, hand_idx: int,
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_keyring_extract(keyring_id: String, hand_idx: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_request_keyring_extract(sender_id, keyring_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -606,8 +590,7 @@ func rpc_confirm_keyring_extract(peer_id: int, keyring_id: String, hand_idx: int
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_equip(item_id: String, slot_name: String, hand_index: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_equip(sender_id, item_id, slot_name, hand_index)
 
 @rpc("authority", "call_local", "reliable")
@@ -616,8 +599,7 @@ func rpc_confirm_equip(peer_id: int, item_id: String, slot_name: String, hand_in
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_unequip(slot_name: String, hand_index: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_unequip(sender_id, slot_name, hand_index)
 
 @rpc("authority", "call_local", "reliable")
@@ -626,8 +608,7 @@ func rpc_confirm_unequip(peer_id: int, slot_name: String, new_entity_id: String,
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_furnace_action(furnace_id: String, action: String, hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_furnace_action(sender_id, furnace_id, action, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -637,8 +618,6 @@ func rpc_confirm_furnace_action(peer_id: int, furnace_id: String, action: String
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_torchwall_action(torchwall_id: String, action: String, hand_idx: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_request_torchwall_action(sender_id, torchwall_id, action, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -651,8 +630,7 @@ func rpc_confirm_auto_extinguish_torch(torch_id: String) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_split_coins(from_hand: int, to_hand: int, split_amount: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_split_coins(sender_id, from_hand, to_hand, split_amount)
 
 @rpc("authority", "call_local", "reliable")
@@ -661,8 +639,7 @@ func rpc_confirm_split_coins(peer_id: int, from_hand: int, to_hand: int, new_nam
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_combine_hand_coins(from_hand: int, to_hand: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_combine_hand_coins(sender_id, from_hand, to_hand)
 
 @rpc("authority", "call_local", "reliable")
@@ -671,8 +648,7 @@ func rpc_confirm_combine_hand_coins(peer_id: int, from_hand: int, to_hand: int, 
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_combine_ground_coin(coin_id: String, hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_combine_ground_coin(sender_id, coin_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -683,9 +659,7 @@ func rpc_confirm_combine_ground_coin(peer_id: int, coin_id: String, hand_idx: in
 func rpc_request_atm_open(atm_id: String) -> void:
 	if not multiplayer.is_server():
 		return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	bank.handle_rpc_request_atm_open(sender_id, atm_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -696,9 +670,7 @@ func rpc_show_atm_menu(atm_id: String, balance: int) -> void:
 func rpc_request_atm_deposit(atm_id: String, metal_type: int, coin_amount: int) -> void:
 	if not multiplayer.is_server():
 		return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	bank.handle_rpc_request_atm_deposit(sender_id, atm_id, metal_type, coin_amount)
 
 @rpc("authority", "call_local", "reliable")
@@ -709,9 +681,7 @@ func rpc_confirm_atm_deposit(peer_id: int, metal_type: int, coin_amount: int) ->
 func rpc_request_atm_hand_deposit(atm_id: String, hand_idx: int) -> void:
 	if not multiplayer.is_server():
 		return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	bank.handle_rpc_request_atm_hand_deposit(sender_id, atm_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -722,9 +692,7 @@ func rpc_confirm_atm_hand_deposit(peer_id: int, hand_idx: int, coin_amount: int)
 func rpc_request_atm_withdraw(atm_id: String, metal_type: int, coin_amount: int, preferred_hand: int) -> void:
 	if not multiplayer.is_server():
 		return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	bank.handle_rpc_request_atm_withdraw(sender_id, atm_id, metal_type, coin_amount, preferred_hand)
 
 @rpc("authority", "call_local", "reliable")
@@ -737,9 +705,7 @@ func rpc_update_atm_balance(atm_id: String, balance: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_merchant_open(vendor_id: String) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_merchant_open(sender_id, vendor_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -748,9 +714,7 @@ func rpc_show_merchant_menu(vendor_id: String, balance: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_merchant_hand_interaction(vendor_id: String, hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_merchant_hand_interaction(sender_id, vendor_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -763,9 +727,7 @@ func rpc_confirm_merchant_sale(peer_id: int, hand_idx: int, payout_payload: Arra
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_merchant_purchase(vendor_id: String, item_type: String) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_merchant_purchase(sender_id, vendor_id, item_type)
 
 @rpc("authority", "call_local", "reliable")
@@ -774,9 +736,7 @@ func rpc_confirm_merchant_purchase(item_type: String, node_name: String, entity_
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_merchant_withdraw(vendor_id: String) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_merchant_withdraw(sender_id, vendor_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -789,8 +749,7 @@ func rpc_update_merchant_balance(vendor_id: String, balance: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_pickup(item_id: String, hand_index: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_pickup(sender_id, item_id, hand_index)
 
 @rpc("authority", "call_local", "reliable")
@@ -799,8 +758,7 @@ func rpc_confirm_pickup(peer_id: int, item_id: String, hand_index: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_drop(item_id: String, tile: Vector2i, spread: float, hand_index: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_drop(sender_id, item_id, tile, spread, hand_index)
 
 @rpc("authority", "call_local", "reliable")
@@ -809,8 +767,7 @@ func rpc_drop_item_at(player_peer_id: int, item_id: String, drop_position: Vecto
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_throw(item_id: String, hand_index: int, dir: Vector2, throw_range: int, interaction_z: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_throw(sender_id, item_id, hand_index, dir, throw_range, interaction_z)
 
 @rpc("authority", "call_local", "reliable")
@@ -819,8 +776,7 @@ func rpc_confirm_throw(peer_id: int, item_id: String, hand_index: int, land_tile
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_send_chat(message: String) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	utils.handle_rpc_send_chat(sender_id, message)
 
 @rpc("authority", "call_local", "reliable")
@@ -830,8 +786,7 @@ func rpc_broadcast_deadchat(sender_peer_id: int, message: String) -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_ghost_z_change(new_z: int) -> void:
 	if not multiplayer.is_server(): return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	var ghost = utils.find_player_by_peer(sender_id)
 	if ghost == null or not utils.is_ghost(ghost): return
 	var target_z: int = clampi(new_z, 1, 5)
@@ -850,16 +805,10 @@ func rpc_broadcast_damage_log(attacker_name: String, target_name: String, amount
 @rpc("any_peer", "call_remote", "unreliable")
 func rpc_report_client_light_sample(tile: Vector2i, z_level: int, light_value: float) -> void:
 	if not multiplayer.is_server(): return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	var player = utils.find_player_by_peer(sender_id)
 	if player == null: return
 	update_client_light_sample(sender_id, tile, z_level, light_value)
-
-@rpc("any_peer", "call_remote", "reliable")
-func rpc_request_sneak_reveal(character_name: String, source_tile: Vector2i, source_z: int) -> void:
-	if not multiplayer.is_server(): return
-	rpc_broadcast_sneak_reveal.rpc(character_name, source_tile, source_z)
 
 @rpc("authority", "call_remote", "unreliable")
 func rpc_sync_player_sneak_alpha(peer_id: int, alpha: float) -> void:
@@ -884,8 +833,7 @@ func rpc_deliver_loot_warning(looter_peer_id: int, item_desc: String) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_loot_item(target_id: String, looter_peer_id: int, slot_type: String, slot_index: Variant) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_loot_item(sender_id, target_id, looter_peer_id, slot_type, slot_index)
 
 @rpc("authority", "call_local", "reliable")
@@ -895,8 +843,6 @@ func rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String, new_en
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_begin_spider_butcher(corpse_id: String, hand_idx: int) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_request_begin_spider_butcher(sender_id, corpse_id, hand_idx)
 
 @rpc("authority", "call_remote", "reliable")
@@ -906,15 +852,11 @@ func rpc_confirm_begin_spider_butcher(corpse_id: String, hand_idx: int, weapon_i
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_cancel_spider_butcher(corpse_id: String) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_cancel_spider_butcher(sender_id, corpse_id)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_finish_spider_butcher(corpse_id: String, hand_idx: int, weapon_id: String) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
 	objects.handle_rpc_request_finish_spider_butcher(sender_id, corpse_id, hand_idx, weapon_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -923,8 +865,7 @@ func rpc_confirm_spider_butcher(corpse_id: String, drops: Array) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_craft(looter_peer_id: int, recipe_id: String) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_craft(sender_id, looter_peer_id, recipe_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -937,8 +878,7 @@ func rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vecto
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_satchel_insert(satchel_id: String, hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_satchel_insert(sender_id, satchel_id, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -947,8 +887,7 @@ func rpc_confirm_satchel_insert(peer_id: int, satchel_id: String, item_id: Strin
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_satchel_extract(satchel_id: String, slot_index: int, hand_idx: int) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_satchel_extract(sender_id, satchel_id, slot_index, hand_idx)
 
 @rpc("authority", "call_local", "reliable")
@@ -957,20 +896,17 @@ func rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_index: i
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_grab(target_id: String, limb: String = "chest") -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	combat.handle_rpc_request_grab(sender_id, target_id, limb)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_release_grab() -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	combat.handle_rpc_request_release_grab(sender_id)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_resist() -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	combat.handle_rpc_request_resist(sender_id)
 
 @rpc("authority", "call_local", "reliable")
@@ -995,19 +931,15 @@ func rpc_confirm_drag_corpse(corpse_id: String, new_pos: Vector2i) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_table_place(table_id: String, hand_idx: int, place_pos: Vector2) -> void:
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id == 0: sender_id = multiplayer.get_unique_id()
+	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_table_place(sender_id, table_id, hand_idx, place_pos)
 
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_table_place(peer_id: int, table_id: String, hand_idx: int, place_pos: Vector2) -> void:
 	objects.handle_rpc_confirm_table_place(peer_id, table_id, hand_idx, place_pos)
 
-@rpc("any_peer", "call_local", "reliable")
-func rpc_request_round_end() -> void:
+func request_round_end() -> void:
 	if not multiplayer.is_server(): return
-	var sender_id = multiplayer.get_remote_sender_id()
-	if sender_id != 1 and sender_id != 0: return
 	rpc("rpc_execute_round_end")
 
 @rpc("authority", "call_local", "reliable")

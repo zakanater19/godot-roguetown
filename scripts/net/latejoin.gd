@@ -52,6 +52,10 @@ func _ready() -> void:
 
 func _on_connected_to_server() -> void:
 	client_connected = true
+	# A new connection is a new authoritative snapshot session. The local main
+	# scene may have been rebuilt or may contain state from before disconnecting.
+	if _sync != null and _sync.has_method("reset_snapshot_state"):
+		_sync.call("reset_snapshot_state")
 
 	if is_manual_reconnect:
 		map_loaded = true
@@ -131,7 +135,7 @@ func update_player_state(peer_id: int, player_data: Dictionary) -> void:
 	_state_dirty = true
 
 func _can_write_authoritative_state() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+	return multiplayer.is_server()
 
 func get_world_state() -> Dictionary:
 	return _world_state.duplicate(true)
@@ -191,8 +195,8 @@ func request_sync() -> void:
 	if not multiplayer.is_server():
 		return
 	var peer_id: int = multiplayer.get_remote_sender_id()
-	if peer_id == 0:
-		peer_id = multiplayer.get_unique_id()
+	if peer_id <= 1:
+		return
 
 	print("LateJoin: Peer requested sync - ", peer_id)
 
@@ -283,8 +287,8 @@ func request_version_check(
 	if not multiplayer.is_server():
 		return
 	var peer_id: int = multiplayer.get_remote_sender_id()
-	if peer_id == 0:
-		peer_id = multiplayer.get_unique_id()
+	if peer_id <= 1:
+		return
 	BootstrapNet.handle_legacy_request_version_check(
 		peer_id,
 		client_version,

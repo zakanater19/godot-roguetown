@@ -44,26 +44,17 @@ func on_object_picked_up(object_node: Node) -> void:
 		# Combine ground coins
 		if active_item.get("is_coin_stack") and object_node.get("is_coin_stack"):
 			if active_item.get("item_type") == object_node.get("item_type"):
-				if player.multiplayer.is_server():
-					World.rpc_request_combine_ground_coin(target_object_id, player.active_hand)
-				else:
-					World.rpc_request_combine_ground_coin.rpc_id(1, target_object_id, player.active_hand)
+				World.rpc_request_combine_ground_coin.rpc_id(1, target_object_id, player.active_hand)
 		return
 
-	if player.multiplayer.is_server():
-		World.rpc_request_pickup(target_object_id, player.active_hand)
-	else:
-		World.rpc_request_pickup.rpc_id(1, target_object_id, player.active_hand)
+	World.rpc_request_pickup.rpc_id(1, target_object_id, player.active_hand)
 
 func drop_item_from_hand(hand_idx: int) -> void:
 	if player.hands[hand_idx] == null:
 		return
 	var obj = player.hands[hand_idx]
 	var obj_id := World.get_entity_id(obj)
-	if player.multiplayer.is_server():
-		World.server_drop_item_at(player.get_multiplayer_authority(), obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx, player.z_level)
-	else:
-		World.rpc_request_drop.rpc_id(1, obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx)
+	World.rpc_request_drop.rpc_id(1, obj_id, player.tile_pos, player.DROP_SPREAD, hand_idx)
 
 func drop_held_object() -> void:
 	drop_item_from_hand(player.active_hand)
@@ -88,19 +79,13 @@ func throw_held_object(mouse_world_pos: Vector2) -> void:
 	if player._throw_label != null:
 		player._throw_label.visible = false
 
-	if player.multiplayer.is_server():
-		World.rpc_request_throw(obj_id, player.active_hand, dir, throw_range, interaction_z)
-	else:
-		World.rpc_request_throw.rpc_id(1, obj_id, player.active_hand, dir, throw_range, interaction_z)
+	World.rpc_request_throw.rpc_id(1, obj_id, player.active_hand, dir, throw_range, interaction_z)
 
 func interact_held_object() -> void:
 	if player.hands[player.active_hand] != null:
 		var item = player.hands[player.active_hand]
 		if item.has_method("interact_in_hand"):
-			if player.multiplayer.is_server():
-				World.rpc_request_interact_hand_item(player.active_hand)
-			else:
-				World.rpc_request_interact_hand_item.rpc_id(1, player.active_hand)
+			World.rpc_request_interact_hand_item.rpc_id(1, player.active_hand)
 
 func use_held_object(mouse_world_pos: Vector2) -> void:
 	var tm = World.get_tilemap(player.z_level)
@@ -214,59 +199,35 @@ func use_held_object(mouse_world_pos: Vector2) -> void:
 		if player._hud != null:
 			limb = player._hud.targeted_limb
 
-		if player.multiplayer.is_server():
-			World.rpc_deal_damage_at_tile(target_tile, limb)
-		else:
-			World.rpc_deal_damage_at_tile.rpc_id(1, target_tile, limb)
+		World.rpc_deal_damage_at_tile.rpc_id(1, target_tile, limb)
 		return
 
 	if door_target != null:
-		if player.multiplayer.is_server():
-			World.rpc_request_hit_door(door_target.get_path())
-		else:
-			World.rpc_request_hit_door.rpc_id(1, door_target.get_path())
+		World.rpc_request_hit_door.rpc_id(1, door_target.get_path())
 		return
 
 	if gate_target != null:
-		if player.multiplayer.is_server():
-			World.rpc_request_hit_gate(gate_target.get_path())
-		else:
-			World.rpc_request_hit_gate.rpc_id(1, gate_target.get_path())
+		World.rpc_request_hit_gate.rpc_id(1, gate_target.get_path())
 		return
 
 	if choppable_target != null and MaterialRegistry.can_tool_affect(choppable_target, held_item):
-		if player.multiplayer.is_server():
-			World.rpc_request_hit_tree(choppable_target.get_path())
-		else:
-			World.rpc_request_hit_tree.rpc_id(1, choppable_target.get_path())
+		World.rpc_request_hit_tree.rpc_id(1, choppable_target.get_path())
 		return
 
 	if breakable_target != null and MaterialRegistry.can_tool_affect(breakable_target, held_item):
-		if player.multiplayer.is_server():
-			World.rpc_request_hit_breakable(breakable_target.get_path())
-		else:
-			World.rpc_request_hit_breakable.rpc_id(1, breakable_target.get_path())
+		World.rpc_request_hit_breakable.rpc_id(1, breakable_target.get_path())
 		return
 
 	if minable_target != null and MaterialRegistry.can_tool_affect(minable_target, held_item):
-		if player.multiplayer.is_server():
-			World.rpc_request_hit_rock(minable_target.get_path())
-		else:
-			World.rpc_request_hit_rock.rpc_id(1, minable_target.get_path())
+		World.rpc_request_hit_rock.rpc_id(1, minable_target.get_path())
 		return
 
 	if grass_decor_target:
-		if player.multiplayer.is_server():
-			World.rpc_request_cut_grass(target_tile, player.z_level)
-		else:
-			World.rpc_request_cut_grass.rpc_id(1, target_tile, player.z_level)
+		World.rpc_request_cut_grass.rpc_id(1, target_tile, player.z_level)
 		return
 
 	if wall_material_id != "" and MaterialRegistry.can_tool_affect(wall_material_id, held_item):
-		if player.multiplayer.is_server():
-			World.rpc_damage_wall(target_tile)
-		else:
-			World.rpc_damage_wall.rpc_id(1, target_tile)
+		World.rpc_damage_wall.rpc_id(1, target_tile)
 
 func _find_object_at_tile(group_name: String, target_tile: Vector2i) -> Node:
 	for obj in player.get_tree().get_nodes_in_group(group_name):

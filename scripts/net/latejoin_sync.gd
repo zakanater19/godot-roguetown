@@ -372,16 +372,16 @@ func handle_receive_world_snapshot(
 
 	# Apply the complete payload in one handler, so no gameplay frame can observe
 	# a purge from one RPC and the replacements from later RPCs.
-	var tile_geometry_changed := false
+	var tile_geometry_changed := true
 	var tile_checksum := str(snapshot.get("tile_checksum", ""))
-	if tile_checksum == "" or tile_checksum != _last_applied_tile_checksum:
-		_apply_full_tile_snapshot(snapshot.get("tiles", PackedInt32Array()))
-		_last_applied_tile_checksum = tile_checksum
-		tile_geometry_changed = true
+	# Full snapshots are only sent for join/reconnect. Always restore geometry:
+	# cached checksums describe the previous local scene, not necessarily the
+	# scene currently registered in World after a reconnect or patch restart.
+	_apply_full_tile_snapshot(snapshot.get("tiles", PackedInt32Array()))
+	_last_applied_tile_checksum = tile_checksum
 	var grass_checksum := str(snapshot.get("grass_checksum", ""))
-	if grass_checksum == "" or grass_checksum != _last_applied_grass_checksum:
-		_apply_grass_snapshot(snapshot.get("grass", []))
-		_last_applied_grass_checksum = grass_checksum
+	_apply_grass_snapshot(snapshot.get("grass", []))
+	_last_applied_grass_checksum = grass_checksum
 	_apply_world_object_snapshot(snapshot.get("objects", []))
 	_apply_mob_snapshot(snapshot.get("mobs", []))
 	handle_receive_player_states({"by_entity": snapshot.get("players", {})})

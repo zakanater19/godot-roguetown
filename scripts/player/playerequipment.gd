@@ -15,17 +15,11 @@ func equip_clothing(item: Node) -> void:
 	if item_slot == null or item_slot == "":
 		return
 	var item_id := World.get_entity_id(item)
-	if player.multiplayer.is_server():
-		World.rpc_request_equip(item_id, item_slot, player.active_hand)
-	else:
-		World.rpc_request_equip.rpc_id(1, item_id, item_slot, player.active_hand)
+	World.rpc_request_equip.rpc_id(1, item_id, item_slot, player.active_hand)
 
 func equip_clothing_to_slot(item: Node, slot_name: String) -> void:
 	var item_id := World.get_entity_id(item)
-	if player.multiplayer.is_server():
-		World.rpc_request_equip(item_id, slot_name, player.active_hand)
-	else:
-		World.rpc_request_equip.rpc_id(1, item_id, slot_name, player.active_hand)
+	World.rpc_request_equip.rpc_id(1, item_id, slot_name, player.active_hand)
 
 func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:
 	var item_name = item.get("item_type")
@@ -74,10 +68,7 @@ func unequip_clothing_from_slot(slot_name: String) -> void:
 	var _equipped_val = player.equipped.get(slot_name)
 	if not (_equipped_val is String) or _equipped_val == "":
 		return
-	if player.multiplayer.is_server():
-		World.rpc_request_unequip(slot_name, player.active_hand)
-	else:
-		World.rpc_request_unequip.rpc_id(1, slot_name, player.active_hand)
+	World.rpc_request_unequip.rpc_id(1, slot_name, player.active_hand)
 
 func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void:
 	var _raw = player.equipped.get(slot_name)

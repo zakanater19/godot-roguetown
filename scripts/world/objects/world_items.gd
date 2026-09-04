@@ -334,7 +334,7 @@ func handle_rpc_request_drop(sender_id: int, item_id: String, tile: Vector2i, sp
 	broadcast_authoritative_drop(sender_id, item_id, tile, spread, hand_index, player.z_level)
 
 func broadcast_authoritative_drop(player_peer_id: int, item_id: String, tile: Vector2i, spread: float, hand_index: int, source_z: int = -1) -> void:
-	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+	if not world.multiplayer.is_server():
 		return
 	var obj: Node = world.get_entity(item_id)
 	if obj == null:

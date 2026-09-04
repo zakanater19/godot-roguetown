@@ -34,7 +34,7 @@ func _init(p_world: Node) -> void:
 # given the resulting position; they never roll their own gameplay outcome.
 func make_authoritative_drop_position(tile: Vector2i, spread: float) -> Vector2:
 	var center: Vector2 = world.utils.tile_to_pixel(tile)
-	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+	if not world.multiplayer.is_server():
 		return center
 	var drop_offset := Vector2(
 		randf_range(-spread, spread),
@@ -43,7 +43,7 @@ func make_authoritative_drop_position(tile: Vector2i, spread: float) -> Vector2:
 	return center + drop_offset
 
 func drop_item_at(obj: Node2D, tile: Vector2i, spread: float) -> void:
-	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+	if not world.multiplayer.is_server():
 		return
 	obj.global_position = make_authoritative_drop_position(tile, spread)
 

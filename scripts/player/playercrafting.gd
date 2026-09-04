@@ -199,10 +199,7 @@ func _update_craft_attempts(delta: float) -> void:
 
 func _complete_craft_attempt(recipe_id: String) -> void:
 	var my_peer_id := player.multiplayer.get_unique_id()
-	if player.multiplayer.is_server():
-		World.rpc_request_craft(my_peer_id, recipe_id)
-	else:
-		World.rpc_request_craft.rpc_id(1, my_peer_id, recipe_id)
+	World.rpc_request_craft.rpc_id(1, my_peer_id, recipe_id)
 
 func _create_craft_indicator(target: Node, recipe_id: String) -> Label:
 	var lbl := Label.new()

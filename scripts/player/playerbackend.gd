@@ -36,7 +36,7 @@ func apply_class_defaults() -> void:
 
 	var base_stats = class_data.get("stats", {})
 	player.stats = {}
-	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
+	var simulation_authority := player.multiplayer.is_server()
 	for stat_name in base_stats:
 		var base_val = base_stats[stat_name]
 		var variation := randi_range(-1, 1) if simulation_authority else 0
@@ -71,8 +71,7 @@ func check_stamina_regen(delta: float) -> void:
 	var peer := player.multiplayer.multiplayer_peer
 	if peer != null and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	var simulation_authority := not player.multiplayer.has_multiplayer_peer() or player.multiplayer.is_server()
-	if not simulation_authority:
+	if not player.multiplayer.is_server():
 		return
 
 	if player.combat_mode:

@@ -95,14 +95,13 @@ func _ready() -> void:
 	await get_tree().process_frame
 	Lighting.rebuild_roof_map()
 
-	if multiplayer.has_multiplayer_peer():
-		if multiplayer.is_server():
-			# Server is fully loaded — hide the startup loading screen.
-			LoadingScreen.hide_loading()
-		else:
-			# Flag the map as fully loaded; LateJoin will now start the version check.
-			LateJoin.map_loaded = true
-			LoadingScreen.update_status("Checking version...")
+	if multiplayer.is_server():
+		# Server is fully loaded — hide the startup loading screen.
+		LoadingScreen.hide_loading()
+	else:
+		# Flag the map as fully loaded; LateJoin will now start the version check.
+		LateJoin.map_loaded = true
+		LoadingScreen.update_status("Checking version...")
 
 func _exit_tree() -> void:
 	if not Engine.is_editor_hint():
@@ -228,7 +227,7 @@ func _build_tileset() -> void:
 
 func _spawn_runtime_foliage() -> void:
 	_ensure_runtime_grass_layers()
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+	if not multiplayer.is_server():
 		return
 
 	var occupied_tiles := _collect_runtime_occupied_tiles()

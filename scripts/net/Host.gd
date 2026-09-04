@@ -298,9 +298,8 @@ func clear_session_data() -> void:
 
 
 func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peasant", is_latejoin: bool = false) -> void:
-	# The listen server keeps peer ID 1 for networking/RPC authority, but the
-	# graphical host is a server console rather than a playable character.
-	if is_host_mode and multiplayer.is_server() and peer_id == multiplayer.get_unique_id():
+	# Peer 1 is reserved for the server console; playable peers are remote clients.
+	if not multiplayer.is_server() or peer_id <= 1:
 		return
 
 	if peers.has(peer_id):

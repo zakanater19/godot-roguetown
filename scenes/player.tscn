@@ -30,10 +30,10 @@ properties/7/spawn = true
 properties/7/replication_mode = 1
 properties/8/path = NodePath(".:equipped")
 properties/8/spawn = true
-properties/8/replication_mode = 1
+properties/8/replication_mode = 2
 properties/9/path = NodePath(".:equipped_data")
 properties/9/spawn = true
-properties/9/replication_mode = 1
+properties/9/replication_mode = 2
 properties/10/path = NodePath(".:combat_mode")
 properties/10/spawn = true
 properties/10/replication_mode = 1
@@ -57,16 +57,17 @@ properties/16/spawn = true
 properties/16/replication_mode = 1
 properties/17/path = NodePath(".:stats")
 properties/17/spawn = true
-properties/17/replication_mode = 1
+properties/17/replication_mode = 2
 properties/18/path = NodePath(".:skills")
 properties/18/spawn = true
-properties/18/replication_mode = 1
+properties/18/replication_mode = 2
 properties/19/path = NodePath(".:intent")
 properties/19/spawn = true
 properties/19/replication_mode = 1
 properties/20/path = NodePath(".:is_possessed")
 properties/20/spawn = true
 properties/20/replication_mode = 1
+
 [node name="Player" type="Node2D"]
 script = ExtResource("1_onrkg")
 

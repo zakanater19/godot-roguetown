@@ -91,7 +91,7 @@ func get_tile_description(source_id: int, atlas_coords: Vector2i) -> String:
 	return TileDefs.get_description(source_id, atlas_coords)
 
 func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> void:
-	if world.multiplayer.has_multiplayer_peer() and not world.multiplayer.is_server():
+	if not world.multiplayer.is_server():
 		return
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if player == null or player.dead: return

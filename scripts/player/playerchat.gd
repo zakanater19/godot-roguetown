@@ -12,8 +12,7 @@ func on_chat_submitted(text: String) -> void:
 	player._chat_input.clear()
 	player._chat_input.release_focus()
 	if text.strip_edges() == "": return
-	if player.multiplayer.is_server(): World.rpc_send_chat(text)
-	else: World.rpc_send_chat.rpc_id(1, text)
+	World.rpc_send_chat.rpc_id(1, text)
 
 func show_remote_chat(sender_name: String, message: String) -> void:
 	Sidebar.add_message(sender_name + " says: " + message)

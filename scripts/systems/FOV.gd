@@ -46,13 +46,10 @@ func _process(delta: float) -> void:
 		_player_z = p_z
 		_view_z = v_z
 		_time_since_update = 0.0
-		if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
-			# Keep the last authoritative mask visible until the next one arrives.
-			# Clearing it here caused a full-screen black flash on every step.
+		# Keep the last authoritative mask visible until the next one arrives.
+		# Clearing it here caused a full-screen black flash on every step.
+		if multiplayer.get_peers().has(1):
 			request_authoritative_fov.rpc_id(1, int(v_z))
-		else:
-			_compute_fov()
-			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
 
 func refresh_local_fov(clear_stale_visibility: bool = true) -> void:
 	if clear_stale_visibility:
@@ -70,23 +67,19 @@ func refresh_local_fov(clear_stale_visibility: bool = true) -> void:
 	_player_tile = player.tile_pos
 	_player_z = player.z_level
 	_view_z = player.get("view_z_level") if "view_z_level" in player else _player_z
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
-		_apply_fov_hiding()
-		if _draw_node != null:
-			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
+	_apply_fov_hiding()
+	if _draw_node != null:
+		_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
+	if multiplayer.get_peers().has(1):
 		request_authoritative_fov.rpc_id(1, int(_view_z))
-	else:
-		_compute_fov()
-		if _draw_node != null:
-			_draw_node.update_fov(_player_tile, _visible_tiles, FOV_RADIUS)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func request_authoritative_fov(requested_view_z: int) -> void:
 	if not multiplayer.is_server():
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id == 0:
-		sender_id = multiplayer.get_unique_id()
+	if sender_id <= 1:
+		return
 	var player := World._find_player_by_peer(sender_id)
 	if player == null:
 		return
