@@ -1,13 +1,21 @@
 [gd_resource type="TileSet" format=3 uid="uid://c2qgoiby6404v"]
 
 [ext_resource type="Texture2D" uid="uid://buf14prsgxcpn" path="res://assets/regions/town.svg" id="1_town"]
+[ext_resource type="Texture2D" uid="uid://bp1lt3633vanh" path="res://assets/regions/tame_wilds.svg" id="2_wilds"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_regions"]
-resource_name = "Regions"
+resource_name = "Town"
 texture = ExtResource("1_town")
+texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_wilds"]
+resource_name = "Tame Wilds"
+texture = ExtResource("2_wilds")
 texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 
 [resource]
 tile_size = Vector2i(64, 64)
 sources/0 = SubResource("TileSetAtlasSource_regions")
+sources/1 = SubResource("TileSetAtlasSource_wilds")

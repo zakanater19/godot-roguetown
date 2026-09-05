@@ -407,7 +407,7 @@ func run() -> Dictionary:
 	_end_section()
 
 	_begin_section("net: authoritative snapshots")
-	_validate_authoritative_snapshot_codec()
+	await _validate_authoritative_snapshot_codec()
 	_end_section()
 
 	_begin_section("net: reconnect behavior")
@@ -879,8 +879,8 @@ func _validate_regions() -> void:
 	if region_tileset == null:
 		_fail("Region TileSet failed to load.")
 		return
-	if region_tileset.get_source_count() != 1 or not region_tileset.has_source(0):
-		_fail("Region TileSet must contain exactly the dedicated region source 0.")
+	if region_tileset.get_source_count() != 2 or not region_tileset.has_source(0) or not region_tileset.has_source(1):
+		_fail("Region TileSet must contain Town and Tame Wilds sources.")
 		return
 	var atlas := region_tileset.get_source(0) as TileSetAtlasSource
 	if atlas == null or not atlas.has_tile(Vector2i.ZERO):
@@ -903,12 +903,21 @@ func _validate_regions() -> void:
 		_fail("Town region lookup did not resolve the painted town cell.")
 	if Regions.allows_grass_decor_at(test_root, town_cell, 3):
 		_fail("Town regions must reject grass decoration placement.")
-	if not Regions.allows_grass_decor_at(test_root, town_cell + Vector2i.RIGHT, 3):
-		_fail("Unpainted cells must allow grass decoration placement.")
+	if Regions.allows_grass_decor_at(test_root, town_cell + Vector2i.RIGHT, 3):
+		_fail("Unpainted cells must not allow grass decoration placement.")
 	if Regions.allows_bushes_at(test_root, town_cell, 3):
 		_fail("Town regions must reject random bush placement.")
-	if not Regions.allows_bushes_at(test_root, town_cell + Vector2i.RIGHT, 3):
-		_fail("Unpainted cells must allow random bush placement.")
+	if Regions.allows_bushes_at(test_root, town_cell + Vector2i.RIGHT, 3):
+		_fail("Unpainted cells must not allow random bush placement.")
+	var wild_cell := town_cell + Vector2i.RIGHT
+	test_layer.set_cell(wild_cell, 1, Vector2i.ZERO)
+	if Regions.get_region_at(test_root, wild_cell, 3) != Regions.TAME_WILDS:
+		_fail("Tame Wilds lookup did not resolve its painted cell.")
+	if not Regions.allows_grass_decor_at(test_root, wild_cell, 3) or not Regions.allows_bushes_at(test_root, wild_cell, 3):
+		_fail("Tame Wilds must allow its configured foliage.")
+	var tame_definition: Dictionary = Regions.REGION_DEFINITIONS[Regions.TAME_WILDS]
+	if tame_definition["tree_chance"] != 0.05 or tame_definition["grass_chance"] != 0.10 or tame_definition["bush_chance"] != 0.02:
+		_fail("Tame Wilds foliage chances must be 5% trees, 10% wildgrass and 2% bushes.")
 	test_root.free()
 
 func _validate_foliage() -> void:
@@ -1381,10 +1390,18 @@ func _validate_authoritative_snapshot_codec() -> void:
 	var latejoin := _SmokeLateJoinStub.new()
 	latejoin._reconnect = _SmokeReconnectStub.new()
 	var sync = preload("res://scripts/net/latejoin_sync.gd").new(latejoin)
+	var empty_region_generation := {
+		"version": Regions.GENERATION_VERSION,
+		"seed": 12345,
+		"layout": PackedInt32Array(),
+		"removed": [],
+		"overrides": {},
+		"grass_cuts": [],
+	}
 	var snapshot := {
-		"schema_version": 1,
+		"schema_version": 2,
 		"tiles": PackedInt32Array(),
-		"grass": [],
+		"region_generation": empty_region_generation,
 		"objects": [],
 		"players": {},
 		"mobs": [],
@@ -1392,7 +1409,7 @@ func _validate_authoritative_snapshot_codec() -> void:
 	var raw: PackedByteArray = var_to_bytes(snapshot)
 	var checksum: String = sync._checksum_bytes(raw)
 	var compressed := raw.compress(FileAccess.COMPRESSION_GZIP)
-	if not sync.handle_receive_world_snapshot(1, 1, raw.size(), checksum, compressed):
+	if not await sync.handle_receive_world_snapshot(2, 1, raw.size(), checksum, compressed):
 		_fail("LateJoinSync: a valid compressed authoritative snapshot was rejected.")
 	if sync._last_applied_snapshot_revision != 1:
 		_fail("LateJoinSync: a valid snapshot did not advance the applied revision.")
@@ -1437,19 +1454,18 @@ func _validate_authoritative_snapshot_codec() -> void:
 	var restored_tiles := PackedInt32Array([3, wall_cell.x, wall_cell.y, 0, 4, 0, 0])
 	var matching_tile_checksum: String = sync._checksum_bytes(var_to_bytes(restored_tiles))
 	var reconnect_snapshot := {
-		"schema_version": 1,
+		"schema_version": 2,
 		"tiles": restored_tiles,
 		"tile_checksum": matching_tile_checksum,
-		"grass": [],
-		"grass_checksum": sync._checksum_bytes(var_to_bytes([])),
+		"region_generation": empty_region_generation,
 		"objects": [],
 		"players": {},
 		"mobs": [],
 	}
 	var reconnect_raw: PackedByteArray = var_to_bytes(reconnect_snapshot)
 	sync._last_applied_tile_checksum = matching_tile_checksum
-	if not sync.handle_receive_world_snapshot(
-		1,
+	if not await sync.handle_receive_world_snapshot(
+		2,
 		2,
 		reconnect_raw.size(),
 		sync._checksum_bytes(reconnect_raw),

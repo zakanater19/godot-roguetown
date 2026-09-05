@@ -448,6 +448,8 @@ func _ready() -> void:
 	view_z_level = z_level
 	z_index = Defs.get_z_index(z_level, Defs.Z_OFFSET_PLAYERS)
 	add_to_group("z_entity")
+	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
+		World.main_scene.register_render_distance_node(self)
 	# The player node keeps peer authority for authenticated input RPCs, while
 	# replicated state always originates from the server.
 	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
@@ -621,6 +623,8 @@ func sync_hands(hand_ids: Array) -> void:
 	_update_hands_ui()
 
 func _exit_tree() -> void:
+	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
+		World.main_scene.unregister_render_distance_node(self)
 	World.unregister_entity(self)
 
 # ── Reconnection ──────────────────────────────────────────────────────────────

@@ -5,7 +5,6 @@ extends Node2D
 const SHOW_OUTLINES: bool  = true
 const OUTLINE_COLOR: Color = Color(0.5, 0.5, 0.5, 0.5)
 const OUTLINE_WIDTH: float = 1.0
-const BUSH_SCENE: PackedScene = preload("res://objects/bush.tscn")
 
 const HIDE_OUTLINES_AT_RUNTIME: bool = true
 
@@ -39,15 +38,20 @@ const GRASS_DECOR_TILE_PATHS: PackedStringArray =[
 	"res://assets/foliage/grass7.png",
 	"res://assets/foliage/grass8.png",
 ]
-const GRASS_FLOOR_ATLAS_COORDS: Vector2i = Vector2i(0, 0)
-const GRASS_DECOR_SPAWN_CHANCE: float = 0.1
-const BUSH_SPAWN_CHANCE: float = 0.025
 const GRASS_DECOR_Z_OFFSET: int = 1
-const FOLIAGE_LAYOUT_SEED: int = 734287
+const RENDER_DISTANCE_TILES: int = 30
+const LEAF_LIGHT_GROUP: StringName = &"leaf_canopy"
 
 var target_fps: int = 60
 var _last_z: int = -1
 var _grass_decor_layers: Dictionary = {}
+var region_generation_baseline: Dictionary = {}
+var _region_grass_cuts: Dictionary = {}
+var region_generation_ready: bool = false
+var _render_distance_nodes: Dictionary = {}
+var _render_distance_dirty: bool = true
+var _last_render_distance_center := Vector2i(-2147483648, -2147483648)
+var _last_render_distance_player_id: int = 0
 
 var _fps_label: Label = null
 
@@ -89,11 +93,14 @@ func _ready() -> void:
 	add_child(fps_layer)
 
 	World.register_main(self)
+	_register_existing_render_distance_nodes()
 	Engine.max_fps = target_fps
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 	
 	# Wait for grid to populate, then calculate global shadow mapping
 	await get_tree().process_frame
+	while multiplayer.is_server() and not region_generation_ready:
+		await get_tree().process_frame
 	Lighting.rebuild_roof_map()
 
 	if multiplayer.is_server():
@@ -228,38 +235,17 @@ func _build_tileset() -> void:
 
 func _spawn_runtime_foliage() -> void:
 	_ensure_runtime_grass_layers()
-	if not multiplayer.is_server():
-		return
+	if multiplayer.is_server():
+		Regions.populate_runtime_features(self, Regions.create_generation_seed())
+		region_generation_ready = true
 
-	var occupied_tiles := _collect_runtime_occupied_tiles()
+func capture_region_generation_snapshot() -> Dictionary:
+	return Regions.capture_generation_snapshot(self)
 
-	for z in range(1, 6):
-		var world_layer := get_node_or_null("TileMapLayer_Z" + str(z)) as TileMapLayer
-		if world_layer == null:
-			continue
-
-		var decor_layer := _grass_decor_layers.get(z) as TileMapLayer
-		if decor_layer == null:
-			continue
-
-		for cell in world_layer.get_used_cells_by_id(0, GRASS_FLOOR_ATLAS_COORDS):
-			if occupied_tiles[z].has(cell):
-				continue
-			var bush_roll := posmod(_get_foliage_hash(cell, z, 2), 10000)
-			if (
-				Regions.allows_bushes_at(self, cell, z)
-				and bush_roll < int(BUSH_SPAWN_CHANCE * 10000.0)
-			):
-				_spawn_runtime_bush(cell, z)
-				occupied_tiles[z][cell] = true
-				continue
-			if not Regions.allows_grass_decor_at(self, cell, z):
-				continue
-			var spawn_roll := posmod(_get_foliage_hash(cell, z, 0), 10000)
-			if spawn_roll >= int(GRASS_DECOR_SPAWN_CHANCE * 10000.0):
-				continue
-			var variant := posmod(_get_foliage_hash(cell, z, 1), GRASS_DECOR_TILE_PATHS.size())
-			decor_layer.set_cell(cell, 0, Vector2i(variant, 0))
+func apply_region_generation_snapshot(snapshot: Dictionary) -> void:
+	_ensure_runtime_grass_layers()
+	Regions.apply_generation_snapshot(self, snapshot)
+	region_generation_ready = true
 
 func _ensure_runtime_grass_layers() -> void:
 	if not _grass_decor_layers.is_empty():
@@ -282,6 +268,7 @@ func _ensure_runtime_grass_layers() -> void:
 		decor_layer.z_as_relative = false
 		decor_layer.z_index = Defs.get_z_index(z, GRASS_DECOR_Z_OFFSET)
 		decor_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		decor_layer.rendering_quadrant_size = 8
 		add_child(decor_layer)
 		_grass_decor_layers[z] = decor_layer
 
@@ -319,37 +306,6 @@ func apply_runtime_grass_snapshot(snapshot: Array) -> void:
 				Vector2i(int(entry.get("variant", 0)), 0)
 			)
 
-func _spawn_runtime_bush(cell: Vector2i, z_level: int) -> void:
-	var bush := BUSH_SCENE.instantiate() as Node2D
-	if bush == null:
-		push_error("Could not instantiate the runtime bush scene.")
-		return
-	bush.name = "RuntimeBush_Z%d_X%d_Y%d" % [z_level, cell.x, cell.y]
-	bush.position = Defs.tile_to_pixel(cell)
-	bush.set("z_level", z_level)
-	bush.set_meta("entity_id", "world:%s" % bush.name)
-	add_child(bush)
-	World.register_entity(bush, "world:%s" % bush.name)
-
-func _collect_runtime_occupied_tiles() -> Dictionary:
-	var occupied: Dictionary = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}}
-	for child in get_children():
-		if not (child is Node2D):
-			continue
-		var z_value = child.get("z_level")
-		if z_value == null:
-			continue
-		var z := clampi(int(z_value), 1, 5)
-		var anchor_tile := Defs.world_to_tile(child.global_position)
-		occupied[z][anchor_tile] = true
-		if child.has_method("get_solid_tiles"):
-			for solid_tile in child.call("get_solid_tiles"):
-				occupied[z][Vector2i(solid_tile)] = true
-	return occupied
-
-func _get_foliage_hash(cell: Vector2i, z: int, salt: int) -> int:
-	return ("%d:%d:%d:%d:%d" % [FOLIAGE_LAYOUT_SEED, cell.x, cell.y, z, salt]).hash()
-
 func has_runtime_grass_decor_at(tile_pos: Vector2i, z_level: int) -> bool:
 	var decor_layer := _grass_decor_layers.get(z_level) as TileMapLayer
 	return decor_layer != null and decor_layer.get_cell_source_id(tile_pos) != -1
@@ -358,6 +314,7 @@ func remove_runtime_grass_decor(tile_pos: Vector2i, z_level: int) -> void:
 	var decor_layer := _grass_decor_layers.get(z_level) as TileMapLayer
 	if decor_layer != null:
 		decor_layer.erase_cell(tile_pos)
+		_region_grass_cuts[Vector3i(tile_pos.x, tile_pos.y, z_level)] = true
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
@@ -367,6 +324,7 @@ func _process(_delta: float) -> void:
 		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 
 	var local_player = World.get_local_player()
+	_update_render_distance(local_player)
 	var current_z = 3
 	if local_player != null:
 		current_z = local_player.get("view_z_level") if "view_z_level" in local_player else local_player.z_level
@@ -388,3 +346,68 @@ func _process(_delta: float) -> void:
 			if darken:
 				# Darken everything below the current player level
 				darken.visible = (z < current_z)
+
+func register_render_distance_node(node: Node2D) -> void:
+	if Engine.is_editor_hint() or not is_instance_valid(node):
+		return
+	var node_id := node.get_instance_id()
+	if _render_distance_nodes.has(node_id):
+		return
+	node.set_meta("render_distance_leaf_entity", node.is_in_group(LEAF_LIGHT_GROUP))
+	node.set_meta("fov_visible", node.visible)
+	_render_distance_nodes[node_id] = node
+	_render_distance_dirty = true
+	_set_render_distance_state(node, false)
+
+func unregister_render_distance_node(node: Node2D) -> void:
+	_render_distance_nodes.erase(node.get_instance_id())
+
+func _register_existing_render_distance_nodes() -> void:
+	for node in get_tree().get_nodes_in_group(Defs.GROUP_Z_ENTITY):
+		if node is Node2D:
+			register_render_distance_node(node)
+
+func _update_render_distance(local_player: Node2D) -> void:
+	var player_id := local_player.get_instance_id() if local_player != null else 0
+	var center := Defs.world_to_tile(local_player.global_position) if local_player != null else Vector2i(-2147483648, -2147483648)
+	if not _render_distance_dirty and center == _last_render_distance_center and player_id == _last_render_distance_player_id:
+		return
+	_render_distance_dirty = false
+	_last_render_distance_center = center
+	_last_render_distance_player_id = player_id
+	var stale: Array = []
+	for node_id: int in _render_distance_nodes:
+		var node: Node2D = _render_distance_nodes[node_id]
+		if not is_instance_valid(node):
+			stale.append(node_id)
+			continue
+		var offset := Defs.world_to_tile(node.global_position) - center
+		# Same horizontal footprint on every Z level. FOV separately decides
+		# which floors are visible; range culling never alters tree gameplay.
+		var in_range := local_player != null and absi(offset.x) <= RENDER_DISTANCE_TILES and absi(offset.y) <= RENDER_DISTANCE_TILES
+		if bool(node.get_meta("render_distance_visible", true)) != in_range:
+			_set_render_distance_state(node, in_range)
+	for node_id: int in stale:
+		_render_distance_nodes.erase(node_id)
+
+func _set_render_distance_state(node: Node2D, in_range: bool) -> void:
+	node.set_meta("render_distance_visible", in_range)
+	if node.has_method("set_render_distance_visible"):
+		node.call("set_render_distance_visible", in_range)
+	else:
+		var combined := in_range and bool(node.get_meta("fov_visible", true))
+		if node.has_method("_set_fov_visibility"):
+			node.call("_set_fov_visibility", combined)
+		else:
+			node.visible = combined
+			if node is CollisionObject2D:
+				node.input_pickable = combined
+	if in_range and not node.is_in_group(Defs.GROUP_Z_ENTITY):
+		node.add_to_group(Defs.GROUP_Z_ENTITY)
+	elif not in_range and node.is_in_group(Defs.GROUP_Z_ENTITY):
+		node.remove_from_group(Defs.GROUP_Z_ENTITY)
+	if node.get_meta("render_distance_leaf_entity", false):
+		if in_range and not node.is_in_group(LEAF_LIGHT_GROUP):
+			node.add_to_group(LEAF_LIGHT_GROUP)
+		elif not in_range and node.is_in_group(LEAF_LIGHT_GROUP):
+			node.remove_from_group(LEAF_LIGHT_GROUP)

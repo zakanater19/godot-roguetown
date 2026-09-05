@@ -60,6 +60,8 @@ func can_be_butchered() -> bool:
 func _ready() -> void:
 	z_index = (z_level - 1) * 200 + z_index
 	add_to_group("z_entity")
+	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
+		World.main_scene.register_render_distance_node(self)
 	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
 	if state_sync != null:
 		state_sync.set_multiplayer_authority(1)
@@ -77,6 +79,8 @@ func _ready() -> void:
 	World.register_solid(tile_pos, z_level, self)
 
 func _exit_tree() -> void:
+	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
+		World.main_scene.unregister_render_distance_node(self)
 	World.unregister_solid(tile_pos, z_level, self)
 	World.unregister_entity(self)
 

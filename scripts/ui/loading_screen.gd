@@ -75,6 +75,7 @@ func _build_ui() -> void:
 	_progress_bar = ProgressBar.new()
 	_progress_bar.min_value            = 0.0
 	_progress_bar.max_value            = 1.0
+	_progress_bar.show_percentage      = true
 	_progress_bar.value                = 0.0
 	_progress_bar.custom_minimum_size.y = 18
 	_progress_bar.visible              = false
@@ -126,11 +127,13 @@ func show_loading(status: String) -> void:
 ## Update the status text and optionally display a progress bar.
 ## Pass progress < 0 to hide the bar.  Pass detail = "" to hide the sub-label.
 func update_status(status: String, progress: float = -1.0, detail: String = "") -> void:
-	_status_label.text = status
 	if progress >= 0.0:
-		_progress_bar.value   = progress
+		var clamped_progress := clampf(progress, 0.0, 1.0)
+		_status_label.text = "Loading %d%%" % roundi(clamped_progress * 100.0)
+		_progress_bar.value   = clamped_progress
 		_progress_bar.visible = true
 	else:
+		_status_label.text = status
 		_progress_bar.visible = false
 	_detail_label.text    = detail
 	_detail_label.visible = detail != ""

@@ -5,6 +5,8 @@ extends Area2D
 @export var z_level: int = 3
 
 var _registered_solid_tiles: Array[Vector2i] = []
+var _fov_visible: bool = true
+var _render_distance_visible: bool = true
 
 # Gameplay state that is allowed to cross the network boundary.  Keeping this
 # list explicit prevents UI nodes, Resources, animation timers, and other
@@ -59,12 +61,16 @@ func _ready() -> void:
 		register_solid_tiles()
 
 	_on_world_object_ready()
+	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
+		World.main_scene.register_render_distance_node(self)
 
 func _exit_tree() -> void:
 	if Engine.is_editor_hint():
 		return
 
 	unregister_solid_tiles()
+	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
+		World.main_scene.unregister_render_distance_node(self)
 	if should_register_entity():
 		World.unregister_entity(self)
 	_on_world_object_exit()
@@ -116,6 +122,21 @@ func set_solid_enabled(enabled: bool) -> void:
 		register_solid_tiles()
 	else:
 		unregister_solid_tiles()
+
+func _set_fov_visibility(p_visible: bool) -> void:
+	_fov_visible = p_visible
+	_apply_combined_visibility()
+
+func set_render_distance_visible(p_visible: bool) -> void:
+	_render_distance_visible = p_visible
+	_apply_combined_visibility()
+
+func _apply_combined_visibility() -> void:
+	var combined := bool(get_meta("fov_visible", _fov_visible)) and _render_distance_visible
+	if visible != combined:
+		visible = combined
+	if input_pickable != combined:
+		input_pickable = combined
 
 func capture_authoritative_state() -> Dictionary:
 	var state: Dictionary = {}

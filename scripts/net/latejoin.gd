@@ -30,6 +30,8 @@ var sync_requested: bool = false
 var version_checked: bool = false
 var _version_check_sent: bool = false
 var is_manual_reconnect: bool = false
+var _snapshot_apply_complete: bool = false
+var _sync_complete_received: bool = false
 
 var _disconnected_players: Dictionary = {}
 
@@ -71,6 +73,8 @@ func _on_server_disconnected() -> void:
 	version_checked = false
 	_version_check_sent = false
 	is_manual_reconnect = false
+	_snapshot_apply_complete = false
+	_sync_complete_received = false
 	# ENet leaves a disconnected peer object assigned after the server closes.
 	# Remove it immediately so gameplay nodes cannot poll an inactive instance
 	# while the synchronized round-restart timer moves us back to the menu.
@@ -90,6 +94,9 @@ func _process(_delta: float) -> void:
 
 	if not multiplayer.is_server() and client_connected and map_loaded and BootstrapNet.version_checked and not sync_requested:
 		sync_requested = true
+		_snapshot_apply_complete = false
+		_sync_complete_received = false
+		LoadingScreen.update_status("Loading...", 0.01)
 		request_sync.rpc_id(1)
 
 func register_tile_change(tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
@@ -203,6 +210,9 @@ func request_sync() -> void:
 	if not _pending_joins.has(peer_id):
 		_pending_joins.append(peer_id)
 
+	receive_sync_progress.rpc_id(peer_id, 1)
+	while World.main_scene != null and "region_generation_ready" in World.main_scene and not World.main_scene.region_generation_ready:
+		await get_tree().process_frame
 	_sync.send_world_state_to_peer(peer_id)
 	_reconnect.handle_reconnection(peer_id)
 	receive_sync_complete.rpc_id(peer_id)
@@ -227,13 +237,18 @@ func receive_world_snapshot(
 	 checksum: String,
 	 payload: PackedByteArray
 ) -> void:
-	_sync.handle_receive_world_snapshot(
+	_snapshot_apply_complete = await _sync.handle_receive_world_snapshot(
 		schema_version,
 		revision,
 		raw_size,
 		checksum,
 		payload
 	)
+	_finish_sync_if_ready()
+
+@rpc("authority", "call_remote", "reliable")
+func receive_sync_progress(percent: int) -> void:
+	LoadingScreen.update_status("Loading...", clampf(float(percent) / 100.0, 0.01, 1.0))
 
 @rpc("authority", "call_remote", "reliable")
 func receive_player_states(player_states: Dictionary) -> void:
@@ -310,6 +325,13 @@ func receive_version_response(server_version: String, diffs: Dictionary, has_pck
 
 @rpc("authority", "call_remote", "reliable")
 func receive_sync_complete() -> void:
+	_sync_complete_received = true
+	_finish_sync_if_ready()
+
+func _finish_sync_if_ready() -> void:
+	if not _sync_complete_received or not _snapshot_apply_complete:
+		return
+	LoadingScreen.update_status("Loading...", 1.0)
 	LoadingScreen.hide_loading()
 	DirAccess.remove_absolute("user://pending_reconnect.json")
 

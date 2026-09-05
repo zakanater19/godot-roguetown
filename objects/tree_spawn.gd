@@ -46,6 +46,8 @@ const LEAF_Z_OFFSET: int = Defs.Z_OFFSET_ITEMS - 1
 @export var z_level: int = 3
 @export var seed_override: int = 0
 
+var manual_runtime_spawn: bool = false
+
 @onready var preview: Sprite2D = $Preview
 
 func _ready() -> void:
@@ -58,7 +60,7 @@ func _ready() -> void:
 
 	# Runtime tree pieces are gameplay objects. Only the server constructs them;
 	# clients receive them from the world snapshot.
-	if not multiplayer.is_server():
+	if manual_runtime_spawn or not multiplayer.is_server():
 		return
 
 	call_deferred("_spawn_runtime_tree")
@@ -203,8 +205,12 @@ func _spawn_segment(parent_node: Node, segment_config: Dictionary) -> void:
 	segment.blocks_fov = bool(segment_config.get("blocks_fov", true))
 	segment.decor_configs = segment_config["decor_configs"].duplicate(true)
 	segment.set_meta("entity_id", "world:%s" % piece_name)
+	if get_meta("region_generated", false):
+		segment.set_meta("region_generated", true)
 	parent_node.add_child(segment)
 	World.register_entity(segment, "world:%s" % piece_name)
+	if get_meta("region_generated", false):
+		Regions.register_generated_object(parent_node, segment)
 
 func _make_canopy_branch_leaf_configs(
 	rng: RandomNumberGenerator,

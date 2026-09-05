@@ -347,22 +347,24 @@ func _apply_fov_hiding() -> void:
 		if ez == null: continue
 		var ent_is_ghost: bool = ent.get("is_ghost") == true
 		
-		var is_visible = false
+		var entity_visible := false
 		if ent_is_ghost and not local_is_ghost:
-			is_visible = false
+			entity_visible = false
 		elif ez > _view_z:
 			# Entites on floors above the player's view are completely hidden
-			is_visible = false
+			entity_visible = false
 		else:
 			# Entities on current or below floors use FOV logic
 			var ent_tile := Vector2i(int(ent.global_position.x / 64.0), int(ent.global_position.y / 64.0))
-			is_visible = _visible_tiles.has(ent_tile)
+			entity_visible = _visible_tiles.has(ent_tile)
 			
+		ent.set_meta("fov_visible", entity_visible)
+		entity_visible = entity_visible and bool(ent.get_meta("render_distance_visible", true))
 		if ent.has_method("_set_fov_visibility"):
-			ent._set_fov_visibility(is_visible)
+			ent._set_fov_visibility(entity_visible)
 		else:
 			# Avoid triggering engine redraws unless visibility status actually changed
-			if "visible" in ent and ent.visible != is_visible:
-				ent.visible = is_visible
-			if "input_pickable" in ent and ent.get("input_pickable") != is_visible:
-				ent.input_pickable = is_visible
+			if "visible" in ent and ent.visible != entity_visible:
+				ent.visible = entity_visible
+			if "input_pickable" in ent and ent.get("input_pickable") != entity_visible:
+				ent.input_pickable = entity_visible

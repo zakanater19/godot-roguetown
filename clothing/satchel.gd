@@ -33,6 +33,8 @@ func _ready() -> void:
 		return
 	World.register_entity(self)
 	add_to_group("pickable")
+	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
+		World.main_scene.register_render_distance_node(self)
 	if contents.size() != MAX_SLOTS:
 		contents.resize(MAX_SLOTS)
 		for i in MAX_SLOTS:
@@ -55,6 +57,8 @@ func _process(_delta: float) -> void:
 func _exit_tree() -> void:
 	if Engine.is_editor_hint():
 		return
+	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
+		World.main_scene.unregister_render_distance_node(self)
 	World.unregister_entity(self)
 	_close_ui()
 

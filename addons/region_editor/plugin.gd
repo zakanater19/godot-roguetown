@@ -62,7 +62,7 @@ func _build_panel() -> void:
 	row.add_child(_level_label)
 
 	var help := Label.new()
-	help.text = "Choose a Z-level, then use the normal TileMap tab to paint or erase the brown 'town' tile. Regions are editor-only and do not replace floors or walls."
+	help.text = "Choose a Z-level, then paint Town (brown) or Tame Wilds (green) in the TileMap tab. Tame Wilds grass generates trees (5%), wildgrass (10%) and bushes (2%). Unpainted areas generate nothing."
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_panel.add_child(help)
 

@@ -94,6 +94,8 @@ func _ready() -> void:
 		state_sync.set_multiplayer_authority(1)
 	add_to_group("player")
 	add_to_group("z_entity")
+	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
+		World.main_scene.register_render_distance_node(self)
 	World.register_entity(self, "player:%s" % name)
 	visible = _is_local_authority()
 
@@ -110,6 +112,8 @@ func _ready() -> void:
 		_refresh_local_view()
 
 func _exit_tree() -> void:
+	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
+		World.main_scene.unregister_render_distance_node(self)
 	World.unregister_entity(self)
 
 func _is_local_authority() -> bool:

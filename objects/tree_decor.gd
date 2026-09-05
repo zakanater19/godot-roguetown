@@ -26,6 +26,12 @@ func _ready() -> void:
 		add_to_group(Defs.GROUP_Z_ENTITY)
 	if not is_in_group(LEAF_LIGHT_GROUP):
 		add_to_group(LEAF_LIGHT_GROUP)
+	if not Engine.is_editor_hint() and World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
+		World.main_scene.register_render_distance_node(self)
+
+func _exit_tree() -> void:
+	if not Engine.is_editor_hint() and World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
+		World.main_scene.unregister_render_distance_node(self)
 
 func _get_region_rect(cell_index: int) -> Rect2:
 	var x: int = (cell_index % SHEET_COLUMNS) * CELL_SIZE

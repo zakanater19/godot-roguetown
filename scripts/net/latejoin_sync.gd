@@ -2,7 +2,7 @@
 # Handles world-state synchronisation for late-joining clients.
 extends RefCounted
 
-const WORLD_SNAPSHOT_SCHEMA_VERSION: int = 1
+const WORLD_SNAPSHOT_SCHEMA_VERSION: int = 2
 const TILE_RECORD_SIZE: int = 7
 
 var lj: Node  # reference to the LateJoin autoload node
@@ -55,13 +55,13 @@ func _build_snapshot_packet() -> Dictionary:
 	if World.main_scene == null:
 		return {}
 	var tile_snapshot := _capture_full_tile_snapshot()
-	var grass_snapshot := _capture_grass_snapshot()
 	var snapshot := {
 		"schema_version": WORLD_SNAPSHOT_SCHEMA_VERSION,
 		"tiles": tile_snapshot,
 		"tile_checksum": _checksum_bytes(var_to_bytes(tile_snapshot)),
-		"grass": grass_snapshot,
-		"grass_checksum": _checksum_bytes(var_to_bytes(grass_snapshot)),
+		# Generated Tame Wilds content is represented once by its compact layout,
+		# seed, removals and changed state. It is not duplicated object-by-object.
+		"region_generation": World.main_scene.call("capture_region_generation_snapshot"),
 		"objects": _capture_world_objects(),
 		"players": _capture_player_states(),
 		"mobs": _capture_mob_states(),
@@ -157,6 +157,8 @@ func _capture_world_objects() -> Array:
 	var objects_to_sync: Array = []
 	var held_object_ids := _collect_held_object_ids()
 	for obj in _collect_world_objects():
+		if obj.get_meta("region_generated", false):
+			continue
 		var obj_id := World.register_entity(obj)
 		if held_object_ids.has(obj_id):
 			continue
@@ -345,6 +347,7 @@ func handle_receive_world_snapshot(
 	 checksum: String,
 	 payload: PackedByteArray
 ) -> bool:
+	await _show_sync_progress(0.01)
 	if schema_version != WORLD_SNAPSHOT_SCHEMA_VERSION:
 		push_error("LateJoin: unsupported world snapshot schema %d" % schema_version)
 		return false
@@ -370,8 +373,7 @@ func handle_receive_world_snapshot(
 		push_error("LateJoin: decoded world snapshot schema mismatch")
 		return false
 
-	# Apply the complete payload in one handler, so no gameplay frame can observe
-	# a purge from one RPC and the replacements from later RPCs.
+	await _show_sync_progress(0.20)
 	var tile_geometry_changed := true
 	var tile_checksum := str(snapshot.get("tile_checksum", ""))
 	# Full snapshots are only sent for join/reconnect. Always restore geometry:
@@ -379,11 +381,17 @@ func handle_receive_world_snapshot(
 	# scene currently registered in World after a reconnect or patch restart.
 	_apply_full_tile_snapshot(snapshot.get("tiles", PackedInt32Array()))
 	_last_applied_tile_checksum = tile_checksum
-	var grass_checksum := str(snapshot.get("grass_checksum", ""))
-	_apply_grass_snapshot(snapshot.get("grass", []))
-	_last_applied_grass_checksum = grass_checksum
+	await _show_sync_progress(0.50)
+	var region_snapshot: Dictionary = snapshot.get("region_generation", {})
+	if not Regions.validate_generation_snapshot(region_snapshot):
+		push_error("LateJoin: invalid Tame Wilds generation snapshot")
+		return false
+	if World.main_scene != null and World.main_scene.has_method("apply_region_generation_snapshot"):
+		World.main_scene.call("apply_region_generation_snapshot", region_snapshot)
+	await _show_sync_progress(0.75)
 	_apply_world_object_snapshot(snapshot.get("objects", []))
 	_apply_mob_snapshot(snapshot.get("mobs", []))
+	await _show_sync_progress(0.90)
 	handle_receive_player_states({"by_entity": snapshot.get("players", {})})
 	_last_applied_snapshot_revision = revision
 
@@ -393,7 +401,13 @@ func handle_receive_world_snapshot(
 		Lighting.call_deferred("rebuild_roof_map")
 	if FOV != null and FOV.has_method("refresh_local_fov"):
 		FOV.call_deferred("refresh_local_fov", false)
+	LoadingScreen.update_status("Loading...", 1.0)
 	return true
+
+func _show_sync_progress(progress: float) -> void:
+	LoadingScreen.update_status("Loading...", progress)
+	if lj.is_inside_tree():
+		await lj.get_tree().process_frame
 
 func _apply_full_tile_snapshot(packed: PackedInt32Array) -> void:
 	if packed.size() % TILE_RECORD_SIZE != 0:
@@ -672,6 +686,8 @@ func handle_purge_missing_objects(valid_ids: Array) -> void:
 			if obj.is_queued_for_deletion() or obj.get_parent() != main_node:
 				continue
 			var obj_id := World.get_entity_id(obj)
+			if obj.get_meta("region_generated", false):
+				continue
 			if held_object_ids.has(obj_id):
 				continue
 			if not valid_ids.has(obj_id):
