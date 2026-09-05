@@ -64,3 +64,7 @@ func _on_exhausted_changed() -> void:
 
 func _on_dead_changed() -> void:
 	pass
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and not Engine.is_editor_hint() and is_inside_tree():
+		WorldStream.update_node(self)

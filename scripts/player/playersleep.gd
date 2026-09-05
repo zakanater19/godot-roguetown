@@ -150,7 +150,7 @@ func update(delta: float, is_local: bool) -> void:
 				player._sleeping_on_bed = is_on_bed()
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are now fast asleep.[/color]")
-				player.rpc("_sync_sleep_state", player.sleep_state)
+				WorldStream.broadcast_actor(player, "_sync_sleep_state", [player.sleep_state])
 		elif player.sleep_state == player.SleepState.WAKING_UP:
 			if simulation_authority or is_local:
 				player.sleep_timer = maxf(player.sleep_timer - delta, 0.0)
@@ -158,7 +158,7 @@ func update(delta: float, is_local: bool) -> void:
 				apply_sleep_state(player.SleepState.AWAKE)
 				if is_local:
 					Sidebar.add_message("[color=#aaccff]You are fully awake.[/color]")
-				player.rpc("_sync_sleep_state", player.sleep_state)
+				WorldStream.broadcast_actor(player, "_sync_sleep_state", [player.sleep_state])
 		elif player.sleep_state == player.SleepState.ASLEEP:
 			if simulation_authority:
 				var regen_rate = 4.0 if player._sleeping_on_bed else 2.0

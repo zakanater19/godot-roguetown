@@ -62,6 +62,8 @@ func _build_break_drop_payload(def: Dictionary, drop_tile: Vector2i) -> Array:
 	return payload
 
 func break_wall(pos: Vector2i, z_level: int, parent: Node, rock_name: String = "", break_floor: Vector2i = Vector2i(6, 0), drops_data: Array = []) -> void:
+	if not WorldStream.contains_tile(pos):
+		return
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, 0, break_floor)
@@ -190,10 +192,10 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			blocking_player.tile_pos = old_tile
 			if old_z != next_z:
 				player.rpc_sync_z_level(next_z)
-				player.rpc_sync_z_level.rpc(next_z)
+				WorldStream.broadcast_actor(player, "rpc_sync_z_level", [next_z], true)
 			if blocking_player.get("z_level") != old_z:
 				blocking_player.rpc_sync_z_level(old_z)
-				blocking_player.rpc_sync_z_level.rpc(old_z)
+				WorldStream.broadcast_actor(blocking_player, "rpc_sync_z_level", [old_z], true)
 			world.combat.drag_grabbed_entity(sender_id, old_tile)
 			var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
 			world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, resolved_sprint)
@@ -216,10 +218,10 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 						player.tile_pos = next_tile
 						if old_z != next_z:
 							player.rpc_sync_z_level(next_z)
-							player.rpc_sync_z_level.rpc(next_z)
+							WorldStream.broadcast_actor(player, "rpc_sync_z_level", [next_z], true)
 						if blocking_player.get("z_level") != next_z:
 							blocking_player.rpc_sync_z_level(next_z)
-							blocking_player.rpc_sync_z_level.rpc(next_z)
+							WorldStream.broadcast_actor(blocking_player, "rpc_sync_z_level", [next_z], true)
 						world.combat.drag_grabbed_entity(sender_id, old_tile)
 						world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), push_dest, false)
 						var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
@@ -232,7 +234,7 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 		player.tile_pos = next_tile
 		if current_z != next_z:
 			player.rpc_sync_z_level(next_z)
-			player.rpc_sync_z_level.rpc(next_z)
+			WorldStream.broadcast_actor(player, "rpc_sync_z_level", [next_z], true)
 		world.combat.drag_grabbed_entity(sender_id, old_tile)
 		var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
 		world.rpc_confirm_move.rpc(sender_id, next_tile, resolved_sprint)
@@ -285,6 +287,8 @@ func handle_rpc_confirm_break_wall(pos: Vector2i, z_level: int, rock_name: Strin
 		LateJoin.register_tile_change(pos, z_level, 0, break_floor)
 
 func handle_rpc_confirm_replace_tile(pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void:
+	if not WorldStream.contains_tile(pos):
+		return
 	var tm = world.get_tilemap(z_level)
 	if tm == null: return
 	tm.set_cell(pos, source_id, atlas_coords)

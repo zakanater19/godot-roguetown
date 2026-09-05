@@ -101,7 +101,7 @@ func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos
 			n.queue_free()
 
 	var tm = world.get_tilemap(z_level)
-	if tm != null:
+	if tm != null and WorldStream.contains_tile(tile_pos):
 		tm.set_cell(tile_pos, source_id, atlas_coords)
 		world.handle_runtime_tile_change(tile_pos, z_level, source_id, atlas_coords)
 		LateJoin.register_tile_change(tile_pos, z_level, source_id, atlas_coords)

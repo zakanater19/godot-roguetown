@@ -130,8 +130,10 @@ func register_main(node: Node) -> void:
 	# of the frame. Never let a join/reconnect snapshot write into that old tree.
 	_tilemap_cache.clear()
 	main_scene = node
+	WorldStream.attach_main(node)
 
 func unregister_main() -> void:
+	WorldStream.detach_main(main_scene)
 	_tilemap_cache.clear()
 	main_scene = null
 
@@ -791,7 +793,7 @@ func rpc_request_ghost_z_change(new_z: int) -> void:
 	if ghost == null or not utils.is_ghost(ghost): return
 	var target_z: int = clampi(new_z, 1, 5)
 	ghost.rpc_sync_z_level(target_z)
-	ghost.rpc_sync_z_level.rpc(target_z)
+	WorldStream.broadcast_actor(ghost, "rpc_sync_z_level", [target_z], true)
 	LateJoin.update_player_state(sender_id, {"position": ghost.position, "z_level": target_z})
 
 @rpc("authority", "call_local", "reliable")

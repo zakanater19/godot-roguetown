@@ -104,7 +104,7 @@ func deal_damage_at_tile(tile: Vector2i, z_level: int, amount: int, attacker_id:
 				var target_limb = "chest"
 				if attacker != null and "targeted_limb" in attacker:
 					target_limb = attacker.targeted_limb
-				entity.receive_damage.rpc(roll.damage, target_limb)
+				WorldStream.broadcast_actor(entity, "receive_damage", [roll.damage, target_limb], true)
 			elif entity.has_method("receive_damage"): entity.receive_damage(roll.damage)
 		elif roll.blocked:
 			if entity.is_in_group("player") and entity.get("is_possessed") == true:
@@ -230,7 +230,7 @@ func handle_rpc_deal_damage_at_tile(sender_id: int, tile: Vector2i, targeted_lim
 		var t_name = ""
 		if entity.is_in_group("player"):
 			t_name = (entity as Node2D).get("character_name")
-			if roll.damage > 0: entity.receive_damage.rpc(roll.damage, targeted_limb)
+			if roll.damage > 0: WorldStream.broadcast_actor(entity, "receive_damage", [roll.damage, targeted_limb], true)
 			elif roll.blocked:
 				if entity.has_method("rpc_consume_stamina"): world.utils.server_consume_stamina(entity, CombatDefs.STAMINA_BLOCK_COST)
 				if roll.block_type == "dodged" and roll.has("dodge_tile"):

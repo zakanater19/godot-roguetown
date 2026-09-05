@@ -33,6 +33,10 @@ func _exit_tree() -> void:
 	if not Engine.is_editor_hint() and World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
 		World.main_scene.unregister_render_distance_node(self)
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and not Engine.is_editor_hint() and is_inside_tree():
+		WorldStream.update_node(self)
+
 func _get_region_rect(cell_index: int) -> Rect2:
 	var x: int = (cell_index % SHEET_COLUMNS) * CELL_SIZE
 	var y: int = floori(float(cell_index) / float(SHEET_COLUMNS)) * CELL_SIZE

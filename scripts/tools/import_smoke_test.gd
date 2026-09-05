@@ -18,6 +18,11 @@ const NET_SPAWNABLE_SCENES: Array[String] =[
 const NET_SYNCED_SCENES: Array[String] =[
 	"res://scenes/player.tscn",
 	"res://core/ghost.tscn",
+]
+
+# WorldStream owns these scenes' lifetime and replication. They must not
+# register native synchronizers, including before their map's _ready runs.
+const STREAMED_NPC_SCENES: Array[String] = [
 	"res://npcs/spider.tscn",
 ]
 
@@ -1082,14 +1087,18 @@ func _validate_replication_configs() -> void:
 			if scene_path == "res://scenes/player.tscn" and NodePath(".:view_z_level") in replicated_properties:
 				_fail("%s: view_z_level is client-local view intent and must not be overwritten by server state replication." % scene_path)
 			for prop_path: NodePath in replicated_properties:
+				if config.property_get_replication_mode(prop_path) == SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE:
+					_fail("%s: streamed actors must route reliable deltas through WorldStream, not a despawnable native synchronizer." % scene_path)
 				if configured_properties.has(prop_path):
 					_fail("%s: replication property '%s' appears in both '%s' and '%s'." % [
 						scene_path, prop_path, configured_properties[prop_path], sync_node.name])
 				else:
 					configured_properties[prop_path] = sync_node.name
 				if scene_path == "res://scenes/player.tscn" and prop_path in PLAYER_LARGE_REPLICATED_PROPERTIES:
-					if config.property_get_replication_mode(prop_path) != SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE:
-						_fail("%s: large replication property '%s' must use ON_CHANGE mode to stay out of the 1350-byte continuous snapshot." % [scene_path, prop_path])
+					if config.property_get_replication_mode(prop_path) != SceneReplicationConfig.REPLICATION_MODE_NEVER or not config.property_get_spawn(prop_path):
+						_fail("%s: large replication property '%s' must be spawn-only; WorldStream sends changes outside the native snapshot MTU." % [scene_path, prop_path])
+					if not str(prop_path).trim_prefix(".:") in WorldStream.ACTOR_DELTA_FIELDS:
+						_fail("%s: large replication property '%s' is missing from the WorldStream delta fields." % [scene_path, prop_path])
 				_validate_replication_property(scene_path, instance, prop_path)
 
 		if scene_path == "res://scenes/player.tscn":
@@ -1097,6 +1106,19 @@ func _validate_replication_configs() -> void:
 				if not configured_properties.has(expected_path):
 					_fail("%s: required replication property '%s' is missing." % [scene_path, expected_path])
 
+		instance.free()
+
+	for scene_path in STREAMED_NPC_SCENES:
+		var packed := ResourceLoader.load(scene_path, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
+		if packed == null:
+			_fail("%s: streamed NPC scene could not be loaded." % scene_path)
+			continue
+		var instance := packed.instantiate()
+		if not _find_multiplayer_synchronizers(instance).is_empty():
+			_fail("%s: streamed NPCs must not contain a MultiplayerSynchronizer; clients unload their node paths." % scene_path)
+		for field in ["tile_pos", "z_level", "facing", "health", "dead"]:
+			if not (field in instance):
+				_fail("%s: streamed NPC state field '%s' is missing." % [scene_path, field])
 		instance.free()
 
 # NETCODE/PATCHING: every directory in GameVersion.RESOURCE_DIFF_DIRS must exist.

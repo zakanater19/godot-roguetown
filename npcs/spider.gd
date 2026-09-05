@@ -62,9 +62,8 @@ func _ready() -> void:
 	add_to_group("z_entity")
 	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
 		World.main_scene.register_render_distance_node(self)
-	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
-	if state_sync != null:
-		state_sync.set_multiplayer_authority(1)
+	# WorldStream owns NPC replication. A native synchronizer would cache this
+	# scene's path even when the client later unloads the spider.
 	World.register_entity(self)
 	
 	# Ensure the spider is in the NPC group for targeting
@@ -100,10 +99,10 @@ func rpc_spawn_blood(pos: Vector2) -> void:
 func receive_damage(amount: int) -> void:
 	if dead:
 		return
-	rpc_spawn_blood.rpc(global_position)
+	WorldStream.broadcast_actor(self, "rpc_spawn_blood", [global_position], true)
 	health -= amount
 	if health <= 0:
-		# Setter handles unregister_solid and sprite flip on all peers via StateSync
+		# The setter updates the host immediately; WorldStream sends the new state.
 		dead = true
 
 func _process(delta: float) -> void:
@@ -187,7 +186,7 @@ func _attack_player(player: Combatant) -> void:
 	
 	if roll.damage > 0:
 		if player.has_method("receive_damage"):
-			player.receive_damage.rpc(roll.damage)
+			WorldStream.broadcast_actor(player, "receive_damage", [roll.damage], true)
 	elif roll.blocked:
 		if player.has_method("rpc_consume_stamina"):
 			World.utils.server_consume_stamina(player, 3.0)
@@ -244,7 +243,7 @@ func _try_move(dir: Vector2i) -> void:
 		var drop = z_level - land_z
 		z_level = land_z
 		z_index = (z_level - 1) * 200 + (z_index % 200)
-		rpc_sync_spider_z_level.rpc(land_z)
+		WorldStream.broadcast_actor(self, "rpc_sync_spider_z_level", [land_z])
 		
 		var dmg = randi_range(CombatDefs.FALL_DAMAGE_MIN, CombatDefs.FALL_DAMAGE_MAX) * drop
 		receive_damage(dmg)

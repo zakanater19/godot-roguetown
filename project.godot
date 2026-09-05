@@ -38,6 +38,7 @@ Lobby="*res://scripts/net/lobby.gd"
 Trade="*res://scripts/ui/trade.gd"
 ServerBrowser="*res://scripts/net/serverbrowser.gd"
 Lighting="*res://scripts/systems/lighting.gd"
+WorldStream="*res://scripts/player/player_world_stream.gd"
 ImportSmokeRunner="*res://scripts/tools/import_smoke_runner.gd"
 
 [display]

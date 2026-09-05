@@ -221,7 +221,7 @@ func _rpc_sync_sneak_mode(val: bool) -> void:
 			return
 		if sneak:
 			sneak.set_sneak_mode_local(val)
-		rpc("_rpc_sync_sneak_mode", val)
+		WorldStream.broadcast_actor(self, "_rpc_sync_sneak_mode", [val])
 	elif sender_id == 1 and sneak:
 		sneak.set_sneak_mode_local(val)
 
@@ -263,7 +263,7 @@ func _sync_combat_mode(mode: bool) -> void:
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			if combat: combat.set_combat_mode_local(mode)
-			rpc("_sync_combat_mode", mode)
+			WorldStream.broadcast_actor(self, "_sync_combat_mode", [mode])
 	else:
 		if sender_id == 1:
 			if combat: combat.set_combat_mode_local(mode)
@@ -274,7 +274,7 @@ func _sync_combat_stance(stance: String) -> void:
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			if combat: combat.set_combat_stance_local(stance)
-			rpc("_sync_combat_stance", stance)
+			WorldStream.broadcast_actor(self, "_sync_combat_stance", [stance])
 	else:
 		if sender_id == 1:
 			if combat: combat.set_combat_stance_local(stance)
@@ -303,7 +303,7 @@ func _sync_hood_state(hood_up: bool) -> void:
 			data["hood_up"] = hood_up
 			equipped_data["face"] = data
 			_update_clothing_sprites()
-			rpc("_sync_hood_state", hood_up)
+			WorldStream.broadcast_actor(self, "_sync_hood_state", [hood_up])
 	else:
 		if sender_id == 1:
 			var data = equipped_data.get("face", null)
@@ -328,7 +328,7 @@ func _sync_sleep_state(new_state: int) -> void:
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority() and sleep_ != null and sleep_.is_valid_requested_transition(new_state):
 			sleep_.apply_sleep_state(new_state)
-			rpc("_sync_sleep_state", new_state)
+			WorldStream.broadcast_actor(self, "_sync_sleep_state", [new_state])
 	else:
 		if sender_id == 1 and sleep_ != null:
 			sleep_.apply_sleep_state(new_state)
@@ -344,7 +344,7 @@ func _rpc_sync_lying_down(val: bool) -> void:
 			is_lying_down = val
 			_update_sprite()
 			_update_water_submerge()
-			rpc("_rpc_sync_lying_down", val)
+			WorldStream.broadcast_actor(self, "_rpc_sync_lying_down", [val])
 	else:
 		if sender_id == 1:
 			is_lying_down = val
@@ -415,7 +415,7 @@ func _sync_active_hand(hand_idx: int) -> void:
 	if multiplayer.is_server():
 		if sender_id == get_multiplayer_authority():
 			active_hand = hand_idx
-			rpc("_sync_active_hand", hand_idx)
+			WorldStream.broadcast_actor(self, "_sync_active_hand", [hand_idx])
 	else:
 		if sender_id == 1: active_hand = hand_idx
 
@@ -429,7 +429,7 @@ func rpc_transfer_to_hand(from_idx: int, to_idx: int) -> void:
 		hands[to_idx]   = hands[from_idx]
 		hands[from_idx] = null
 		if _is_local_authority(): _update_hands_ui()
-		rpc("rpc_transfer_to_hand", from_idx, to_idx)
+		WorldStream.broadcast_actor(self, "rpc_transfer_to_hand", [from_idx, to_idx])
 	else:
 		if sender_id != 1: return
 		hands[to_idx]   = hands[from_idx]
@@ -443,6 +443,11 @@ func _enter_tree() -> void:
 		var parts = name.split("_")
 		if parts.size() > 1:
 			set_multiplayer_authority(parts[1].to_int())
+	# Set the host's state authority before the child registers with multiplayer.
+	# The player itself retains peer authority for authenticated input RPCs.
+	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
+	if state_sync != null:
+		state_sync.set_multiplayer_authority(1)
 
 func _ready() -> void:
 	view_z_level = z_level
@@ -450,11 +455,6 @@ func _ready() -> void:
 	add_to_group("z_entity")
 	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
 		World.main_scene.register_render_distance_node(self)
-	# The player node keeps peer authority for authenticated input RPCs, while
-	# replicated state always originates from the server.
-	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
-	if state_sync != null:
-		state_sync.set_multiplayer_authority(1)
 	backend  = preload("res://scripts/player/playerbackend.gd").new(self)
 	misc     = preload("res://scripts/player/playermisc.gd").new(self)
 	combat   = preload("res://scripts/player/playercombat.gd").new(self)
@@ -488,6 +488,8 @@ func _ready() -> void:
 	if _is_local_authority():
 		camera = get_parent().get_node_or_null("Camera2D")
 		_build_ui()
+
+	WorldStream.configure_actor(self)
 
 func _is_local_authority() -> bool:
 	if not is_possessed: return false
@@ -579,7 +581,7 @@ func _rpc_sync_facing(new_facing: int) -> void:
 		if sender_id != get_multiplayer_authority():
 			return
 		facing = new_facing
-		rpc("_rpc_sync_facing", new_facing)
+		WorldStream.broadcast_actor(self, "_rpc_sync_facing", [new_facing])
 	elif sender_id == 1:
 		facing = new_facing
 

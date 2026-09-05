@@ -22,7 +22,7 @@ func handle_player_death(player: Node) -> void:
 	if world.utils.find_player_by_peer(peer_id) != player:
 		return
 
-	player.rpc_make_corpse.rpc()
+	WorldStream.broadcast_actor(player, "rpc_make_corpse", [], true)
 
 	if world.grab_map.has(peer_id):
 		world.combat.release_grab_for_peer(peer_id, true)
@@ -45,7 +45,7 @@ func handle_player_death(player: Node) -> void:
 	ghost.position = corpse_pixel
 	world.main_scene.add_child(ghost)
 	if ghost.has_method("rpc_sync_ghost_state"):
-		ghost.rpc_sync_ghost_state.rpc(player.get("character_name"), player.get("character_class"), corpse_tile, player.get("z_level"))
+		WorldStream.broadcast_actor(ghost, "rpc_sync_ghost_state", [player.get("character_name"), player.get("character_class"), corpse_tile, player.get("z_level")], true)
 
 	Host.peers[peer_id] = ghost
 	LateJoin.update_player_state(peer_id, {"position": ghost.position, "z_level": ghost.get("z_level")})
@@ -65,7 +65,7 @@ func handle_rpc_request_respawn(sender_id: int, request_peer_id: int) -> void:
 
 	var old_player = current_entity
 	if old_player != null and old_player.get("dead") == true:
-		old_player.rpc_make_corpse.rpc()
+		WorldStream.broadcast_actor(old_player, "rpc_make_corpse", [], true)
 		Host.peers.erase(sender_id)
 		if LateJoin._disconnected_players.has(sender_id):
 			LateJoin._disconnected_players.erase(sender_id)

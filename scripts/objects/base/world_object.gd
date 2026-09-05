@@ -201,3 +201,7 @@ func _on_world_object_ready() -> void:
 
 func _on_world_object_exit() -> void:
 	pass
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and not Engine.is_editor_hint() and is_inside_tree():
+		WorldStream.update_node(self)

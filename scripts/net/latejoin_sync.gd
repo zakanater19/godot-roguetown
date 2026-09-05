@@ -28,6 +28,7 @@ func reset_snapshot_state() -> void:
 # ---------------------------------------------------------------------------
 
 func send_world_state_to_peer(peer_id: int) -> void:
+	WorldStream.reset_peer(peer_id)
 	send_world_snapshot_to_peer(peer_id)
 	lj.rpc_id(peer_id, "receive_laws", World.current_laws)
 
@@ -54,17 +55,19 @@ func broadcast_world_snapshot_if_changed(force: bool = false) -> void:
 func _build_snapshot_packet() -> Dictionary:
 	if World.main_scene == null:
 		return {}
-	var tile_snapshot := _capture_full_tile_snapshot()
+	var streaming := WorldStream.map_root == World.main_scene
+	var tile_snapshot := PackedInt32Array() if streaming else _capture_full_tile_snapshot()
 	var snapshot := {
 		"schema_version": WORLD_SNAPSHOT_SCHEMA_VERSION,
+		"streaming": streaming,
 		"tiles": tile_snapshot,
 		"tile_checksum": _checksum_bytes(var_to_bytes(tile_snapshot)),
-		# Generated Tame Wilds content is represented once by its compact layout,
-		# seed, removals and changed state. It is not duplicated object-by-object.
-		"region_generation": World.main_scene.call("capture_region_generation_snapshot"),
-		"objects": _capture_world_objects(),
-		"players": _capture_player_states(),
-		"mobs": _capture_mob_states(),
+		# Streaming clients start empty. Current terrain and generated objects
+		# arrive in local batches after their possessed player has spawned.
+		"region_generation": {"version": Regions.GENERATION_VERSION, "seed": 0, "layout": PackedInt32Array(), "removed": [], "overrides": {}, "grass_cuts": []} if streaming else World.main_scene.call("capture_region_generation_snapshot"),
+		"objects": [] if streaming else _capture_world_objects(),
+		"players": {} if streaming else _capture_player_states(),
+		"mobs": [] if streaming else _capture_mob_states(),
 	}
 	var raw: PackedByteArray = var_to_bytes(snapshot)
 	var checksum := _checksum_bytes(raw)
@@ -393,6 +396,8 @@ func handle_receive_world_snapshot(
 	_apply_mob_snapshot(snapshot.get("mobs", []))
 	await _show_sync_progress(0.90)
 	handle_receive_player_states({"by_entity": snapshot.get("players", {})})
+	if snapshot.get("streaming", false):
+		WorldStream.begin_client()
 	_last_applied_snapshot_revision = revision
 
 	# Visibility is requested from the authority after its world data is in
@@ -444,7 +449,7 @@ func _apply_world_object_snapshot(object_snapshot: Array) -> void:
 		if raw_data is Dictionary:
 			handle_spawn_object_for_late_join(raw_data)
 
-func _apply_mob_snapshot(mob_snapshot: Array) -> void:
+func _apply_mob_snapshot(mob_snapshot: Array, purge_missing: bool = true) -> void:
 	if not lj.is_inside_tree():
 		return
 	var scene_tree := lj.get_tree()
@@ -455,7 +460,7 @@ func _apply_mob_snapshot(mob_snapshot: Array) -> void:
 
 	for local_mob in scene_tree.get_nodes_in_group("npc"):
 		if local_mob is Node2D and local_mob.get_parent() == World.main_scene:
-			if not valid_ids.has(World.get_entity_id(local_mob)):
+			if purge_missing and not valid_ids.has(World.get_entity_id(local_mob)):
 				local_mob.queue_free()
 
 	for raw_data in mob_snapshot:
@@ -471,6 +476,8 @@ func _apply_mob_snapshot(mob_snapshot: Array) -> void:
 				mob = scene.instantiate() as Node2D
 				mob.name = str(data.get("name", "Mob"))
 				mob.set_meta("entity_id", entity_id)
+				mob.position = data.get("position", Vector2.ZERO)
+				mob.set("z_level", data.get("z_level", 3))
 				World.main_scene.add_child(mob)
 				World.register_entity(mob, entity_id)
 		if mob == null:
@@ -489,6 +496,8 @@ func _apply_mob_snapshot(mob_snapshot: Array) -> void:
 func handle_receive_tile_changes(tile_changes: Dictionary) -> void:
 	for key in tile_changes:
 		var change  = tile_changes[key]
+		if not WorldStream.contains_tile(change["tile_pos"]):
+			continue
 		var z_level = change.get("z_level", 3)
 		var tm      = World.get_tilemap(z_level)
 		if tm != null:
@@ -696,6 +705,8 @@ func handle_purge_missing_objects(valid_ids: Array) -> void:
 func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 	var main_node = World.main_scene
 	if main_node == null: return
+	if WorldStream.client_enabled and obj_data.has("position") and not WorldStream.contains_tile(Defs.world_to_tile(obj_data["position"])):
+		return
 	var obj_name = str(obj_data["name"])
 	var entity_id = str(obj_data.get("entity_id", ""))
 	var obj = World.get_entity(entity_id)
@@ -732,6 +743,8 @@ func handle_spawn_object_for_late_join(obj_data: Dictionary) -> void:
 			_apply_pre_add_object_state(obj, obj_data)
 			if entity_id != "":
 				obj.set_meta("entity_id", entity_id)
+			if obj_data.has("position"):
+				obj.position = obj_data["position"]
 			main_node.add_child(obj)
 			World.register_entity(obj, entity_id)
 			if obj_data.has("z_index"):

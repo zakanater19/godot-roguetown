@@ -25,7 +25,7 @@ func apply_gravity_to_player(player: Node2D) -> void:
 
 	var drop = player.z_level - land_z
 	player.rpc_sync_z_level(land_z)
-	player.rpc_sync_z_level.rpc(land_z)
+	WorldStream.broadcast_actor(player, "rpc_sync_z_level", [land_z], true)
 
 	var agility = 10
 	if "stats" in player and player.stats.has("agility"):
@@ -42,10 +42,10 @@ func apply_gravity_to_player(player: Node2D) -> void:
 		var target_limb = "chest"
 		if drop >= 2:
 			target_limb = Defs.LIMBS.pick_random()
-		player.receive_damage.rpc(dmg, target_limb)
+		WorldStream.broadcast_actor(player, "receive_damage", [dmg, target_limb], true)
 		world.rpc_broadcast_damage_log.rpc("Gravity", player.character_name, dmg, player.tile_pos, land_z, false, false, target_limb, "")
 		if not player.get("is_lying_down"):
 			player.set("is_lying_down", true)
 			if player.has_method("_update_sprite"):        player.call("_update_sprite")
 			if player.has_method("_update_water_submerge"): player.call("_update_water_submerge")
-			player.rpc("_rpc_sync_lying_down", true)
+			WorldStream.broadcast_actor(player, "_rpc_sync_lying_down", [true])

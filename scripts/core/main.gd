@@ -39,8 +39,6 @@ const GRASS_DECOR_TILE_PATHS: PackedStringArray =[
 	"res://assets/foliage/grass8.png",
 ]
 const GRASS_DECOR_Z_OFFSET: int = 1
-const RENDER_DISTANCE_TILES: int = 30
-const LEAF_LIGHT_GROUP: StringName = &"leaf_canopy"
 
 var target_fps: int = 60
 var _last_z: int = -1
@@ -48,10 +46,6 @@ var _grass_decor_layers: Dictionary = {}
 var region_generation_baseline: Dictionary = {}
 var _region_grass_cuts: Dictionary = {}
 var region_generation_ready: bool = false
-var _render_distance_nodes: Dictionary = {}
-var _render_distance_dirty: bool = true
-var _last_render_distance_center := Vector2i(-2147483648, -2147483648)
-var _last_render_distance_player_id: int = 0
 
 var _fps_label: Label = null
 
@@ -324,7 +318,6 @@ func _process(_delta: float) -> void:
 		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 
 	var local_player = World.get_local_player()
-	_update_render_distance(local_player)
 	var current_z = 3
 	if local_player != null:
 		current_z = local_player.get("view_z_level") if "view_z_level" in local_player else local_player.z_level
@@ -347,67 +340,16 @@ func _process(_delta: float) -> void:
 				# Darken everything below the current player level
 				darken.visible = (z < current_z)
 
+# Keep the existing object lifecycle entry points; streaming owns residency.
 func register_render_distance_node(node: Node2D) -> void:
-	if Engine.is_editor_hint() or not is_instance_valid(node):
-		return
-	var node_id := node.get_instance_id()
-	if _render_distance_nodes.has(node_id):
-		return
-	node.set_meta("render_distance_leaf_entity", node.is_in_group(LEAF_LIGHT_GROUP))
-	node.set_meta("fov_visible", node.visible)
-	_render_distance_nodes[node_id] = node
-	_render_distance_dirty = true
-	_set_render_distance_state(node, false)
+	if not Engine.is_editor_hint():
+		WorldStream.register_node(node)
 
 func unregister_render_distance_node(node: Node2D) -> void:
-	_render_distance_nodes.erase(node.get_instance_id())
+	if not Engine.is_editor_hint():
+		WorldStream.unregister_node(node)
 
 func _register_existing_render_distance_nodes() -> void:
 	for node in get_tree().get_nodes_in_group(Defs.GROUP_Z_ENTITY):
 		if node is Node2D:
 			register_render_distance_node(node)
-
-func _update_render_distance(local_player: Node2D) -> void:
-	var player_id := local_player.get_instance_id() if local_player != null else 0
-	var center := Defs.world_to_tile(local_player.global_position) if local_player != null else Vector2i(-2147483648, -2147483648)
-	if not _render_distance_dirty and center == _last_render_distance_center and player_id == _last_render_distance_player_id:
-		return
-	_render_distance_dirty = false
-	_last_render_distance_center = center
-	_last_render_distance_player_id = player_id
-	var stale: Array = []
-	for node_id: int in _render_distance_nodes:
-		var node: Node2D = _render_distance_nodes[node_id]
-		if not is_instance_valid(node):
-			stale.append(node_id)
-			continue
-		var offset := Defs.world_to_tile(node.global_position) - center
-		# Same horizontal footprint on every Z level. FOV separately decides
-		# which floors are visible; range culling never alters tree gameplay.
-		var in_range := local_player != null and absi(offset.x) <= RENDER_DISTANCE_TILES and absi(offset.y) <= RENDER_DISTANCE_TILES
-		if bool(node.get_meta("render_distance_visible", true)) != in_range:
-			_set_render_distance_state(node, in_range)
-	for node_id: int in stale:
-		_render_distance_nodes.erase(node_id)
-
-func _set_render_distance_state(node: Node2D, in_range: bool) -> void:
-	node.set_meta("render_distance_visible", in_range)
-	if node.has_method("set_render_distance_visible"):
-		node.call("set_render_distance_visible", in_range)
-	else:
-		var combined := in_range and bool(node.get_meta("fov_visible", true))
-		if node.has_method("_set_fov_visibility"):
-			node.call("_set_fov_visibility", combined)
-		else:
-			node.visible = combined
-			if node is CollisionObject2D:
-				node.input_pickable = combined
-	if in_range and not node.is_in_group(Defs.GROUP_Z_ENTITY):
-		node.add_to_group(Defs.GROUP_Z_ENTITY)
-	elif not in_range and node.is_in_group(Defs.GROUP_Z_ENTITY):
-		node.remove_from_group(Defs.GROUP_Z_ENTITY)
-	if node.get_meta("render_distance_leaf_entity", false):
-		if in_range and not node.is_in_group(LEAF_LIGHT_GROUP):
-			node.add_to_group(LEAF_LIGHT_GROUP)
-		elif not in_range and node.is_in_group(LEAF_LIGHT_GROUP):
-			node.remove_from_group(LEAF_LIGHT_GROUP)

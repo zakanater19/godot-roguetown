@@ -84,14 +84,14 @@ func _enter_tree() -> void:
 		var parts = name.split("_")
 		if parts.size() > 1:
 			set_multiplayer_authority(parts[1].to_int())
+	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
+	if state_sync != null:
+		state_sync.set_multiplayer_authority(1)
 
 func _ready() -> void:
 	view_z_level = z_level
 	z_index = Defs.get_z_index(z_level, GHOST_Z_OFFSET)
 	current_move_duration = GHOST_MOVE_TIME
-	var state_sync := get_node_or_null("StateSync") as MultiplayerSynchronizer
-	if state_sync != null:
-		state_sync.set_multiplayer_authority(1)
 	add_to_group("player")
 	add_to_group("z_entity")
 	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
@@ -110,6 +110,8 @@ func _ready() -> void:
 		camera = get_parent().get_node_or_null("Camera2D")
 		_build_ui()
 		_refresh_local_view()
+
+	WorldStream.configure_actor(self)
 
 func _exit_tree() -> void:
 	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
@@ -477,3 +479,7 @@ func sync_hands(_hand_ids: Array) -> void:
 
 func _set_fov_visibility(p_is_visible: bool) -> void:
 	visible = p_is_visible
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and not Engine.is_editor_hint() and is_inside_tree():
+		WorldStream.update_node(self)
