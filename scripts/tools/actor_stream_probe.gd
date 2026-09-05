@@ -44,6 +44,15 @@ func _run(server: bool) -> void:
 			mover.tile_pos = B
 			mover.position = Defs.tile_to_pixel(B)
 			await _verify_all("away", cycle - 1)
+			if cycle == 1:
+				# Match reconnect's in-tree authority reassignment while the other
+				# client has this actor despawned by its radius filter.
+				var sync := mover.get_node("StateSync") as MultiplayerSynchronizer
+				var sync_id := sync.get_instance_id()
+				LateJoin._reconnect.retry_update_authority(mover.get_path(), 77, 0)
+				LateJoin._reconnect.retry_update_authority(mover.get_path(), _connected[0], 0)
+				_check(sync.get_instance_id() == sync_id and sync.get_multiplayer_authority() == 1, "reconnect preserves the registered host synchronizer")
+				await get_tree().create_timer(0.3).timeout
 			# Chopping/building changes inventory and character dictionaries while
 			# the clients have unloaded each other. Exercise native ON_CHANGE too.
 			var tree := World.get_entity(NEAR_ID)

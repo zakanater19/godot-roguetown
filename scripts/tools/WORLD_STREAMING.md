@@ -17,6 +17,9 @@ subsequent changes use reliable, host-authoritative WorldStream RPCs at most eve
 requests their full current state. These fields must not use native ON_CHANGE:
 late delta packets otherwise target a synchronizer that has already despawned.
 Movement and the other small state fields still use native continuous sync.
+Reconnect changes only the player root's input authority. It leaves the existing
+host-owned synchronizer registered with the same network ID, so other clients do
+not receive cache paths for an actor they currently have outside their window.
 NPC scenes contain no native MultiplayerSynchronizer: map-placed children enter
 the tree before the map registers WorldStream, so disabling one in a later
 configuration callback leaves its network path registered on the host.

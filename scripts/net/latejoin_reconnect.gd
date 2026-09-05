@@ -396,10 +396,13 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 func retry_update_authority(player_path: NodePath, new_peer_id: int, retries: int) -> void:
 	var player = lj.get_node_or_null(player_path)
 	if player != null:
-		player.set_multiplayer_authority(new_peer_id)
+		# The player owns input RPCs, but StateSync is permanently host-owned.
+		# Recursive reassignment stops and restarts the live synchronizer, gives it
+		# a new network ID, and makes Godot cache its path on peers that culled it.
+		player.set_multiplayer_authority(new_peer_id, false)
 		var state_sync := player.get_node_or_null("StateSync") as MultiplayerSynchronizer
-		if state_sync != null:
-			state_sync.set_multiplayer_authority(1)
+		if state_sync != null and state_sync.get_multiplayer_authority() != 1:
+			state_sync.set_multiplayer_authority(1, false)
 		if player.has_method("_on_authority_changed"): player.call("_on_authority_changed")
 	elif retries > 0:
 		await lj.get_tree().create_timer(0.1).timeout
