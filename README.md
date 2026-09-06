@@ -1,6 +1,6 @@
 
 
-EXTREMELY WIP but currently playable without compilation errors or major gameplay bugs.
+EXTREMELY WIP but currently playable without compilation errors or major gameplay bugs. (Content is currently thin, working on foundation first)
 
 
 godot 4.7 (delete .godot folder in project to refresh shaders, you'll need to do that if you get any errors or weird visual bugs)
@@ -8,6 +8,12 @@ godot 4.7 (delete .godot folder in project to refresh shaders, you'll need to do
 roguetown in godot, sprites/mechanics from here [https://github.com/Rotwood-Vale/Ratwood-Keep] (https://github.com/SS13-Special-Codebases-Archive/RogueTown)
 
 just download godot 4.7 and open project.godot inside godot, no external tools needed. (for the smoke test you need to put the project files into a new folder, and in the folder above the project place the godot 4.7.exe
+
+
+
+Multiplayer is one person hosts and others join via direct IP or the built-in server browser.
+Patching is automatic - your client checks the host's game version and if it doesn't match, it downloads the host's current game files over the connection and restarts with them. 
+Rejoining/disconnect/reconnect/latejoin all works
 
 
 
