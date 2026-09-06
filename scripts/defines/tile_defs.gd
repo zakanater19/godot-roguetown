@@ -88,7 +88,7 @@ const DEFS: Dictionary = {
 		},
 		Vector2i(4, 0): {
 			"opaque"            : true,
-			"description"       : "an indestructible barrier marking the edge of the world",
+			"description"       : "extremely dense rock, unbreakable",
 		},
 	},
 	# -------------------------------------------------------------------------

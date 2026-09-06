@@ -1,24 +1,13 @@
 
 
-
-
-
-
-
-
-
-
-
-
-
 EXTREMELY WIP but currently playable without compilation errors or major gameplay bugs.
 
 
-godot 4.5 (delete .godot folder in project to refresh shaders, you'll need to do that if you get any errors or weird visual bugs)
+godot 4.7 (delete .godot folder in project to refresh shaders, you'll need to do that if you get any errors or weird visual bugs)
 
 roguetown in godot, sprites/mechanics from here [https://github.com/Rotwood-Vale/Ratwood-Keep] (https://github.com/SS13-Special-Codebases-Archive/RogueTown)
 
-just download godot 4.5 and open project.godot inside godot, no external tools needed. (for the smoke test you need to put the project files into a new folder, and in the folder above the project place the godot 4.5.exe
+just download godot 4.7 and open project.godot inside godot, no external tools needed. (for the smoke test you need to put the project files into a new folder, and in the folder above the project place the godot 4.7.exe
 
 
 
