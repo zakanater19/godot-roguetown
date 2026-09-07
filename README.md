@@ -15,7 +15,7 @@ Multiplayer is one person hosts and others join via direct IP or the built-in se
 Patching is automatic - your client checks the host's game version and if it doesn't match, it downloads the host's current game files over the connection and restarts with them. 
 Rejoining/disconnect/reconnect/latejoin all works
 
-
+To enable patching, compile the Godot export template with disable_path_overrides=no and select the resulting executable under Custom Template → Release in the export settings.
 
 Keybinds;
 Q - drop item
