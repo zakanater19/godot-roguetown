@@ -7,6 +7,10 @@ const DIVIDER := "============================================================"
 const THIN := "------------------------------------------------------------"
 
 func _ready() -> void:
+	if OS.get_cmdline_user_args().has("--patch-smoke-client") or OS.get_cmdline_user_args().has("--patch-smoke-server") or OS.get_cmdline_user_args().has("--patch-smoke-invalid"):
+		var probe := load("res://scripts/tools/patch_smoke_test.gd").new() as Node
+		add_child(probe)
+		return
 	var should_run := OS.get_cmdline_user_args().has("--validate-imports") or OS.get_environment("CODEX_VALIDATE_IMPORTS") == "1" or FileAccess.file_exists(ProjectSettings.globalize_path(FLAG_PATH))
 	if not should_run:
 		return

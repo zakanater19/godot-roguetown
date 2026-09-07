@@ -1,3 +1,6 @@
+res://scripts/defines/player_defs.gd
+res://scripts/ui/sidebar.gd
+res://scripts/net/lobby_ui.gd
 res://scenes/main.tscn
 res://assets/tileset.tres
 res://assets/region_tileset.tres

@@ -76,13 +76,13 @@ func _build() -> void:
 	bottom_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bottom_mask)
 
-	# Dark grey panel stretching from x=1000 to the right edge
+	# Begin at the exact right-hand tile boundary of the gameplay viewport.
 	var panel := Panel.new()
 	panel.anchor_left   = 0.0
 	panel.anchor_right  = 1.0
 	panel.anchor_top    = 0.0
 	panel.anchor_bottom = 1.0
-	panel.offset_left   = 1000.0
+	panel.offset_left   = PlayerDefs.CAMERA_VIEW_SIZE.x
 	panel.offset_right  = 0.0
 	panel.offset_top    = 0.0
 	panel.offset_bottom = 0.0

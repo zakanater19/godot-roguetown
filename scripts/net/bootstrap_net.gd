@@ -12,6 +12,7 @@ var _version_check_sent: bool = false
 
 var _pck_buffer: Dictionary = {}
 var _pck_total_chunks: int = 0
+var _pck_total_size: int = 0
 var _pck_chunks_received: int = 0
 var _pending_pck_version: String = ""
 var _restarting_for_patch: bool = false
@@ -21,6 +22,7 @@ func reset_client_state(clear_pending_reconnect: bool = false) -> void:
 	_version_check_sent = false
 	_pck_buffer.clear()
 	_pck_total_chunks = 0
+	_pck_total_size = 0
 	_pck_chunks_received = 0
 	_pending_pck_version = ""
 	if clear_pending_reconnect and not _restarting_for_patch:
@@ -181,6 +183,10 @@ func receive_pck_header_bootstrap(total_size: int, total_chunks: int) -> void:
 	handle_receive_pck_header(total_size, total_chunks)
 
 func handle_receive_pck_header(total_size: int, total_chunks: int) -> void:
+	if total_size <= 0 or total_chunks != int(ceil(float(total_size) / float(PCK_CHUNK_SIZE))):
+		_patch_failed("The server sent an invalid update header.")
+		return
+	_pck_total_size = total_size
 	_pck_buffer.clear()
 	_pck_total_chunks = total_chunks
 	_pck_chunks_received = 0
@@ -191,6 +197,13 @@ func receive_pck_chunk_bootstrap(chunk_index: int, data: PackedByteArray) -> voi
 	handle_receive_pck_chunk(chunk_index, data)
 
 func handle_receive_pck_chunk(chunk_index: int, data: PackedByteArray) -> void:
+	if _pck_total_chunks <= 0 or _restarting_for_patch:
+		return
+	if chunk_index < 0 or chunk_index >= _pck_total_chunks or data.size() != mini(PCK_CHUNK_SIZE, _pck_total_size - chunk_index * PCK_CHUNK_SIZE):
+		_patch_failed("The downloaded update contains an invalid chunk.")
+		return
+	if _pck_buffer.has(chunk_index):
+		return
 	_pck_buffer[chunk_index] = data
 	_pck_chunks_received += 1
 	var progress: float = float(_pck_chunks_received) / float(_pck_total_chunks)
@@ -204,38 +217,54 @@ func _assemble_and_apply_pck() -> void:
 	for i in range(_pck_total_chunks):
 		assembled.append_array(_pck_buffer[i])
 	_pck_buffer.clear()
+	if assembled.size() != _pck_total_size:
+		_patch_failed("The update download is incomplete.")
+		return
 
 	var pack_path := _get_downloaded_pack_path()
 	var out: FileAccess = FileAccess.open(pack_path, FileAccess.WRITE)
-	if out != null:
-		out.store_buffer(assembled)
-		out.close()
-		out = null
+	if out == null:
+		_patch_failed("Could not save the downloaded update. Check available disk space.")
+		return
+	out.store_buffer(assembled)
+	out.flush()
+	var write_error := out.get_error()
+	out.close()
+	if write_error != OK:
+		_patch_failed("Could not finish saving the downloaded update.")
+		return
 
 	var reconnect_data: Dictionary = {
 		"ip": Host.last_server_address,
 		"port": Host.last_server_port,
 		"pack_path": pack_path,
 	}
-	var rf: FileAccess = FileAccess.open("user://pending_reconnect.json", FileAccess.WRITE)
-	if rf != null:
-		rf.store_string(JSON.stringify(reconnect_data))
-		rf.close()
-		rf = null
+	if PatchBoot.write_json("user://pending_reconnect.json", reconnect_data) != OK:
+		_patch_failed("Could not save the server address for reconnecting.")
+		return
 
 	_restarting_for_patch = true
 	LoadingScreen.update_status("Restarting...")
-	await get_tree().create_timer(1.0).timeout
-
-	var args: PackedStringArray = GameVersion.build_restart_args(pack_path)
-	var pid: int = OS.create_instance(args)
-	if pid == -1:
-		OS.create_process(OS.get_executable_path(), args)
-
+	# Release the old connection so the server accepts the replacement client.
+	var expected_version := _pending_pck_version
+	multiplayer.multiplayer_peer = null
+	if not await GameVersion.restart_with_patch(pack_path, expected_version):
+		DirAccess.remove_absolute("user://pending_reconnect.json")
+		_patch_failed(GameVersion.patch_restart_error)
+		return
 	get_tree().quit()
+
+func _patch_failed(message: String) -> void:
+	_restarting_for_patch = false
+	_pck_total_chunks = 0
+	_pck_buffer.clear()
+	LoadingScreen.show_loading("Update failed")
+	LoadingScreen.update_status(message, -1.0, "Return to the main menu and try connecting again.")
+	push_warning("BootstrapNet: " + message)
 
 func _get_downloaded_pack_path() -> String:
 	var version_tag := _pending_pck_version.strip_edges().left(12)
 	if version_tag == "":
 		version_tag = str(Time.get_unix_time_from_system())
-	return "user://server_bundle_%s.pck" % version_tag
+	# Never overwrite a pack still mounted by this process.
+	return "user://server_bundle_%s_%d.pck" % [version_tag, Time.get_ticks_usec()]

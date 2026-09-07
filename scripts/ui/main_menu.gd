@@ -22,6 +22,7 @@ var _connect_retry_index: int = 0
 var _connect_attempt_serial: int = 0
 
 func _ready() -> void:
+	PatchBoot.confirm_startup(GameVersion.get_version())
 	version_label.text = "Version: " + GameVersion.APP_VERSION
 	Sidebar.set_visible(false)
 	ServerBrowser.server_found.connect(_on_server_found)
@@ -73,13 +74,13 @@ func _check_pending_reconnect() -> void:
 		DirAccess.remove_absolute(path)
 		return
 
-	# Older clients already write a reconnect marker before restarting into the
-	# downloaded pack. Trust that marker when the downloaded pack still exists,
-	# because Godot may consume --main-pack before it reaches OS.get_cmdline_args().
+	# Reconnect only after the downloaded content actually loaded successfully.
 	var launched_from_patch: bool = GameVersion.has_active_content_patch()
-	var has_downloaded_pack: bool = pack_path != "" and FileAccess.file_exists(pack_path)
-	if not launched_from_patch and not has_downloaded_pack:
+	var matching_pack := PatchBoot.pack_path == ProjectSettings.globalize_path(pack_path)
+	if not launched_from_patch or (not OS.has_feature("editor") and not matching_pack):
 		DirAccess.remove_absolute(path)
+		LoadingScreen.show_loading("Update could not be loaded")
+		LoadingScreen.update_status(PatchBoot.boot_error if not PatchBoot.boot_error.is_empty() else "Reconnect to download the update again.")
 		return
 
 	# Consume the marker before attempting reconnect so the behavior is one-shot.

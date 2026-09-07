@@ -62,6 +62,8 @@ func _ready() -> void:
 				darken.visible = false
 		return
 
+	$Camera2D.zoom = Vector2.ONE * PlayerDefs.CAMERA_ZOOM
+
 	# Region maps are editor-only metadata, like SS13 areas. Their overlay never
 	# renders to players; gameplay behavior can be attached later.
 	for z in range(1, 6):

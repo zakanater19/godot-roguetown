@@ -81,6 +81,7 @@ func _bind_chat_input(ui_root: Control) -> void:
 
 func _bind_host_dashboard(ui_root: Control) -> void:
 	lobby._host_dashboard = ui_root.get_node("HostDashboard") as Control
+	lobby._host_dashboard.offset_right = PlayerDefs.CAMERA_VIEW_SIZE.x
 	lobby._host_server_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/ServerLabel") as Label
 	lobby._host_phase_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/PhaseLabel") as Label
 	lobby._host_time_label = ui_root.get_node("HostDashboard/Content/StatsPanel/Margin/Stats/TimeLabel") as Label
