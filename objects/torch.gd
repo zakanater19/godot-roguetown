@@ -52,7 +52,7 @@ func _process(delta: float) -> void:
 	_anim_timer += delta
 	_update_animation_frame()
 	var peer := multiplayer.multiplayer_peer
-	if peer != null and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
 	if not multiplayer.is_server():
 		return

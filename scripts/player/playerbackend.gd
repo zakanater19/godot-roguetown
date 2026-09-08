@@ -69,7 +69,7 @@ func spend_stamina(amount: float) -> void:
 
 func check_stamina_regen(delta: float) -> void:
 	var peer := player.multiplayer.multiplayer_peer
-	if peer != null and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
 	if not player.multiplayer.is_server():
 		return
