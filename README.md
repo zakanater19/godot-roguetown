@@ -1,4 +1,3 @@
-Delete .godot before you launch, i uploaded it so i can redownload and get back in without messing with a bunch of options.
 
 EXTREMELY WIP but currently playable without compilation errors or major gameplay bugs. (Content is currently thin, working on foundation first)
 
