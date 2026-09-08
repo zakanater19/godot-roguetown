@@ -1,5 +1,5 @@
 @tool
-extends Area2D
+extends PickableWorldObject
 
 const TILE_SIZE: int  = 64
 const MAX_SLOTS: int  = 10
@@ -17,8 +17,6 @@ var _drag_started:      bool    = false
 var _drag_press_screen: Vector2 = Vector2.ZERO
 var _press_received:    bool    = false
 
-@export var z_level: int = 3
-
 func get_description() -> String:
 	return "a leather satchel, useful for carrying things"
 
@@ -26,15 +24,9 @@ func get_use_delay() -> float:
 	return 0.3
 
 func _ready() -> void:
-	# Standardized to floor base + 2 (below players at +10)
-	z_index = (z_level - 1) * 200 + 2
-	add_to_group("z_entity")
+	super._ready()
 	if Engine.is_editor_hint():
 		return
-	World.register_entity(self)
-	add_to_group("pickable")
-	if World.main_scene != null and World.main_scene.has_method("register_render_distance_node"):
-		World.main_scene.register_render_distance_node(self)
 	if contents.size() != MAX_SLOTS:
 		contents.resize(MAX_SLOTS)
 		for i in MAX_SLOTS:
@@ -55,12 +47,8 @@ func _process(_delta: float) -> void:
 				_close_ui()
 
 func _exit_tree() -> void:
-	if Engine.is_editor_hint():
-		return
-	if World.main_scene != null and World.main_scene.has_method("unregister_render_distance_node"):
-		World.main_scene.unregister_render_distance_node(self)
-	World.unregister_entity(self)
 	_close_ui()
+	super._exit_tree()
 
 func _input(event: InputEvent) -> void:
 	if Engine.is_editor_hint() or not _drag_started:

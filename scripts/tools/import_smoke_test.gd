@@ -26,6 +26,12 @@ const STREAMED_NPC_SCENES: Array[String] = [
 	"res://npcs/spider.tscn",
 ]
 
+# Custom pickable scenes that do not use ObjectItem still need the WorldObject
+# lifecycle or the host's per-client streaming window will never include them.
+const STREAMED_WORLD_OBJECT_SCENES: Array[String] = [
+	"res://clothing/satchel.tscn",
+]
+
 const PLAYER_REPLICATED_PROPERTIES: Array[NodePath] = [
 	NodePath(".:tile_pos"), NodePath(".:health"), NodePath(".:facing"),
 	NodePath(".:dead"), NodePath(".:stamina"), NodePath(".:character_name"),
@@ -1049,6 +1055,16 @@ func _validate_keyring_icons() -> void:
 func _validate_spawnable_scenes() -> void:
 	for scene_path in NET_SPAWNABLE_SCENES:
 		_validate_packed_scene(scene_path, "spawnable scene")
+
+	for scene_path in STREAMED_WORLD_OBJECT_SCENES:
+		var packed := ResourceLoader.load(scene_path, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
+		if packed == null:
+			_fail("%s: streamed world-object scene could not be loaded." % scene_path)
+			continue
+		var instance := packed.instantiate()
+		if not instance is WorldObject:
+			_fail("%s: streamed scene root must inherit WorldObject." % scene_path)
+		instance.free()
 
 # Every scene in NET_SYNCED_SCENES must have at least one MultiplayerSynchronizer,
 # and every synchronizer's replication_config paths must resolve to real
