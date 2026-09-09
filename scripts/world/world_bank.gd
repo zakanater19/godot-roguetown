@@ -1,6 +1,6 @@
 extends RefCounted
 
-const DEFAULT_STARTING_BALANCE: int = 100
+const DEFAULT_STARTING_BALANCE: int = 0
 
 var world: Node
 var accounts: Dictionary = {}

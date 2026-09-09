@@ -15,8 +15,12 @@ const DATA: Dictionary = {
 		"equipment": {
 			"clothing": "Undershirt",
 			"trousers": "LeatherTrousers",
-			"feet": "LeatherBoots"
-		}
+			"feet": "LeatherBoots",
+			"pocket_1": "Pouch"
+		},
+		"starting_pouch": [
+			{"item_type": "CopperCoin", "metal_type": 0, "amount_min": 10, "amount_max": 20}
+		]
 	},
 	"merchant": {
 		"stats": {
@@ -34,10 +38,11 @@ const DATA: Dictionary = {
 			"trousers": "LeatherTrousers",
 			"feet": "LeatherBoots",
 			"armor": "Merchantrobe",
-			"pocket_l": "Keyring"
+			"pocket_1": "Pouch",
+			"pocket_2": "Keyring"
 		},
 		"equipment_data": {
-			"pocket_l": {
+			"pocket_2": {
 				"contents": [
 					{
 						"item_type": "BrownKey",
@@ -45,7 +50,10 @@ const DATA: Dictionary = {
 					}
 				]
 			}
-		}
+		},
+		"starting_pouch": [
+			{"item_type": "GoldCoin", "metal_type": 2, "amount": 20, "stacks": 2}
+		]
 	},
 	"bandit": {
 		"stats": {
@@ -62,7 +70,8 @@ const DATA: Dictionary = {
 			"trousers": "LeatherTrousers",
 			"feet": "LeatherBoots",
 			"armor": "IronChestplate",
-			"waist": "Sword"
+			"waist": "Sword",
+			"pocket_1": "Pouch"
 		}
 	},
 	"adventurer": {
@@ -78,8 +87,12 @@ const DATA: Dictionary = {
 		"equipment": {
 			"clothing": "Undershirt",
 			"trousers": "LeatherTrousers",
-			"feet": "LeatherBoots"
-		}
+			"feet": "LeatherBoots",
+			"pocket_1": "Pouch"
+		},
+		"starting_pouch": [
+			{"item_type": "SilverCoin", "metal_type": 1, "amount_min": 5, "amount_max": 15}
+		]
 	},
 	"swordsman": {
 		"stats": {
@@ -95,7 +108,8 @@ const DATA: Dictionary = {
 			"clothing": "Undershirt",
 			"trousers": "LeatherTrousers",
 			"feet": "LeatherBoots",
-			"waist": "Sword"
+			"waist": "Sword",
+			"pocket_1": "Pouch"
 		}
 	},
 	"miner": {
@@ -112,7 +126,8 @@ const DATA: Dictionary = {
 			"clothing": "Undershirt",
 			"trousers": "LeatherTrousers",
 			"feet": "LeatherBoots",
-			"waist": "Pickaxe"
+			"waist": "Pickaxe",
+			"pocket_1": "Pouch"
 		}
 	},
 	"king": {
@@ -130,8 +145,12 @@ const DATA: Dictionary = {
 			"trousers": "LeatherTrousers",
 			"feet": "LeatherBoots",
 			"cloak": "KingCloak",
-			"head": "Crown"
-		}
+			"head": "Crown",
+			"pocket_1": "Pouch"
+		},
+		"starting_pouch": [
+			{"item_type": "GoldCoin", "metal_type": 2, "amount": 20}
+		]
 	}
 }
 

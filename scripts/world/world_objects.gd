@@ -129,11 +129,15 @@ func handle_rpc_request_craft(sender_id: int, looter_peer_id: int, recipe_id: St
 func handle_rpc_confirm_craft_item(peer_id: int, consumed_paths: Array, scene_path: String, result_name: String, drop_position: Vector2, land_z: int) -> void: crafting.handle_rpc_confirm_craft_item(peer_id, consumed_paths, scene_path, result_name, drop_position, land_z)
 func handle_rpc_confirm_craft_tile(peer_id: int, consumed_paths: Array, tile_pos: Vector2i, z_level: int, source_id: int, atlas_coords: Vector2i) -> void: crafting.handle_rpc_confirm_craft_tile(peer_id, consumed_paths, tile_pos, z_level, source_id, atlas_coords)
 
-# ── Storage (satchel / table) ─────────────────────────────────────────────────
+# ── Storage (satchel / equipped pouch / table) ────────────────────────────────
 func handle_rpc_request_satchel_insert(sender_id: int, satchel_id: String, hand_idx: int) -> void:                                        storage.handle_rpc_request_satchel_insert(sender_id, satchel_id, hand_idx)
 func handle_rpc_confirm_satchel_insert(peer_id: int, satchel_id: String, item_id: String, hand_idx: int, slot_index: int, scene_path: String, itype: String, item_state: Dictionary) -> void: storage.handle_rpc_confirm_satchel_insert(peer_id, satchel_id, item_id, hand_idx, slot_index, scene_path, itype, item_state)
 func handle_rpc_request_satchel_extract(sender_id: int, satchel_id: String, slot_index: int, hand_idx: int) -> void:                      storage.handle_rpc_request_satchel_extract(sender_id, satchel_id, slot_index, hand_idx)
 func handle_rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_index: int, hand_idx: int, new_entity_id: String, scene_path: String, item_state: Dictionary) -> void: storage.handle_rpc_confirm_satchel_extract(peer_id, satchel_id, slot_index, hand_idx, new_entity_id, scene_path, item_state)
+func handle_rpc_request_equipped_pouch_insert(sender_id: int, pocket_slot: String, hand_idx: int) -> void: storage.handle_rpc_request_equipped_pouch_insert(sender_id, pocket_slot, hand_idx)
+func handle_rpc_confirm_equipped_pouch_insert(peer_id: int, pocket_slot: String, item_id: String, hand_idx: int, slot_index: int, scene_path: String, item_type: String, item_state: Dictionary) -> void: storage.handle_rpc_confirm_equipped_pouch_insert(peer_id, pocket_slot, item_id, hand_idx, slot_index, scene_path, item_type, item_state)
+func handle_rpc_request_equipped_pouch_extract(sender_id: int, pocket_slot: String, slot_index: int, hand_idx: int) -> void: storage.handle_rpc_request_equipped_pouch_extract(sender_id, pocket_slot, slot_index, hand_idx)
+func handle_rpc_confirm_equipped_pouch_extract(peer_id: int, pocket_slot: String, slot_index: int, hand_idx: int, new_entity_id: String, scene_path: String, item_state: Dictionary) -> void: storage.handle_rpc_confirm_equipped_pouch_extract(peer_id, pocket_slot, slot_index, hand_idx, new_entity_id, scene_path, item_state)
 func handle_rpc_request_table_place(sender_id: int, table_id: String, hand_idx: int, place_pos: Vector2) -> void:                         storage.handle_rpc_request_table_place(sender_id, table_id, hand_idx, place_pos)
 func handle_rpc_confirm_table_place(peer_id: int, table_id: String, hand_idx: int, place_pos: Vector2) -> void:                           storage.handle_rpc_confirm_table_place(peer_id, table_id, hand_idx, place_pos)
 

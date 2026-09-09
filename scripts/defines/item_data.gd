@@ -21,7 +21,7 @@ extends Resource
 @export var description: String = ""
 
 ## Equipment slot: "head", "cloak", "armor", "backpack", "waist",
-## "clothing", "trousers", "feet", or "" for non-wearable items.
+## "clothing", "trousers", "feet", "pocket_1", "pocket_2", or "".
 @export var slot: String = ""
 
 ## Damage dealt when used as a weapon (0 for non-weapons).

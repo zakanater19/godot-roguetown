@@ -897,6 +897,24 @@ func rpc_confirm_satchel_extract(peer_id: int, satchel_id: String, slot_index: i
 	objects.handle_rpc_confirm_satchel_extract(peer_id, satchel_id, slot_index, hand_idx, new_entity_id, scene_path, item_state)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_equipped_pouch_insert(pocket_slot: String, hand_idx: int) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	objects.handle_rpc_request_equipped_pouch_insert(sender_id, pocket_slot, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_equipped_pouch_insert(peer_id: int, pocket_slot: String, item_id: String, hand_idx: int, slot_index: int, scene_path: String, item_type: String, item_state: Dictionary) -> void:
+	objects.handle_rpc_confirm_equipped_pouch_insert(peer_id, pocket_slot, item_id, hand_idx, slot_index, scene_path, item_type, item_state)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_equipped_pouch_extract(pocket_slot: String, slot_index: int, hand_idx: int) -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	objects.handle_rpc_request_equipped_pouch_extract(sender_id, pocket_slot, slot_index, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_equipped_pouch_extract(peer_id: int, pocket_slot: String, slot_index: int, hand_idx: int, new_entity_id: String, scene_path: String, item_state: Dictionary) -> void:
+	objects.handle_rpc_confirm_equipped_pouch_extract(peer_id, pocket_slot, slot_index, hand_idx, new_entity_id, scene_path, item_state)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_grab(target_id: String, limb: String = "chest") -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
 	combat.handle_rpc_request_grab(sender_id, target_id, limb)

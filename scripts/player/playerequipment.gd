@@ -64,11 +64,14 @@ func sync_equip_state(slot_name: String, hand_index: int, item_type: String, slo
 	player.equipped_data[slot_name] = _duplicate_slot_data(slot_data)
 	_refresh_after_equipment_change(true)
 
-func unequip_clothing_from_slot(slot_name: String) -> void:
+func unequip_clothing_from_slot(slot_name: String, hand_index: int = -1) -> void:
 	var _equipped_val = player.equipped.get(slot_name)
 	if not (_equipped_val is String) or _equipped_val == "":
 		return
-	World.rpc_request_unequip.rpc_id(1, slot_name, player.active_hand)
+	var target_hand: int = player.active_hand if hand_index < 0 else hand_index
+	if not Defs.is_valid_hand_index(target_hand) or player.hands[target_hand] != null:
+		return
+	World.rpc_request_unequip.rpc_id(1, slot_name, target_hand)
 
 func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void:
 	var _raw = player.equipped.get(slot_name)

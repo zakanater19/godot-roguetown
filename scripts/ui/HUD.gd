@@ -14,8 +14,8 @@ const SLOT_NODE_NAMES: Dictionary = {
 	"feet": "FeetSlot",
 	"clothing": "ClothingSlot",
 	"waist": "WaistSlot",
-	"pocket_l": "PocketLSlot",
-	"pocket_r": "PocketRSlot",
+	"pocket_1": "Pocket1Slot",
+	"pocket_2": "Pocket2Slot",
 }
 
 const HAND_NODE_NAMES: Array[String] = ["LeftHand", "RightHand"]
@@ -60,9 +60,11 @@ const LIMB_TEXTURES: Dictionary = {
 }
 const FISHNET_SHADER_CODE := "shader_type canvas_item;\nvoid fragment() {\n\tvec4 tex = texture(TEXTURE, UV);\n\tfloat u = UV.x * 64.0;\n\tfloat v = UV.y * 64.0;\n\tif (tex.a > 0.1 && (mod(u + v, 5.0) < 1.0 || mod(u - v, 5.0) < 1.0)) {\n\t\tCOLOR = vec4(0.9, 0.1, 0.1, 0.9);\n\t} else {\n\t\tCOLOR = vec4(0.0, 0.0, 0.0, 0.0);\n\t}\n}\n"
 const LIMB_CLICK_ALPHA_THRESHOLD: float = 0.05
-const ALWAYS_VISIBLE_SLOTS: Array[String] = ["waist", "pocket_l", "pocket_r"]
+const ALWAYS_VISIBLE_SLOTS: Array[String] = ["waist", "pocket_1", "pocket_2"]
 const HUD_ICON_TEXTURE: Texture2D = preload("res://assets/HUDicon.jpg")
 const RESIST_TEXTURE: Texture2D = preload("res://ui/resist.png")
+const EQUIPPED_POUCH_UI := preload("res://scripts/ui/equipped_pouch_ui.gd")
+const EQUIPMENT_DRAG_THRESHOLD: float = 10.0
 
 # Eyes/hands/feet are intentionally spawned into LimbPanel at runtime instead
 # of being baked into hud.tscn. That keeps the doll layer flexible for future
@@ -104,6 +106,10 @@ var _limb_fishnet_material: ShaderMaterial = null
 var _stance_icon: TextureRect = null
 var _sneak_icon: TextureRect = null
 
+var _pouch_press_slot: String = ""
+var _pouch_press_position: Vector2 = Vector2.ZERO
+var _equipped_pouch_ui: CanvasLayer = null
+
 var _scene_cached: bool = false
 var _signals_connected: bool = false
 
@@ -123,10 +129,10 @@ func _slot_label_text(slot_name: String) -> String:
 	match slot_name:
 		"clothing":
 			return "clothing\n/torso"
-		"pocket_l":
-			return "L. Pocket"
-		"pocket_r":
-			return "R. Pocket"
+		"pocket_1":
+			return "Pocket 1"
+		"pocket_2":
+			return "Pocket 2"
 		_:
 			return slot_name
 
@@ -679,6 +685,68 @@ func update_clothing_display(equipped: Dictionary, equipped_data: Dictionary = {
 		icon.visible = false
 		amt_lbl.visible = false
 
+func refresh_equipped_pouch(slot_name: String) -> void:
+	if _equipped_pouch_ui == null or not is_instance_valid(_equipped_pouch_ui):
+		return
+	if _equipped_pouch_ui.pocket_slot == slot_name:
+		_equipped_pouch_ui.refresh()
+
+func _input(event: InputEvent) -> void:
+	if _pouch_press_slot == "":
+		return
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed):
+		return
+
+	var pouch_slot := _pouch_press_slot
+	_pouch_press_slot = ""
+	get_viewport().set_input_as_handled()
+
+	if event.position.distance_to(_pouch_press_position) <= EQUIPMENT_DRAG_THRESHOLD:
+		_toggle_equipped_pouch(pouch_slot)
+		return
+
+	var target_hand := _get_hand_drop_target(event.position)
+	if target_hand < 0:
+		return
+	if player.body != null and player.body.is_arm_broken(target_hand):
+		Sidebar.add_message("[color=#ffaaaa]That arm is useless![/color]")
+		return
+
+	_close_equipped_pouch()
+	player._unequip_clothing_from_slot(pouch_slot, target_hand)
+
+func _get_hand_drop_target(viewport_position: Vector2) -> int:
+	if player == null:
+		return -1
+	for hand_idx in range(HAND_NODE_NAMES.size()):
+		if player.hands[hand_idx] != null:
+			continue
+		var hand_ctrl := get_node_or_null("SafeArea/HandsPanel/" + HAND_NODE_NAMES[hand_idx]) as Control
+		if hand_ctrl != null and hand_ctrl.get_global_rect().has_point(viewport_position):
+			return hand_idx
+	return -1
+
+func _toggle_equipped_pouch(slot_name: String) -> void:
+	if player == null or player.equipped.get(slot_name) != "Pouch":
+		return
+	if _equipped_pouch_ui != null and is_instance_valid(_equipped_pouch_ui):
+		if _equipped_pouch_ui.pocket_slot == slot_name:
+			_close_equipped_pouch()
+			return
+		_close_equipped_pouch()
+
+	_equipped_pouch_ui = EQUIPPED_POUCH_UI.new()
+	get_tree().root.add_child(_equipped_pouch_ui)
+	_equipped_pouch_ui.setup(player, slot_name)
+
+func _close_equipped_pouch() -> void:
+	if _equipped_pouch_ui != null and is_instance_valid(_equipped_pouch_ui):
+		_equipped_pouch_ui.close()
+	_equipped_pouch_ui = null
+
+func _exit_tree() -> void:
+	_close_equipped_pouch()
+
 func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
 		return
@@ -706,10 +774,10 @@ func _on_hand_gui_input(event: InputEvent, hand_idx: int) -> void:
 			return
 
 		var itype = clicked_item.get("item_type")
-		if itype == "Satchel":
+		if itype in ["Satchel", "Pouch"]:
 			if active_held.get("too_large_for_satchel") == true:
 				var label = active_held.get("item_type") if active_held.get("item_type") != null else active_held.name
-				Sidebar.add_message("[color=#ffaaaa]" + label + " is too large to fit in the satchel.[/color]")
+				Sidebar.add_message("[color=#ffaaaa]" + label + " is too large to fit in the " + itype.to_lower() + ".[/color]")
 				return
 			var clicked_item_id := World.get_entity_id(clicked_item)
 			World.rpc_request_satchel_insert.rpc_id(1, clicked_item_id, player.active_hand)
@@ -840,11 +908,24 @@ func _on_slot_gui_input(event: InputEvent, slot_name: String) -> void:
 
 	if Input.is_key_pressed(KEY_SHIFT):
 		if currently_equipped != null and currently_equipped != "":
-			player._show_inspect_text(slot_name + ": " + currently_equipped, "")
+			var slot_label := str(Defs.SLOT_DISPLAY.get(slot_name, slot_name))
+			player._show_inspect_text(slot_label + ": " + currently_equipped, "")
+		return
+
+	if currently_equipped == "Pouch":
+		if held != null:
+			if held.get("too_large_for_satchel") == true:
+				var pouch_item_label = held.get("item_type") if held.get("item_type") != null else held.name
+				Sidebar.add_message("[color=#ffaaaa]" + pouch_item_label + " is too large to fit in the pouch.[/color]")
+				return
+			World.rpc_request_equipped_pouch_insert.rpc_id(1, slot_name, player.active_hand)
+		else:
+			_pouch_press_slot = slot_name
+			_pouch_press_position = get_viewport().get_mouse_position()
 		return
 
 	if held != null:
-		if slot_name in ["pocket_l", "pocket_r"]:
+		if slot_name in ["pocket_1", "pocket_2"]:
 			if held.get("too_large_for_satchel") == true:
 				var item_label = held.get("item_type") if held.get("item_type") != null else held.name
 				Sidebar.add_message("[color=#ffaaaa]" + item_label + " is too large to fit in your pocket.[/color]")

@@ -31,6 +31,7 @@ func is_disguised() -> bool:
 
 func apply_class_defaults() -> void:
 	var class_data = Classes.DATA.get(player.character_class, Classes.DATA["peasant"])
+	var incoming_pouch_data = player.equipped_data.get("pocket_1", null)
 	player.skills = class_data["skills"].duplicate()
 	player.prices_shown = class_data.get("prices_shown", false)
 
@@ -55,9 +56,57 @@ func apply_class_defaults() -> void:
 	for slot in class_equipped_data:
 		player.equipped_data[slot] = class_equipped_data[slot].duplicate(true)
 
+	if player.equipped.get("pocket_1") == "Pouch":
+		if (
+			not simulation_authority
+			and incoming_pouch_data is Dictionary
+			and incoming_pouch_data.get("starting_class", "") == player.character_class
+		):
+			player.equipped_data["pocket_1"] = incoming_pouch_data.duplicate(true)
+		else:
+			player.equipped_data["pocket_1"] = {
+				"contents": _build_starting_pouch_contents(class_data, simulation_authority),
+				"starting_class": player.character_class,
+			}
+
 	player._update_clothing_sprites()
 	if player._is_local_authority() and player._hud != null:
 		player._hud.update_clothing_display(player.equipped, player.equipped_data)
+
+func _build_starting_pouch_contents(class_data: Dictionary, simulation_authority: bool) -> Array:
+	var contents: Array = []
+	contents.resize(Defs.POUCH_SLOT_COUNT)
+	contents.fill(null)
+
+	var slot_index := 0
+	var starting_items: Array = class_data.get("starting_pouch", [])
+	for raw_entry in starting_items:
+		if not (raw_entry is Dictionary):
+			continue
+		var entry: Dictionary = raw_entry
+		var item_type := str(entry.get("item_type", ""))
+		var scene_path := ItemRegistry.get_scene_path(item_type)
+		if item_type == "" or scene_path == "":
+			continue
+
+		var stack_count := maxi(1, int(entry.get("stacks", 1)))
+		for _stack in stack_count:
+			if slot_index >= Defs.POUCH_SLOT_COUNT:
+				break
+			var amount_min := maxi(1, int(entry.get("amount_min", entry.get("amount", 1))))
+			var amount_max := maxi(amount_min, int(entry.get("amount_max", amount_min)))
+			var amount := randi_range(amount_min, amount_max) if simulation_authority else amount_min
+			contents[slot_index] = {
+				"scene_path": scene_path,
+				"item_type": item_type,
+				"state": {
+					"amount": mini(amount, Defs.MAX_COIN_STACK),
+					"metal_type": int(entry.get("metal_type", 0)),
+				},
+			}
+			slot_index += 1
+
+	return contents
 
 # ===========================================================================
 # Stamina Logic
@@ -177,7 +226,7 @@ func equip_clothing(item: Node) -> void:                                        
 func equip_clothing_to_slot(item: Node, slot_name: String) -> void:                  equipment.equip_clothing_to_slot(item, slot_name)
 func perform_equip(item: Node, slot_name: String, hand_index: int) -> void:          equipment.perform_equip(item, slot_name, hand_index)
 func sync_equip_state(slot_name: String, hand_index: int, item_type: String, slot_data: Variant, expected_item_id: String = "") -> void: equipment.sync_equip_state(slot_name, hand_index, item_type, slot_data, expected_item_id)
-func unequip_clothing_from_slot(slot_name: String) -> void:                          equipment.unequip_clothing_from_slot(slot_name)
+func unequip_clothing_from_slot(slot_name: String, hand_index: int = -1) -> void:    equipment.unequip_clothing_from_slot(slot_name, hand_index)
 func perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void: equipment.perform_unequip(slot_name, new_entity_id, hand_index)
 func sync_unequip_state(slot_name: String, new_entity_id: String, hand_index: int, item_type: String, slot_data: Variant = null) -> void: equipment.sync_unequip_state(slot_name, new_entity_id, hand_index, item_type, slot_data)
 

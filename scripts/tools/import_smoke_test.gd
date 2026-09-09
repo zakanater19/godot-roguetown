@@ -30,6 +30,7 @@ const STREAMED_NPC_SCENES: Array[String] = [
 # lifecycle or the host's per-client streaming window will never include them.
 const STREAMED_WORLD_OBJECT_SCENES: Array[String] = [
 	"res://clothing/satchel.tscn",
+	"res://clothing/pouch.tscn",
 ]
 
 const PLAYER_REPLICATED_PROPERTIES: Array[NodePath] = [
@@ -759,7 +760,7 @@ func _validate_items(item_types: Dictionary) -> void:
 	const VALID_SLOTS: Array[String] =[
 		"head", "face", "cloak", "armor", "backpack",
 		"gloves", "waist", "clothing", "trousers", "feet",
-		"pocket_l", "pocket_r",
+		"pocket_1", "pocket_2",
 	]
 	const VALID_TOOL_TYPES: Array[String] =["slashing", "stabbing", "pickaxe"]
 
@@ -879,11 +880,54 @@ func _validate_recipes(item_types: Dictionary) -> void:
 # GAMEPLAY: every item_type referenced in Classes.DATA equipment must exist.
 func _validate_classes(item_types: Dictionary) -> void:
 	for class_key: String in Classes.DATA:
-		var equipment: Dictionary = Classes.DATA[class_key].get("equipment", {})
+		var class_data: Dictionary = Classes.DATA[class_key]
+		var equipment: Dictionary = class_data.get("equipment", {})
 		for slot_key: String in equipment:
 			var item_type: String = str(equipment[slot_key])
 			if not item_types.has(item_type):
 				_fail("Classes['%s'].equipment['%s']: item_type '%s' not found in %s." %[class_key, slot_key, item_type, ITEMS_DIR])
+		if equipment.get("pocket_1") != "Pouch":
+			_fail("Classes['%s'] must start with a Pouch in pocket_1." % class_key)
+
+	var merchant_equipment: Dictionary = Classes.DATA["merchant"].get("equipment", {})
+	if merchant_equipment.get("pocket_2") != "Keyring":
+		_fail("Merchant keyring must start in pocket_2.")
+
+	_validate_starting_coin_config("peasant", "CopperCoin", 0, 10, 20, 1)
+	_validate_starting_coin_config("merchant", "GoldCoin", 2, 20, 20, 2)
+	_validate_starting_coin_config("adventurer", "SilverCoin", 1, 5, 15, 1)
+	_validate_starting_coin_config("king", "GoldCoin", 2, 20, 20, 1)
+	if not (Classes.DATA["bandit"].get("starting_pouch", []) as Array).is_empty():
+		_fail("Bandit starting pouch must be empty.")
+
+	var pouch_data := ItemRegistry.get_by_type("Pouch")
+	if pouch_data == null or not pouch_data.has_inventory or pouch_data.inventory_slots != Defs.POUCH_SLOT_COUNT:
+		_fail("Pouch item data must define exactly %d inventory slots." % Defs.POUCH_SLOT_COUNT)
+
+	var bank := preload("res://scripts/world/world_bank.gd").new(World)
+	var bank_player := _SmokePlayerStub.new()
+	bank_player.character_name = "Fresh Account"
+	bank_player.character_class = "merchant"
+	if bank.get_balance_for_player(bank_player) != 0:
+		_fail("Fresh player bank accounts must start at zero.")
+	bank_player.free()
+
+func _validate_starting_coin_config(class_key: String, item_type: String, metal_type: int, min_amount: int, max_amount: int, stacks: int) -> void:
+	var entries: Array = Classes.DATA[class_key].get("starting_pouch", [])
+	if entries.size() != 1 or not (entries[0] is Dictionary):
+		_fail("Classes['%s'].starting_pouch must contain one coin configuration." % class_key)
+		return
+	var entry: Dictionary = entries[0]
+	var actual_min := int(entry.get("amount_min", entry.get("amount", 1)))
+	var actual_max := int(entry.get("amount_max", actual_min))
+	if (
+		str(entry.get("item_type", "")) != item_type
+		or int(entry.get("metal_type", -1)) != metal_type
+		or actual_min != min_amount
+		or actual_max != max_amount
+		or int(entry.get("stacks", 1)) != stacks
+	):
+		_fail("Classes['%s'].starting_pouch coin configuration is incorrect." % class_key)
 
 func _validate_regions() -> void:
 	var region_tileset := load("res://assets/region_tileset.tres") as TileSet
@@ -1632,15 +1676,15 @@ func _validate_player_object_interactions() -> void:
 	]
 	temp_root.add_child(hand_keyring)
 	misc_target.hands[0] = hand_keyring
-	misc_target.equipped["pocket_l"] = "Keyring"
-	misc_target.equipped_data["pocket_l"] = {
+	misc_target.equipped["pocket_1"] = "Keyring"
+	misc_target.equipped_data["pocket_1"] = {
 		"contents": [
 			{"item_type": "BrownKey", "key_id": 1},
 			{"item_type": "BrownKey", "key_id": 2},
 		]
 	}
-	misc_target.equipped["pocket_r"] = "CopperCoin"
-	misc_target.equipped_data["pocket_r"] = {
+	misc_target.equipped["pocket_2"] = "CopperCoin"
+	misc_target.equipped_data["pocket_2"] = {
 		"amount": 5,
 		"metal_type": 0,
 	}
@@ -1658,11 +1702,11 @@ func _validate_player_object_interactions() -> void:
 	if hand_btn == null or (hand_btn.icon == null and hand_btn.text.find("Keyring") == -1):
 		_fail("PlayerMisc.refresh_loot_panel: held keyring entries were not rendered in the target object list.")
 
-	var ring_btn := (misc.loot_slot_controls.get("equip_pocket_l", {}).get("btn", null) as Button)
+	var ring_btn := (misc.loot_slot_controls.get("equip_pocket_1", {}).get("btn", null) as Button)
 	if ring_btn == null or (ring_btn.icon == null and ring_btn.text.find("Keyring") == -1):
 		_fail("PlayerMisc.refresh_loot_panel: equipped keyring entries were not rendered correctly.")
 
-	var coin_btn := (misc.loot_slot_controls.get("equip_pocket_r", {}).get("btn", null) as Button)
+	var coin_btn := (misc.loot_slot_controls.get("equip_pocket_2", {}).get("btn", null) as Button)
 	if coin_btn == null or (coin_btn.icon == null and coin_btn.text != "5" and coin_btn.text.find("CopperCoin") == -1):
 		_fail("PlayerMisc.refresh_loot_panel: equipped coin entries were not rendered with stack-aware UI.")
 
@@ -1740,6 +1784,54 @@ func _validate_player_object_interactions() -> void:
 		_fail("WorldStorage.handle_rpc_confirm_satchel_extract: nested container contents were not restored on the recreated item.")
 	if World.get_entity("smoke:satchel_extract") != satchel_extracted_item:
 		_fail("WorldStorage.handle_rpc_confirm_satchel_extract: recreated satchel item did not register with its generated entity ID.")
+
+	var pouch_player := _SmokePlayerStub.new()
+	pouch_player.name = "PouchPlayer"
+	pouch_player.tile_pos = Vector2i(12, 10)
+	pouch_player.pixel_pos = Defs.tile_to_pixel(pouch_player.tile_pos)
+	pouch_player.z_level = 3
+	pouch_player.equipped["pocket_1"] = "Pouch"
+	pouch_player.equipped_data["pocket_1"] = {"contents": [null, null, null, null]}
+	pouch_player.add_to_group("player")
+	pouch_player.set_multiplayer_authority(94)
+	temp_root.add_child(pouch_player)
+
+	var pouch_insert_item := _SmokeInventoryItemStub.new()
+	pouch_insert_item.name = "PouchInsertItem"
+	pouch_insert_item.item_type = "Keyring"
+	pouch_insert_item.contents = {"legacy": true}
+	temp_root.add_child(pouch_insert_item)
+	var pouch_insert_item_id := World.register_entity(pouch_insert_item, "smoke:pouch_insert")
+	pouch_player.hands[0] = pouch_insert_item
+
+	storage.handle_rpc_confirm_equipped_pouch_insert(94, "pocket_1", pouch_insert_item_id, 0, 2, keyring_scene_path, "Keyring", {
+		"contents": [
+			{"item_type": "BrownKey", "key_id": 1},
+		]
+	})
+	var equipped_pouch_contents: Array = pouch_player.equipped_data["pocket_1"]["contents"]
+	if equipped_pouch_contents.size() != Defs.POUCH_SLOT_COUNT:
+		_fail("WorldStorage equipped pouch insert changed the four-slot capacity.")
+	if equipped_pouch_contents[2] == null or equipped_pouch_contents[2].get("item_type", "") != "Keyring":
+		_fail("WorldStorage equipped pouch insert did not populate the requested pouch slot.")
+	if pouch_player.hands[0] != null or World.get_entity(pouch_insert_item_id) != null:
+		_fail("WorldStorage equipped pouch insert did not consume the held item.")
+
+	storage.handle_rpc_confirm_equipped_pouch_extract(94, "pocket_1", 2, 1, "smoke:pouch_extract", keyring_scene_path, {
+		"contents": [
+			{"item_type": "BrownKey", "key_id": 1},
+		]
+	})
+	var pouch_extracted_item: Node = pouch_player.hands[1]
+	equipped_pouch_contents = pouch_player.equipped_data["pocket_1"]["contents"]
+	if equipped_pouch_contents[2] != null:
+		_fail("WorldStorage equipped pouch extract did not clear the pouch slot.")
+	if pouch_extracted_item == null or not is_instance_valid(pouch_extracted_item):
+		_fail("WorldStorage equipped pouch extract did not recreate the item in the destination hand.")
+	elif pouch_extracted_item.get("contents").size() != 1:
+		_fail("WorldStorage equipped pouch extract did not preserve nested item state.")
+	if World.get_entity("smoke:pouch_extract") != pouch_extracted_item:
+		_fail("WorldStorage equipped pouch extract did not register the recreated item.")
 
 	var keyring_player := _SmokePlayerStub.new()
 	keyring_player.name = "KeyringPlayer"
@@ -1837,6 +1929,8 @@ func _validate_player_object_interactions() -> void:
 		satchel,
 		held_satchel_item,
 		satchel_extracted_item,
+		pouch_insert_item,
+		pouch_extracted_item,
 		keyring,
 		key_item,
 		extracted_key,

@@ -60,12 +60,12 @@ var skills: Dictionary = {}
 var equipped: Dictionary = {
 	"head": null, "face": null, "cloak": null, "armor": null,
 	"backpack": null, "waist": null, "clothing": null, "trousers": null,
-	"feet": null, "gloves": null, "pocket_l": null, "pocket_r": null
+	"feet": null, "gloves": null, "pocket_1": null, "pocket_2": null
 }
 var equipped_data: Dictionary = {
 	"head": null, "face": null, "cloak": null, "armor": null,
 	"backpack": null, "waist": null, "clothing": null, "trousers": null,
-	"feet": null, "gloves": null, "pocket_l": null, "pocket_r": null
+	"feet": null, "gloves": null, "pocket_1": null, "pocket_2": null
 }
 
 var inspect = null

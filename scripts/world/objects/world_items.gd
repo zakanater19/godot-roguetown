@@ -208,6 +208,7 @@ func handle_rpc_request_unequip(sender_id: int, slot_name: String, hand_index: i
 	var player: Node2D = world.utils.find_player_by_peer(sender_id) as Node2D
 	if not world.utils.can_player_interact(player): return
 	if player.body != null and player.body.is_arm_broken(hand_index): return
+	if player.hands[hand_index] != null: return
 	var current_item = player.equipped.get(slot_name)
 	var item_type: String = current_item if current_item is String else ""
 	if item_type == "":

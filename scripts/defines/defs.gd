@@ -27,6 +27,7 @@ const LOOT_BLINK_INTERVAL: float = 0.25  # progress indicator blink rate (s)
 const SPIDER_BUTCHER_DURATION: float = 5.0
 const HAND_COUNT:         int = 2
 const SATCHEL_SLOT_COUNT: int = 10
+const POUCH_SLOT_COUNT:   int = 4
 const MAX_COIN_STACK:     int = 20
 const KEYRING_MAX_KEYS:   int = 5
 const COIN_STACK_ICON_THRESHOLDS: Array[int] = [20, 15, 10, 5, 4, 3, 2, 1]
@@ -119,7 +120,7 @@ const LIMB_DISPLAY: Dictionary = {
 const SLOTS_ALL: Array =[
 	"head", "face", "cloak", "armor", "backpack",
 	"gloves", "waist", "clothing", "trousers", "feet",
-	"pocket_l", "pocket_r"
+	"pocket_1", "pocket_2"
 ]
 
 # Display labels for the loot/inspect UI (key → human-readable label).
@@ -135,8 +136,8 @@ const SLOT_DISPLAY: Dictionary = {
 	"clothing": "Clothing",
 	"trousers": "Trousers",
 	"feet":     "Feet",
-	"pocket_l": "L. Pocket",
-	"pocket_r": "R. Pocket",
+	"pocket_1": "Pocket 1",
+	"pocket_2": "Pocket 2",
 }
 
 # ---------------------------------------------------------------------------

@@ -76,8 +76,8 @@ var active_hand:  int         = 0
 @warning_ignore("unused_private_class_variable")
 var _is_throwing: bool        = false
 
-var equipped: Dictionary = {"head": null, "face": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
-var equipped_data: Dictionary = {"head": null, "face": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_l": null, "pocket_r": null}
+var equipped: Dictionary = {"head": null, "face": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_1": null, "pocket_2": null}
+var equipped_data: Dictionary = {"head": null, "face": null, "cloak": null, "armor": null, "backpack": null, "waist": null, "clothing": null, "trousers": null, "feet": null, "gloves": null, "pocket_1": null, "pocket_2": null}
 
 var throwing_mode:     bool    = false
 @warning_ignore("unused_private_class_variable")
@@ -160,7 +160,7 @@ func _equip_clothing(item: Node) -> void:                                      i
 func _equip_clothing_to_slot(item: Node, slot_name: String) -> void:          if backend: backend.equip_clothing_to_slot(item, slot_name)
 func _perform_equip(item: Node, slot_name: String, hand_index: int) -> void:  if backend: backend.perform_equip(item, slot_name, hand_index)
 func _sync_equip_state(slot_name: String, hand_index: int, item_type: String, slot_data: Variant, expected_item_id: String = "") -> void: if backend: backend.sync_equip_state(slot_name, hand_index, item_type, slot_data, expected_item_id)
-func _unequip_clothing_from_slot(slot_name: String) -> void:                   if backend: backend.unequip_clothing_from_slot(slot_name)
+func _unequip_clothing_from_slot(slot_name: String, hand_index: int = -1) -> void: if backend: backend.unequip_clothing_from_slot(slot_name, hand_index)
 func _perform_unequip(slot_name: String, new_entity_id: String, hand_index: int) -> void: if backend: backend.perform_unequip(slot_name, new_entity_id, hand_index)
 func _sync_unequip_state(slot_name: String, new_entity_id: String, hand_index: int, item_type: String, slot_data: Variant = null) -> void: if backend: backend.sync_unequip_state(slot_name, new_entity_id, hand_index, item_type, slot_data)
 func _inspect_at(world_pos: Vector2) -> void:                                  if inspect: inspect.inspect_at(world_pos)

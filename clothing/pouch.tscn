@@ -1,0 +1,26 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://clothing/satchel.gd" id="1_pouch"]
+[ext_resource type="Texture2D" path="res://clothing/pouch.png" id="2_pouchtex"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(24, 20)
+
+[node name="Pouch" type="Area2D"]
+z_index = 5
+script = ExtResource("1_pouch")
+item_type = "Pouch"
+slot = "pocket_1"
+too_large_for_satchel = false
+max_slots = 4
+container_label = "Pouch"
+description = "a small leather pouch with room for four items"
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(1.5, 1.5)
+texture = ExtResource("2_pouchtex")
+region_enabled = true
+region_rect = Rect2(0, 0, 32, 32)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")

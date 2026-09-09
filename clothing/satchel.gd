@@ -2,12 +2,14 @@
 extends PickableWorldObject
 
 const TILE_SIZE: int  = 64
-const MAX_SLOTS: int  = 10
 const DRAG_THRESHOLD: float = 10.0
 
-var item_type: String = "Satchel"
-var slot: String = "backpack"
-var too_large_for_satchel: bool = true
+@export var item_type: String = "Satchel"
+@export var slot: String = "backpack"
+@export var too_large_for_satchel: bool = true
+@export var max_slots: int = Defs.SATCHEL_SLOT_COUNT
+@export var container_label: String = "Satchel"
+@export_multiline var description: String = "a leather satchel, useful for carrying things"
 
 var contents: Array =[]
 var _ui_layer:  CanvasLayer = null
@@ -18,7 +20,7 @@ var _drag_press_screen: Vector2 = Vector2.ZERO
 var _press_received:    bool    = false
 
 func get_description() -> String:
-	return "a leather satchel, useful for carrying things"
+	return description
 
 func get_use_delay() -> float:
 	return 0.3
@@ -27,9 +29,9 @@ func _ready() -> void:
 	super._ready()
 	if Engine.is_editor_hint():
 		return
-	if contents.size() != MAX_SLOTS:
-		contents.resize(MAX_SLOTS)
-		for i in MAX_SLOTS:
+	if contents.size() != max_slots:
+		contents.resize(max_slots)
+		for i in max_slots:
 			contents[i] = null
 
 func _process(_delta: float) -> void:
@@ -111,7 +113,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			if active_held != null and not in_active_hand:
 				if active_held.get("too_large_for_satchel") == true:
 					var item_label: String = active_held.get("item_type") if active_held.get("item_type") != null else active_held.name
-					Sidebar.add_message("[color=#ffaaaa]" + item_label + " is too large to fit in the satchel.[/color]")
+					Sidebar.add_message("[color=#ffaaaa]" + item_label + " is too large to fit in the " + container_label.to_lower() + ".[/color]")
 					return
 
 				var satchel_id := World.get_entity_id(self)
@@ -149,7 +151,7 @@ func _open_ui() -> void:
 	vbox.add_child(title_row)
 
 	var title_lbl := Label.new()
-	title_lbl.text                  = "Satchel"
+	title_lbl.text                  = container_label
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.add_theme_font_size_override("font_size", 13)
 	title_row.add_child(title_lbl)
@@ -169,7 +171,7 @@ func _open_ui() -> void:
 	vbox.add_child(grid)
 
 	_slot_btns.clear()
-	for i in MAX_SLOTS:
+	for i in max_slots:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(100, 40)
 		btn.add_theme_font_size_override("font_size", 10)

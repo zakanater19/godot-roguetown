@@ -583,7 +583,7 @@ theme_override_font_sizes/font_size = 10
 horizontal_alignment = 2
 vertical_alignment = 2
 
-[node name="PocketLSlot" type="Control" parent="SafeArea/ClothingPanel"]
+[node name="Pocket1Slot" type="Control" parent="SafeArea/ClothingPanel"]
 clip_contents = true
 anchors_preset = 0
 offset_left = 52.0
@@ -591,7 +591,7 @@ offset_top = 208.0
 offset_right = 100.0
 offset_bottom = 256.0
 
-[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/PocketLSlot"]
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/Pocket1Slot"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -602,7 +602,7 @@ mouse_filter = 2
 texture = ExtResource("2_hud_icon")
 expand_mode = 1
 
-[node name="Label" type="Label" parent="SafeArea/ClothingPanel/PocketLSlot"]
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/Pocket1Slot"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -611,16 +611,16 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
 theme_override_font_sizes/font_size = 9
-text = "L. Pocket"
+text = "Pocket 1"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/PocketLSlot"]
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/Pocket1Slot"]
 visible = false
 position = Vector2(24, 24)
 scale = Vector2(0.75, 0.75)
 
-[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/PocketLSlot"]
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/Pocket1Slot"]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -635,7 +635,7 @@ theme_override_font_sizes/font_size = 10
 horizontal_alignment = 2
 vertical_alignment = 2
 
-[node name="PocketRSlot" type="Control" parent="SafeArea/ClothingPanel"]
+[node name="Pocket2Slot" type="Control" parent="SafeArea/ClothingPanel"]
 clip_contents = true
 anchors_preset = 0
 offset_left = 104.0
@@ -643,7 +643,7 @@ offset_top = 208.0
 offset_right = 152.0
 offset_bottom = 256.0
 
-[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/PocketRSlot"]
+[node name="Background" type="TextureRect" parent="SafeArea/ClothingPanel/Pocket2Slot"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -654,7 +654,7 @@ mouse_filter = 2
 texture = ExtResource("2_hud_icon")
 expand_mode = 1
 
-[node name="Label" type="Label" parent="SafeArea/ClothingPanel/PocketRSlot"]
+[node name="Label" type="Label" parent="SafeArea/ClothingPanel/Pocket2Slot"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -663,16 +663,16 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 0.5)
 theme_override_font_sizes/font_size = 9
-text = "R. Pocket"
+text = "Pocket 2"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/PocketRSlot"]
+[node name="Icon" type="Sprite2D" parent="SafeArea/ClothingPanel/Pocket2Slot"]
 visible = false
 position = Vector2(24, 24)
 scale = Vector2(0.75, 0.75)
 
-[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/PocketRSlot"]
+[node name="AmountLabel" type="Label" parent="SafeArea/ClothingPanel/Pocket2Slot"]
 visible = false
 layout_mode = 1
 anchors_preset = 15

@@ -38,6 +38,7 @@
 [ext_resource type="PackedScene" path="res://objects/fibers.tscn" id="36_pibwh"]
 [ext_resource type="PackedScene" path="res://objects/thorn.tscn" id="37_c6pm6"]
 [ext_resource type="PackedScene" uid="uid://cspider001sc" path="res://npcs/spider.tscn" id="38_pibwh"]
+[ext_resource type="PackedScene" path="res://clothing/pouch.tscn" id="39_c6pm6"]
 
 [node name="Main" type="Node2D" unique_id=657010275]
 script = ExtResource("1_main")
@@ -496,3 +497,7 @@ position = Vector2(29536, 12195)
 [node name="TorchWall12" parent="." unique_id=452204350 instance=ExtResource("33_dgi5k")]
 z_index = 405
 position = Vector2(31776, 10592)
+
+[node name="Pouch" parent="." unique_id=196411913 instance=ExtResource("39_c6pm6")]
+z_index = 402
+position = Vector2(32172, 12123)
