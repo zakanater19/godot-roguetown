@@ -388,11 +388,7 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	return item
 
 func _add_recreated_hand_item(main_node: Node, item: Node, entity_id: String) -> void:
-	# Pickable items register themselves from _ready(). Bind the server-owned ID
-	# before that lifecycle boundary so _ready() cannot invent a client-only ID.
-	item.set_meta("entity_id", entity_id)
-	main_node.add_child(item)
-	World.register_entity(item, entity_id)
+	World.add_registered_entity(main_node, item, entity_id)
 
 # ---------------------------------------------------------------------------
 # Retry helpers (async — must be called as coroutines via the lj node)

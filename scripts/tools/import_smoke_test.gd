@@ -1904,6 +1904,40 @@ func _validate_player_object_interactions() -> void:
 	if World.get_entity("smoke:pouch_extract") != pouch_extracted_item:
 		_fail("WorldStorage equipped pouch extract did not register the recreated item.")
 
+	var loot_target := _SmokePlayerStub.new()
+	loot_target.name = "LootPouchTarget"
+	loot_target.tile_pos = Vector2i(13, 10)
+	loot_target.pixel_pos = Defs.tile_to_pixel(loot_target.tile_pos)
+	loot_target.z_level = 3
+	loot_target.equipped["pocket_1"] = "Pouch"
+	loot_target.equipped_data["pocket_1"] = {
+		"contents": [
+			{"item_type": "BrownKey", "key_id": 2},
+			null,
+			null,
+			null,
+		],
+	}
+	loot_target.add_to_group("player")
+	loot_target.set_multiplayer_authority(95)
+	temp_root.add_child(loot_target)
+	var loot_target_id := World.register_entity(loot_target, "smoke:loot_pouch_target")
+	var loot = preload("res://scripts/world/objects/world_loot.gd").new(World)
+	loot.handle_rpc_confirm_loot_unequip_drop(
+		loot_target_id,
+		"pocket_1",
+		"smoke:stolen_pouch",
+		Defs.tile_to_pixel(loot_target.tile_pos),
+		loot_target.z_level
+	)
+	var stolen_pouch: Node = World.get_entity("smoke:stolen_pouch")
+	if stolen_pouch == null or not is_instance_valid(stolen_pouch):
+		_fail("WorldLoot pouch theft did not register the dropped pouch under the server-generated entity ID.")
+	elif stolen_pouch.get("contents").size() != Defs.POUCH_SLOT_COUNT or stolen_pouch.get("contents")[0].get("key_id", -1) != 2:
+		_fail("WorldLoot pouch theft did not preserve the equipped pouch contents.")
+	if loot_target.equipped.get("pocket_1") != null or loot_target.equipped_data.get("pocket_1") != null:
+		_fail("WorldLoot pouch theft left a ghost equipped pouch on the target.")
+
 	var keyring_player := _SmokePlayerStub.new()
 	keyring_player.name = "KeyringPlayer"
 	keyring_player.tile_pos = Vector2i(12, 10)
@@ -2002,6 +2036,8 @@ func _validate_player_object_interactions() -> void:
 		satchel_extracted_item,
 		pouch_insert_item,
 		pouch_extracted_item,
+		loot_target,
+		stolen_pouch,
 		keyring,
 		key_item,
 		extracted_key,

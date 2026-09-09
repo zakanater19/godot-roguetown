@@ -95,6 +95,18 @@ func ensure_entity_id(node: Node, preferred_id: String = "") -> String:
 func register_entity(node: Node, preferred_id: String = "") -> String:
 	return ensure_entity_id(node, preferred_id)
 
+func add_registered_entity(parent: Node, node: Node, entity_id: String) -> String:
+	if parent == null or node == null or not is_instance_valid(node):
+		return ""
+	# WorldObject._ready() registers pickables as soon as they enter the tree.
+	# Bind the authoritative identity first so every peer registers the same
+	# object rather than briefly inventing a local ID that can later be streamed
+	# back as a duplicate.
+	if entity_id != "":
+		node.set_meta("entity_id", entity_id)
+	parent.add_child(node)
+	return register_entity(node, entity_id)
+
 func unregister_entity(node: Node) -> void:
 	if node == null:
 		return

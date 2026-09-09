@@ -81,10 +81,9 @@ func handle_rpc_confirm_loot_unequip_drop(target_id: String, equip_slot: String,
 			item.set("key_id", edata["key_id"])
 		target.equipped_data[equip_slot] = null
 
-	target.get_parent().add_child(item)
+	world.add_registered_entity(target.get_parent(), item, new_entity_id)
 	if item.has_method("_update_sprite"):
 		item._update_sprite()
-	world.register_entity(item, new_entity_id)
 	item.global_position = drop_position
 	for child in item.get_children():
 		if child is CollisionShape2D: child.disabled = false

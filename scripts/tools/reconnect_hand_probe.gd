@@ -67,9 +67,7 @@ func _on_hand_client_connected(peer_id: int) -> void:
 	item.name = "ReconnectHeldKeyring"
 	item.position = World.tile_to_pixel(A)
 	var saved_id := "probe:reconnected_hand:%d" % peer_id
-	item.set_meta("entity_id", saved_id)
-	_main.add_child(item)
-	World.register_entity(item, saved_id)
+	World.add_registered_entity(_main, item, saved_id)
 	player.hands[0] = item
 	for child in item.get_children():
 		if child is CollisionShape2D:
