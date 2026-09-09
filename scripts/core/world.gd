@@ -706,6 +706,17 @@ func rpc_update_atm_balance(atm_id: String, balance: int) -> void:
 	bank.handle_rpc_update_atm_balance(atm_id, balance)
 
 @rpc("any_peer", "call_remote", "reliable")
+func rpc_request_stockpile_vendor_sale(vendor_id: String, hand_idx: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	bank.handle_rpc_request_stockpile_vendor_sale(sender_id, vendor_id, hand_idx)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_stockpile_vendor_sale(peer_id: int, vendor_id: String, hand_idx: int, item_id: String) -> void:
+	bank.handle_rpc_confirm_stockpile_vendor_sale(peer_id, vendor_id, hand_idx, item_id)
+
+@rpc("any_peer", "call_remote", "reliable")
 func rpc_request_merchant_open(vendor_id: String) -> void:
 	var sender_id := multiplayer.get_remote_sender_id()
 	objects.handle_rpc_request_merchant_open(sender_id, vendor_id)

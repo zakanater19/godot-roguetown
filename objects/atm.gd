@@ -4,7 +4,7 @@ extends WorldObject
 const ATM_TEXTURE: Texture2D = preload("res://objects/atm.png")
 const ATM_SPRITE_OFFSET: Vector2 = Vector2(0, -40)
 const ATM_SPRITE_SCALE: Vector2 = Vector2(2, 2)
-const ATM_HITBOX_SIZE: Vector2 = Vector2(44, 18)
+const ATM_HITBOX_SIZE: Vector2 = Vector2(64, 64)
 const ATM_POPUP_PADDING: Vector2i = Vector2i(20, 20)
 
 var blocks_fov: bool = false

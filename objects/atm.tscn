@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" path="res://objects/atm.png" id="2_atmtex"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(44, 18)
+size = Vector2(64, 64)
 
 [node name="ATM" type="Area2D"]
 z_index = 5

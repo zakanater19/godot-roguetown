@@ -1,6 +1,16 @@
 extends RefCounted
 
 const DEFAULT_STARTING_BALANCE: int = 0
+const STOCKPILE_PAYOUTS: Dictionary = {
+	"Log": 2,
+	"Coal": 5,
+	"IronOre": 10,
+}
+const STOCKPILE_ITEM_NAMES: Dictionary = {
+	"Log": "log",
+	"Coal": "coal",
+	"IronOre": "iron ore",
+}
 
 var world: Node
 var accounts: Dictionary = {}
@@ -175,6 +185,54 @@ func handle_rpc_update_atm_balance(atm_id: String, balance: int) -> void:
 	if atm != null and atm.has_method("_update_atm_balance"):
 		atm._update_atm_balance(balance)
 
+func handle_rpc_request_stockpile_vendor_sale(sender_id: int, vendor_id: String, hand_idx: int) -> void:
+	if not world.multiplayer.is_server():
+		return
+
+	var player := world.utils.find_player_by_peer(sender_id) as Node2D
+	var vendor := _get_stockpile_vendor_node(vendor_id)
+	if not _can_player_use_stockpile_vendor(player, vendor):
+		return
+	if not Defs.is_valid_hand_index(hand_idx):
+		return
+	if player.body != null and player.body.is_arm_broken(hand_idx):
+		_send_error(sender_id, "That arm is useless.")
+		return
+
+	var held_item: Node = player.hands[hand_idx]
+	if held_item == null or not is_instance_valid(held_item):
+		return
+	var item_type := str(held_item.get("item_type"))
+	var payout := int(STOCKPILE_PAYOUTS.get(item_type, 0))
+	if payout <= 0:
+		_send_error(sender_id, "The stockpile vendor does not accept that item.")
+		return
+
+	var sold_item_id: String = world.get_entity_id(held_item)
+	var new_balance := get_balance_for_player(player) + payout
+	_set_balance_for_player(player, new_balance)
+
+	world.rpc_confirm_stockpile_vendor_sale.rpc(sender_id, vendor_id, hand_idx, sold_item_id)
+	world.rpc_send_direct_message.rpc_id(
+		sender_id,
+		"[color=#aaffaa]The stockpile vendor accepts your %s. %d coppers were deposited into your ATM account. New balance: %d.[/color]" % [str(STOCKPILE_ITEM_NAMES.get(item_type, item_type)), payout, new_balance]
+	)
+
+func handle_rpc_confirm_stockpile_vendor_sale(peer_id: int, vendor_id: String, hand_idx: int, item_id: String) -> void:
+	var player := world.utils.find_player_by_peer(peer_id) as Node2D
+	if player != null and Defs.is_valid_hand_index(hand_idx):
+		var held_item: Node = player.hands[hand_idx]
+		if held_item != null and is_instance_valid(held_item) and world.get_entity_id(held_item) == item_id:
+			player.hands[hand_idx] = null
+			world.unregister_entity(held_item)
+			held_item.queue_free()
+			if player._is_local_authority():
+				player._update_hands_ui()
+
+	var vendor := _get_stockpile_vendor_node(vendor_id)
+	if vendor != null and vendor.has_method("_play_feed_animation"):
+		vendor._play_feed_animation()
+
 func _ensure_account(player: Node) -> Dictionary:
 	if player == null:
 		return {}
@@ -228,6 +286,14 @@ func _get_atm_node(atm_id: String) -> Node2D:
 		return null
 	return atm
 
+func _get_stockpile_vendor_node(vendor_id: String) -> Node2D:
+	var vendor := world.get_entity(vendor_id) as Node2D
+	if vendor == null or not is_instance_valid(vendor):
+		return null
+	if vendor.get("is_stockpile_vendor") != true:
+		return null
+	return vendor
+
 func _can_player_use_atm(player: Node2D, atm: Node2D) -> bool:
 	return (
 		player != null
@@ -235,6 +301,15 @@ func _can_player_use_atm(player: Node2D, atm: Node2D) -> bool:
 		and world.utils.can_player_interact(player)
 		and player.z_level == atm.z_level
 		and world.utils.is_within_interaction_range(player, atm.global_position)
+	)
+
+func _can_player_use_stockpile_vendor(player: Node2D, vendor: Node2D) -> bool:
+	return (
+		player != null
+		and vendor != null
+		and world.utils.can_player_interact(player)
+		and player.z_level == vendor.z_level
+		and world.utils.is_within_interaction_range(player, vendor.global_position)
 	)
 
 func _can_use_open_hand(player: Node2D) -> bool:
