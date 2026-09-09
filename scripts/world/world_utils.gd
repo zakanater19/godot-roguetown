@@ -89,7 +89,7 @@ func world_to_tile(world_pos: Vector2) -> Vector2i:
 	return Vector2i(int(world_pos.x / world.TILE_SIZE), int(world_pos.y / world.TILE_SIZE))
 
 func get_local_player() -> Node:
-	if not world.multiplayer.has_multiplayer_peer() or world.multiplayer.is_server(): return null
+	if not MultiplayerSession.is_active(world.multiplayer) or world.multiplayer.is_server(): return null
 	var local_id = world.multiplayer.get_unique_id()
 	return find_player_by_peer(local_id)
 

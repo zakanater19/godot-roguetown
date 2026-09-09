@@ -89,7 +89,6 @@ func _on_quit_pressed() -> void:
 	LateJoin.client_connected = false
 	LateJoin.map_loaded = false
 	LateJoin.sync_requested = false
-	LateJoin.is_manual_reconnect = false
 	
 	# 5. Clean up Sidebar state
 	Sidebar._messages.clear()

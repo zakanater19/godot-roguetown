@@ -370,10 +370,9 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 		if hand_data.has("amount")   and "amount"   in fallback: fallback.set("amount",   hand_data["amount"])
 		if hand_data.has("metal_type") and "metal_type" in fallback: fallback.set("metal_type", hand_data["metal_type"])
 		if hand_data.has("key_id") and "key_id" in fallback: fallback.set("key_id", hand_data["key_id"])
-		main_node.add_child(fallback)
+		_add_recreated_hand_item(main_node, fallback, entity_id)
 		if hand_data.has("is_on") and fallback.has_method("_set_sprite"): fallback._set_sprite(hand_data["is_on"])
 		elif fallback.has_method("_update_sprite"): fallback._update_sprite()
-		World.register_entity(fallback, entity_id)
 		return fallback
 	var scene = load(scene_path) as PackedScene
 	if scene == null: return null
@@ -383,11 +382,17 @@ func _recreate_hand_item(hand_data: Dictionary) -> Node:
 	if hand_data.has("amount")   and "amount"   in item: item.set("amount",   hand_data["amount"])
 	if hand_data.has("metal_type") and "metal_type" in item: item.set("metal_type", hand_data["metal_type"])
 	if hand_data.has("key_id") and "key_id" in item: item.set("key_id", hand_data["key_id"])
-	main_node.add_child(item)
+	_add_recreated_hand_item(main_node, item, entity_id)
 	if hand_data.has("is_on") and item.has_method("_set_sprite"): item._set_sprite(hand_data["is_on"])
 	elif item.has_method("_update_sprite"): item._update_sprite()
-	World.register_entity(item, entity_id)
 	return item
+
+func _add_recreated_hand_item(main_node: Node, item: Node, entity_id: String) -> void:
+	# Pickable items register themselves from _ready(). Bind the server-owned ID
+	# before that lifecycle boundary so _ready() cannot invent a client-only ID.
+	item.set_meta("entity_id", entity_id)
+	main_node.add_child(item)
+	World.register_entity(item, entity_id)
 
 # ---------------------------------------------------------------------------
 # Retry helpers (async — must be called as coroutines via the lj node)

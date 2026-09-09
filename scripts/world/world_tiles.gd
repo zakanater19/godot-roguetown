@@ -196,10 +196,14 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 			if blocking_player.get("z_level") != old_z:
 				blocking_player.rpc_sync_z_level(old_z)
 				WorldStream.broadcast_actor(blocking_player, "rpc_sync_z_level", [old_z], true)
-			world.combat.drag_grabbed_entity(sender_id, old_tile)
+			var dragged_update: Dictionary = world.combat.drag_grabbed_entity(sender_id, old_tile)
 			var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
-			world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, resolved_sprint)
-			world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), old_tile, false)
+			var move_updates: Array = [
+				make_move_update(player, resolved_sprint),
+				make_move_update(blocking_player, false),
+			]
+			append_move_update(move_updates, dragged_update)
+			world.rpc_confirm_moves.rpc(move_updates)
 			world.apply_gravity_to_player(blocking_player)
 			world.apply_gravity_to_player(player)
 		else:
@@ -222,10 +226,14 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 						if blocking_player.get("z_level") != next_z:
 							blocking_player.rpc_sync_z_level(next_z)
 							WorldStream.broadcast_actor(blocking_player, "rpc_sync_z_level", [next_z], true)
-						world.combat.drag_grabbed_entity(sender_id, old_tile)
-						world.rpc_confirm_move.rpc(blocking_player.get_multiplayer_authority(), push_dest, false)
+						var dragged_update: Dictionary = world.combat.drag_grabbed_entity(sender_id, old_tile)
 						var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
-						world.rpc_confirm_move.rpc(player.get_multiplayer_authority(), next_tile, resolved_sprint)
+						var move_updates: Array = [
+							make_move_update(blocking_player, false),
+							make_move_update(player, resolved_sprint),
+						]
+						append_move_update(move_updates, dragged_update)
+						world.rpc_confirm_moves.rpc(move_updates)
 						world.apply_gravity_to_player(blocking_player)
 						world.apply_gravity_to_player(player)
 						return
@@ -235,17 +243,61 @@ func handle_rpc_try_move(sender_id: int, dir: Vector2i, is_sprinting: bool) -> v
 		if current_z != next_z:
 			player.rpc_sync_z_level(next_z)
 			WorldStream.broadcast_actor(player, "rpc_sync_z_level", [next_z], true)
-		world.combat.drag_grabbed_entity(sender_id, old_tile)
+		var dragged_update: Dictionary = world.combat.drag_grabbed_entity(sender_id, old_tile)
 		var resolved_sprint: bool = is_sprinting and world.utils.server_consume_stamina(player, PlayerDefs.SPRINT_STAMINA_COST)
-		world.rpc_confirm_move.rpc(sender_id, next_tile, resolved_sprint)
+		var move_updates: Array = [make_move_update(player, resolved_sprint)]
+		append_move_update(move_updates, dragged_update)
+		world.rpc_confirm_moves.rpc(move_updates)
 		world.apply_gravity_to_player(player)
 
+func make_move_update(player: Node, is_sprinting: bool = false) -> Dictionary:
+	if player == null or not is_instance_valid(player):
+		return {}
+	return {
+		"entity_id": world.get_entity_id(player),
+		"peer_id": player.get_multiplayer_authority(),
+		"tile_pos": player.get("tile_pos"),
+		"is_sprinting": is_sprinting,
+	}
+
+func append_move_update(updates: Array, update: Dictionary) -> void:
+	if update.is_empty():
+		return
+	var entity_id := str(update.get("entity_id", ""))
+	for index in range(updates.size()):
+		var existing = updates[index]
+		if existing is Dictionary and str(existing.get("entity_id", "")) == entity_id:
+			updates[index] = update
+			return
+	updates.append(update)
+
 func handle_rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool) -> void:
-	var player: Node2D = world.utils.find_player_by_peer(peer_id) as Node2D
-	if player == null: return
-	player.is_sprinting = is_sprinting
-	player.tile_pos = new_pos
-	if player.has_method("_start_move_lerp"): player._start_move_lerp()
+	handle_rpc_confirm_moves([{
+		"entity_id": "",
+		"peer_id": peer_id,
+		"tile_pos": new_pos,
+		"is_sprinting": is_sprinting,
+	}])
+
+func handle_rpc_confirm_moves(updates: Array) -> void:
+	var resolved_players: Array[Node2D] = []
+	for raw_update in updates:
+		if not (raw_update is Dictionary):
+			continue
+		var update: Dictionary = raw_update
+		var player := world.get_entity(str(update.get("entity_id", ""))) as Node2D
+		if player == null:
+			player = world.utils.find_player_by_peer(int(update.get("peer_id", -1))) as Node2D
+		if player == null or not player.is_in_group("player"):
+			continue
+		player.is_sprinting = bool(update.get("is_sprinting", false))
+		player.tile_pos = Vector2i(update.get("tile_pos", player.tile_pos))
+		resolved_players.append(player)
+	# Commit every authoritative tile first, then start interpolation. Grabbed
+	# pairs therefore enter the same movement frame from one complete state.
+	for player in resolved_players:
+		if player.has_method("_start_move_lerp"):
+			player._start_move_lerp()
 
 func handle_rpc_damage_wall(sender_id: int, pos: Vector2i) -> void:
 	if not world.multiplayer.is_server(): return

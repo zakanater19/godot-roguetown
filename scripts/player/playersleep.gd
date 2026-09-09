@@ -137,8 +137,7 @@ func update_stand_up(delta: float, buffered_dir: Vector2i) -> void:
 # ---------------------------------------------------------------------------
 
 func update(delta: float, is_local: bool) -> void:
-	var peer := player.multiplayer.multiplayer_peer
-	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if not MultiplayerSession.is_active(player.multiplayer):
 		return
 	var simulation_authority := player.multiplayer.is_server()
 	if player.sleep_state != player.SleepState.AWAKE and not player.dead and player.is_possessed:

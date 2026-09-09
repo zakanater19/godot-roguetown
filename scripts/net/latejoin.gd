@@ -29,7 +29,6 @@ var map_loaded: bool = false
 var sync_requested: bool = false
 var version_checked: bool = false
 var _version_check_sent: bool = false
-var is_manual_reconnect: bool = false
 var _snapshot_apply_complete: bool = false
 var _sync_complete_received: bool = false
 
@@ -49,9 +48,6 @@ func _ready() -> void:
 	if not BootstrapNet.ready_to_enter_game.is_connected(_on_bootstrap_ready_to_enter_game):
 		BootstrapNet.ready_to_enter_game.connect(_on_bootstrap_ready_to_enter_game)
 
-	if not multiplayer.is_server():
-		print("LateJoin: Client mode - Press F5 to manually attempt reconnection")
-
 func _on_connected_to_server() -> void:
 	client_connected = true
 	# A new connection is a new authoritative snapshot session. The local main
@@ -59,12 +55,9 @@ func _on_connected_to_server() -> void:
 	if _sync != null and _sync.has_method("reset_snapshot_state"):
 		_sync.call("reset_snapshot_state")
 
-	if is_manual_reconnect:
-		map_loaded = true
-
 	if not _version_check_sent:
 		_version_check_sent = true
-		BootstrapNet.begin_version_check(is_manual_reconnect)
+		BootstrapNet.begin_version_check()
 
 func _on_server_disconnected() -> void:
 	client_connected = false
@@ -72,7 +65,6 @@ func _on_server_disconnected() -> void:
 	sync_requested = false
 	version_checked = false
 	_version_check_sent = false
-	is_manual_reconnect = false
 	_snapshot_apply_complete = false
 	_sync_complete_received = false
 	# ENet leaves a disconnected peer object assigned after the server closes.
@@ -86,11 +78,8 @@ func _on_server_disconnected() -> void:
 		_sync.call("reset_snapshot_state")
 
 func _process(_delta: float) -> void:
-	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+	if not MultiplayerSession.is_active(multiplayer):
 		return
-
-	if not multiplayer.is_server() and Input.is_key_pressed(KEY_F5):
-		_attempt_manual_reconnection()
 
 	if not multiplayer.is_server() and client_connected and map_loaded and BootstrapNet.version_checked and not sync_requested:
 		sync_requested = true
@@ -172,20 +161,6 @@ func _find_player_by_peer(peer_id: int) -> Node:
 		if p.get_multiplayer_authority() == peer_id and p.get("is_possessed") != false:
 			return p
 	return null
-
-func _attempt_manual_reconnection() -> void:
-	if multiplayer.is_server():
-		return
-	client_connected = false
-	sync_requested = false
-	version_checked = false
-	_version_check_sent = false
-	is_manual_reconnect = true
-	BootstrapNet.reset_client_state(false)
-	var enet: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
-	var err: Error = enet.create_client("127.0.0.1", Host.PORT, 3)
-	if err == OK:
-		multiplayer.multiplayer_peer = enet
 
 func _on_bootstrap_ready_to_enter_game() -> void:
 	version_checked = true

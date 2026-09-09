@@ -107,8 +107,7 @@ func receive_damage(amount: int) -> void:
 
 func _process(delta: float) -> void:
 	# Spider AI is server-authoritative only
-	var peer := multiplayer.multiplayer_peer
-	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if not MultiplayerSession.is_active(multiplayer):
 		return
 	if not multiplayer.is_server():
 		var target_position := World.tile_to_pixel(tile_pos)

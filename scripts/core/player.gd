@@ -494,9 +494,8 @@ func _ready() -> void:
 func _is_local_authority() -> bool:
 	if not is_possessed: return false
 	if not is_inside_tree(): return false
-	if not multiplayer.has_multiplayer_peer(): return false
+	if not MultiplayerSession.is_active(multiplayer): return false
 	if multiplayer.is_server(): return false
-	if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED: return false
 	return multiplayer.get_unique_id() == get_multiplayer_authority()
 
 func _is_server_state_message() -> bool:

@@ -28,26 +28,24 @@ func reset_client_state(clear_pending_reconnect: bool = false) -> void:
 	if clear_pending_reconnect and not _restarting_for_patch:
 		DirAccess.remove_absolute("user://pending_reconnect.json")
 
-func begin_version_check(is_manual_reconnect: bool) -> void:
+func begin_version_check() -> void:
 	if multiplayer.is_server():
 		return
 	if _version_check_sent:
 		return
 	_version_check_sent = true
 	LoadingScreen.update_status("Checking version...")
-	_send_version_check_deferred(is_manual_reconnect)
+	_send_version_check_deferred()
 
-func _send_version_check_deferred(is_manual_reconnect: bool) -> void:
+func _send_version_check_deferred() -> void:
 	await get_tree().create_timer(0.1).timeout
-	if multiplayer.multiplayer_peer == null:
-		return
-	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if not MultiplayerSession.is_active(multiplayer):
 		return
 	request_version_check_bootstrap.rpc_id(1,
 		GameVersion.get_version(),
 		GameVersion.build_manifest(),
 		GameVersion.APP_VERSION,
-		is_manual_reconnect)
+		false)
 
 @rpc("any_peer", "call_remote", "reliable")
 func request_version_check_bootstrap(

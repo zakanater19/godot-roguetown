@@ -1,12 +1,14 @@
 @tool
+class_name StockpileVendor
 extends WorldObject
 
-const ACCEPTED_ITEM_TYPES: Array[String] = ["Log", "Coal", "IronOre"]
 const FEED_FRAME: Rect2 = Rect2(32, 0, 32, 32)
 const IDLE_FRAME: Rect2 = Rect2(0, 0, 32, 32)
 const SPRITE_OFFSET: Vector2 = Vector2(0, -40)
 const SPRITE_SCALE: Vector2 = Vector2(2, 2)
 const HITBOX_SIZE: Vector2 = Vector2(64, 64)
+
+@export var catalog: StockpileCatalog
 
 var blocks_fov: bool = false
 var is_stockpile_vendor: bool = true
@@ -27,6 +29,15 @@ func _notification(what: int) -> void:
 
 func get_description() -> String:
 	return "a stockpile vendor"
+
+func accepts_item(item_type: String) -> bool:
+	return catalog != null and catalog.accepts(item_type)
+
+func get_payout(item_type: String) -> int:
+	return catalog.get_payout(item_type) if catalog != null else 0
+
+func get_item_label(item_type: String) -> String:
+	return catalog.get_item_name(item_type) if catalog != null else item_type
 
 func get_z_offset() -> int:
 	return 5
@@ -67,7 +78,7 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 	if player.body != null and player.body.is_arm_broken(player.active_hand):
 		player._show_inspect_text("that arm is useless", "")
 		return
-	if not ACCEPTED_ITEM_TYPES.has(str(held_item.get("item_type"))):
+	if not accepts_item(str(held_item.get("item_type"))):
 		player._show_inspect_text("the stockpile vendor doesn't accept that", "")
 		return
 

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StockpileCatalog" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defines/stockpile_catalog.gd" id="1_catalog"]
+
+[resource]
+script = ExtResource("1_catalog")
+payouts = {
+"Coal": 5,
+"IronOre": 10,
+"Log": 2
+}
+item_names = {
+"Coal": "coal",
+"IronOre": "iron ore",
+"Log": "log"
+}

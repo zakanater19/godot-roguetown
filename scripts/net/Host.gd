@@ -100,7 +100,6 @@ func execute_round_restart() -> void:
 	LateJoin.sync_requested = false
 	LateJoin.version_checked = false
 	LateJoin._version_check_sent = false
-	LateJoin.is_manual_reconnect = false
 	BootstrapNet.reset_client_state(false)
 
 	Sidebar._messages.clear()
@@ -226,7 +225,7 @@ func _get_peer_ip(peer_id: int) -> String:
 
 func _query_peer_ip_from_enet(peer_id: int) -> String:
 	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
-	if enet == null or enet.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if enet == null or not MultiplayerSession.is_active(multiplayer):
 		return ""
 	if not multiplayer.get_peers().has(peer_id):
 		return ""
@@ -238,7 +237,7 @@ func _query_peer_ip_from_enet(peer_id: int) -> String:
 
 func _disconnect_peer(peer_id: int) -> void:
 	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
-	if enet == null or enet.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if enet == null or not MultiplayerSession.is_active(multiplayer):
 		return
 	if not multiplayer.get_peers().has(peer_id):
 		return
@@ -281,10 +280,7 @@ func _assign_session_id(peer_id: int, known_ip: String = "") -> void:
 
 
 func _is_server_peer_active() -> bool:
-	var peer := multiplayer.multiplayer_peer
-	return peer != null \
-		and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED \
-		and is_host_mode
+	return MultiplayerSession.is_active(multiplayer) and is_host_mode
 
 
 func clear_session_data() -> void:
@@ -293,7 +289,7 @@ func clear_session_data() -> void:
 	session_ids.clear()
 	_next_session_id = 2.0
 
-	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+	if MultiplayerSession.is_active(multiplayer) and multiplayer.is_server():
 		session_ids[1] = 1.0
 
 

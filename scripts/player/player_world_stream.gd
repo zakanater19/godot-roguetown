@@ -159,7 +159,7 @@ func contains_tile(tile: Vector2i) -> bool:
 func _process(delta: float) -> void:
 	if map_root == null or not is_instance_valid(map_root):
 		return
-	if not multiplayer.has_multiplayer_peer():
+	if not MultiplayerSession.is_active(multiplayer):
 		return
 	if multiplayer.is_server():
 		_actor_delta_timer += delta

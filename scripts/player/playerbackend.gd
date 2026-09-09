@@ -117,8 +117,7 @@ func spend_stamina(amount: float) -> void:
 	player.last_exertion_time = Time.get_ticks_msec() / 1000.0
 
 func check_stamina_regen(delta: float) -> void:
-	var peer := player.multiplayer.multiplayer_peer
-	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if not MultiplayerSession.is_active(player.multiplayer):
 		return
 	if not player.multiplayer.is_server():
 		return

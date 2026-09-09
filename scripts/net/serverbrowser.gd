@@ -242,7 +242,7 @@ func _get_registry_servers_url() -> String:
 
 func _get_current_player_count() -> int:
 	var current_players := 1
-	if multiplayer.multiplayer_peer != null:
+	if MultiplayerSession.is_active(multiplayer):
 		current_players += multiplayer.get_peers().size()
 	return current_players
 

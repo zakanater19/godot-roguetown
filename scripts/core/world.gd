@@ -148,8 +148,7 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 func _process(delta: float) -> void:
-	var peer := multiplayer.multiplayer_peer
-	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+	if not MultiplayerSession.is_active(multiplayer):
 		return
 	if not multiplayer.is_server():
 		return
@@ -284,7 +283,7 @@ func _world_to_tile(world_pos: Vector2) -> Vector2i:
 	return utils.world_to_tile(world_pos)
 
 func get_local_player() -> Node:
-	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED: return null
+	if not MultiplayerSession.is_active(multiplayer): return null
 	var local_id = multiplayer.get_unique_id()
 	return _find_player_by_peer(local_id)
 
@@ -409,6 +408,10 @@ func rpc_try_move(dir: Vector2i, is_sprinting: bool = false) -> void:
 @rpc("authority", "call_local", "reliable")
 func rpc_confirm_move(peer_id: int, new_pos: Vector2i, is_sprinting: bool = false) -> void:
 	tiles.handle_rpc_confirm_move(peer_id, new_pos, is_sprinting)
+
+@rpc("authority", "call_local", "reliable")
+func rpc_confirm_moves(updates: Array) -> void:
+	tiles.handle_rpc_confirm_moves(updates)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_request_shove(target_tile: Vector2i) -> void:

@@ -131,7 +131,7 @@ func _on_chat_submitted(text: String) -> void:
 	if text.strip_edges() == "":
 		return
 		
-	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
+	if MultiplayerSession.is_active(multiplayer) and multiplayer.get_peers().has(1):
 		rpc_send_lobby_chat.rpc_id(1, text)
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -160,7 +160,7 @@ func rpc_receive_lobby_chat(formatted_message: String) -> void:
 func _process(delta: float) -> void:
 	# Guard: if there is no multiplayer peer (e.g. after a disconnect/before hosting),
 	# skip all multiplayer calls to prevent "No multiplayer peer is assigned" spam.
-	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+	if not MultiplayerSession.is_active(multiplayer):
 		return
 
 	if _host_dashboard != null and _host_dashboard.visible:
@@ -192,7 +192,7 @@ func _process(delta: float) -> void:
 func _on_ready_pressed() -> void:
 	if not game_started:
 		var p_name = _name_input.text.strip_edges()
-		var local_peer_id: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else -1
+		var local_peer_id: int = multiplayer.get_unique_id() if MultiplayerSession.is_active(multiplayer) else -1
 		
 		var validation_error = _get_validation_error(p_name, local_peer_id)
 		if validation_error != "":
@@ -217,7 +217,7 @@ func _on_ready_pressed() -> void:
 
 func _on_confirm_latejoin_pressed() -> void:
 	var p_name = _lj_name_input.text.strip_edges()
-	var local_peer_id: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else -1
+	var local_peer_id: int = multiplayer.get_unique_id() if MultiplayerSession.is_active(multiplayer) else -1
 	
 	var validation_error = _get_validation_error(p_name, local_peer_id)
 	if validation_error != "":
@@ -247,13 +247,13 @@ func _on_subclass_chosen(subclass: String) -> void:
 		_send_latejoin_request(p_name, subclass)
 
 func _send_ready_request(is_ready: bool, p_name: String, p_class: String) -> void:
-	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
+	if MultiplayerSession.is_active(multiplayer) and multiplayer.get_peers().has(1):
 		request_set_ready.rpc_id(1, is_ready, p_name, p_class)
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")
 
 func _send_latejoin_request(p_name: String, p_class: String) -> void:
-	if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer.get_peers().has(1):
+	if MultiplayerSession.is_active(multiplayer) and multiplayer.get_peers().has(1):
 		request_latejoin.rpc_id(1, p_name, p_class)
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")

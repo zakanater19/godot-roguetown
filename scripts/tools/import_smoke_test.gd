@@ -26,13 +26,6 @@ const STREAMED_NPC_SCENES: Array[String] = [
 	"res://npcs/spider.tscn",
 ]
 
-# Custom pickable scenes that do not use ObjectItem still need the WorldObject
-# lifecycle or the host's per-client streaming window will never include them.
-const STREAMED_WORLD_OBJECT_SCENES: Array[String] = [
-	"res://clothing/satchel.tscn",
-	"res://clothing/pouch.tscn",
-]
-
 const PLAYER_REPLICATED_PROPERTIES: Array[NodePath] = [
 	NodePath(".:tile_pos"), NodePath(".:health"), NodePath(".:facing"),
 	NodePath(".:dead"), NodePath(".:stamina"), NodePath(".:character_name"),
@@ -382,6 +375,10 @@ func run() -> Dictionary:
 	_validate_classes(item_types)
 	_end_section()
 
+	_begin_section("gameplay: stockpile catalog")
+	_validate_stockpile_catalog()
+	_end_section()
+
 	_begin_section("regions")
 	_validate_regions()
 	_end_section()
@@ -403,7 +400,7 @@ func run() -> Dictionary:
 	_end_section()
 
 	_begin_section("net: spawnable scenes")
-	_validate_spawnable_scenes()
+	_validate_spawnable_scenes(item_types)
 	_end_section()
 
 	_begin_section("net: replication configs")
@@ -577,6 +574,11 @@ func _validate_all_instantiations() -> void:
 # Spins up isolated server/client MultiplayerAPI branches, sends authoritative
 # state over real RPCs, and verifies desync detection and correction.
 func _validate_live_networking() -> void:
+	var detached_api := MultiplayerAPI.create_default_interface()
+	detached_api.multiplayer_peer = null
+	if MultiplayerSession.is_active(detached_api):
+		_fail("MultiplayerSession: a detached MultiplayerAPI was reported as active.")
+
 	var port := -1
 	var err := FAILED
 	var server_peer: ENetMultiplayerPeer = null
@@ -645,6 +647,8 @@ func _validate_live_networking() -> void:
 		_fail("Live Network: Headless client timed out attempting to connect to the local server on port %d." % port)
 		await _cleanup_live_networking(server_root, client_root, server_peer, client_peer)
 		return
+	if not MultiplayerSession.is_active(server_api) or not MultiplayerSession.is_active(client_api):
+		_fail("MultiplayerSession: connected ENet peers were not reported as active.")
 
 	# Establish an initial authoritative baseline, then make the client submit a
 	# short ordered input stream. Every server update must arrive and converge.
@@ -777,6 +781,7 @@ func _validate_items(item_types: Dictionary) -> void:
 			item_types[item.item_type] = {
 				"path": path,
 				"scene_path": item.scene_path,
+				"pickable": item.pickable,
 			}
 
 		if item.scene_path.is_empty():
@@ -911,6 +916,39 @@ func _validate_classes(item_types: Dictionary) -> void:
 	if bank.get_balance_for_player(bank_player) != 0:
 		_fail("Fresh player bank accounts must start at zero.")
 	bank_player.free()
+
+func _validate_stockpile_catalog() -> void:
+	var catalog := ResourceLoader.load(
+		"res://objects/default_stockpile_catalog.tres",
+		"",
+		ResourceLoader.CACHE_MODE_REPLACE
+	) as StockpileCatalog
+	if catalog == null:
+		_fail("Stockpile catalog: default catalogue failed to load.")
+		return
+	if catalog.get_payout("Log") != 2 or catalog.get_payout("Coal") != 5 or catalog.get_payout("IronOre") != 10:
+		_fail("Stockpile catalog: default payouts changed or failed to load.")
+	if catalog.accepts("UnknownItem") or catalog.get_payout("UnknownItem") != 0:
+		_fail("Stockpile catalog: unconfigured items must be rejected.")
+
+	var packed := ResourceLoader.load(
+		"res://objects/stockpile_vendor.tscn",
+		"",
+		ResourceLoader.CACHE_MODE_REPLACE
+	) as PackedScene
+	var vendor := packed.instantiate() as StockpileVendor if packed != null else null
+	if vendor == null:
+		_fail("Stockpile catalog: vendor scene failed to instantiate as StockpileVendor.")
+		return
+	if not vendor.accepts_item("Log") or vendor.get_item_label("IronOre") != "iron ore":
+		_fail("Stockpile catalog: vendor did not use its configured default catalogue.")
+
+	var alternate_catalog := StockpileCatalog.new()
+	alternate_catalog.payouts = {"CopperOre": 6}
+	vendor.catalog = alternate_catalog
+	if vendor.get_payout("CopperOre") != 6 or vendor.accepts_item("Log"):
+		_fail("Stockpile catalog: replacing scene configuration did not change vendor offers.")
+	vendor.free()
 
 func _validate_starting_coin_config(class_key: String, item_type: String, metal_type: int, min_amount: int, max_amount: int, stacks: int) -> void:
 	var entries: Array = Classes.DATA[class_key].get("starting_pouch", [])
@@ -1096,18 +1134,28 @@ func _validate_keyring_icons() -> void:
 		_validate_texture(tex_path, "keyring icon")
 
 # Every scene registered with MultiplayerSpawner must exist and instantiate cleanly.
-func _validate_spawnable_scenes() -> void:
+func _validate_spawnable_scenes(item_types: Dictionary) -> void:
 	for scene_path in NET_SPAWNABLE_SCENES:
 		_validate_packed_scene(scene_path, "spawnable scene")
 
-	for scene_path in STREAMED_WORLD_OBJECT_SCENES:
+	# Every registered pickable uses the same lifecycle abstraction. Deriving the
+	# set from ItemData covers new content without another exceptional list.
+	var validated_scene_paths: Dictionary = {}
+	for item_type: String in item_types:
+		var item_entry: Dictionary = item_types[item_type]
+		if not bool(item_entry.get("pickable", false)):
+			continue
+		var scene_path := str(item_entry.get("scene_path", ""))
+		if scene_path == "" or validated_scene_paths.has(scene_path):
+			continue
+		validated_scene_paths[scene_path] = true
 		var packed := ResourceLoader.load(scene_path, "", ResourceLoader.CACHE_MODE_REPLACE) as PackedScene
 		if packed == null:
-			_fail("%s: streamed world-object scene could not be loaded." % scene_path)
+			_fail("%s: pickable item scene could not be loaded." % scene_path)
 			continue
 		var instance := packed.instantiate()
-		if not instance is WorldObject:
-			_fail("%s: streamed scene root must inherit WorldObject." % scene_path)
+		if not instance is PickableWorldObject:
+			_fail("%s: pickable item scene root must inherit PickableWorldObject." % scene_path)
 		instance.free()
 
 # Every scene in NET_SYNCED_SCENES must have at least one MultiplayerSynchronizer,
@@ -1581,9 +1629,14 @@ func _validate_authoritative_snapshot_codec() -> void:
 
 func _validate_reconnection_behavior() -> void:
 	var previous_host_peers: Dictionary = Host.peers.duplicate()
+	var previous_main_scene := World.main_scene
 	var temp_root := Node.new()
 	temp_root.name = "__SmokeReconnectRoot"
 	World.add_child(temp_root)
+	var reconnect_main := Node2D.new()
+	reconnect_main.name = "__SmokeReconnectMain"
+	temp_root.add_child(reconnect_main)
+	World.register_main(reconnect_main)
 
 	var latejoin := _SmokeLateJoinStub.new()
 	temp_root.add_child(latejoin)
@@ -1630,9 +1683,27 @@ func _validate_reconnection_behavior() -> void:
 	if Host.peers.get(77, null) != ghost:
 		_fail("LateJoinReconnect._update_peer_registry: reassigned peer mapping did not point at the live avatar.")
 
+	var hand_scene_path := ItemRegistry.get_scene_path("Keyring")
+	var saved_hand_id := "smoke:reconnected_hand"
+	var reconnected_hand: Node = reconnect._recreate_hand_item({
+		"entity_id": saved_hand_id,
+		"name": "ReconnectedKeyring",
+		"scene_file_path": hand_scene_path,
+		"position": Defs.tile_to_pixel(Vector2i(8, 8)),
+		"contents": [],
+	})
+	if reconnected_hand == null:
+		_fail("LateJoinReconnect._recreate_hand_item: failed to recreate a saved held item.")
+	elif World.get_entity_id(reconnected_hand) != saved_hand_id or World.get_entity(saved_hand_id) != reconnected_hand:
+		_fail("LateJoinReconnect._recreate_hand_item: the saved server item ID was replaced during scene-tree entry, so post-reconnect drop requests would be rejected.")
+
 	Host.peers.clear()
 	for peer_id in previous_host_peers.keys():
 		Host.peers[peer_id] = previous_host_peers[peer_id]
+	if previous_main_scene != null:
+		World.register_main(previous_main_scene)
+	else:
+		World.unregister_main()
 
 	if temp_root.get_parent() == World:
 		World.remove_child(temp_root)

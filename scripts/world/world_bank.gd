@@ -1,16 +1,6 @@
 extends RefCounted
 
 const DEFAULT_STARTING_BALANCE: int = 0
-const STOCKPILE_PAYOUTS: Dictionary = {
-	"Log": 2,
-	"Coal": 5,
-	"IronOre": 10,
-}
-const STOCKPILE_ITEM_NAMES: Dictionary = {
-	"Log": "log",
-	"Coal": "coal",
-	"IronOre": "iron ore",
-}
 
 var world: Node
 var accounts: Dictionary = {}
@@ -203,7 +193,7 @@ func handle_rpc_request_stockpile_vendor_sale(sender_id: int, vendor_id: String,
 	if held_item == null or not is_instance_valid(held_item):
 		return
 	var item_type := str(held_item.get("item_type"))
-	var payout := int(STOCKPILE_PAYOUTS.get(item_type, 0))
+	var payout := vendor.get_payout(item_type)
 	if payout <= 0:
 		_send_error(sender_id, "The stockpile vendor does not accept that item.")
 		return
@@ -215,7 +205,7 @@ func handle_rpc_request_stockpile_vendor_sale(sender_id: int, vendor_id: String,
 	world.rpc_confirm_stockpile_vendor_sale.rpc(sender_id, vendor_id, hand_idx, sold_item_id)
 	world.rpc_send_direct_message.rpc_id(
 		sender_id,
-		"[color=#aaffaa]The stockpile vendor accepts your %s. %d coppers were deposited into your ATM account. New balance: %d.[/color]" % [str(STOCKPILE_ITEM_NAMES.get(item_type, item_type)), payout, new_balance]
+		"[color=#aaffaa]The stockpile vendor accepts your %s. %d coppers were deposited into your ATM account. New balance: %d.[/color]" % [vendor.get_item_label(item_type), payout, new_balance]
 	)
 
 func handle_rpc_confirm_stockpile_vendor_sale(peer_id: int, vendor_id: String, hand_idx: int, item_id: String) -> void:
@@ -286,11 +276,9 @@ func _get_atm_node(atm_id: String) -> Node2D:
 		return null
 	return atm
 
-func _get_stockpile_vendor_node(vendor_id: String) -> Node2D:
-	var vendor := world.get_entity(vendor_id) as Node2D
+func _get_stockpile_vendor_node(vendor_id: String) -> StockpileVendor:
+	var vendor := world.get_entity(vendor_id) as StockpileVendor
 	if vendor == null or not is_instance_valid(vendor):
-		return null
-	if vendor.get("is_stockpile_vendor") != true:
 		return null
 	return vendor
 
@@ -303,7 +291,7 @@ func _can_player_use_atm(player: Node2D, atm: Node2D) -> bool:
 		and world.utils.is_within_interaction_range(player, atm.global_position)
 	)
 
-func _can_player_use_stockpile_vendor(player: Node2D, vendor: Node2D) -> bool:
+func _can_player_use_stockpile_vendor(player: Node2D, vendor: StockpileVendor) -> bool:
 	return (
 		player != null
 		and vendor != null
