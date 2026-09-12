@@ -18,6 +18,7 @@ var _class_option: OptionButton
 var _latejoin_panel: Panel
 var _lj_name_input: LineEdit
 var _lj_class_option: OptionButton
+var _character_creator: CharacterCreator
 
 var _subclass_panel: Panel
 var _pending_action: String = ""
@@ -95,8 +96,10 @@ func _build_ui() -> void:
 	_error_dialog = AcceptDialog.new()
 	_ui_layer.add_child(_error_dialog)
 
-	var bg = ColorRect.new()
-	bg.color = Color(0.15, 0.15, 0.15, 1.0)
+	var bg := TextureRect.new()
+	bg.texture = load("res://assets/231.jpg")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ui_layer.add_child(bg)
 
@@ -215,6 +218,14 @@ func _on_ready_pressed() -> void:
 		_latejoin_panel.visible = true
 		_main_content.visible = false
 
+func _open_character_creator() -> void:
+	if _character_creator != null:
+		_character_creator.open(CharacterProfile.get_appearance())
+
+func _on_character_saved(appearance: Dictionary) -> void:
+	if MultiplayerSession.is_active(multiplayer) and multiplayer.get_peers().has(1):
+		request_update_character.rpc_id(1, appearance)
+
 func _on_confirm_latejoin_pressed() -> void:
 	var p_name = _lj_name_input.text.strip_edges()
 	var local_peer_id: int = multiplayer.get_unique_id() if MultiplayerSession.is_active(multiplayer) else -1
@@ -248,13 +259,13 @@ func _on_subclass_chosen(subclass: String) -> void:
 
 func _send_ready_request(is_ready: bool, p_name: String, p_class: String) -> void:
 	if MultiplayerSession.is_active(multiplayer) and multiplayer.get_peers().has(1):
-		request_set_ready.rpc_id(1, is_ready, p_name, p_class)
+		request_set_ready.rpc_id(1, is_ready, p_name, p_class, CharacterProfile.get_appearance())
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")
 
 func _send_latejoin_request(p_name: String, p_class: String) -> void:
 	if MultiplayerSession.is_active(multiplayer) and multiplayer.get_peers().has(1):
-		request_latejoin.rpc_id(1, p_name, p_class)
+		request_latejoin.rpc_id(1, p_name, p_class, CharacterProfile.get_appearance())
 	else:
 		_show_error("Connecting to server... Please try again in a moment.")
 
@@ -309,7 +320,7 @@ func _on_restart_round_pressed() -> void:
 		World.request_round_end()
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
+func request_set_ready(is_ready: bool, p_name: String, p_class: String, p_appearance: Dictionary) -> void:
 	if not multiplayer.is_server(): return
 	if game_started: return
 	var peer_id := multiplayer.get_remote_sender_id()
@@ -319,13 +330,16 @@ func request_set_ready(is_ready: bool, p_name: String, p_class: String) -> void:
 		rpc_show_name_error.rpc_id(multiplayer.get_remote_sender_id(), "Name invalid or taken.")
 		return
 	
-	ready_players[peer_id] = {"ready": is_ready, "name": p_name, "class": p_class}
-	sync_ready_state.rpc(peer_id, is_ready, p_name, p_class)
+	var appearance := CharacterProfile.sanitize_appearance(p_appearance)
+	ready_players[peer_id] = {"ready": is_ready, "name": p_name, "class": p_class, "appearance": appearance}
+	sync_ready_state.rpc(peer_id, is_ready, p_name, p_class, appearance)
 
 @rpc("authority", "call_local", "reliable")
-func sync_ready_state(peer_id: int, is_ready: bool, p_name: String, p_class: String) -> void:
-	ready_players[peer_id] = {"ready": is_ready, "name": p_name, "class": p_class}
+func sync_ready_state(peer_id: int, is_ready: bool, p_name: String, p_class: String, p_appearance: Dictionary) -> void:
+	var appearance := CharacterProfile.sanitize_appearance(p_appearance)
+	ready_players[peer_id] = {"ready": is_ready, "name": p_name, "class": p_class, "appearance": appearance}
 	if peer_id == multiplayer.get_unique_id():
+		CharacterProfile.set_appearance(appearance)
 		if _ready_btn != null:
 			_ready_btn.text = "Ready" if is_ready else "Unready"
 			if is_ready:
@@ -365,14 +379,14 @@ func _start_game() -> void:
 			if data.get("class", "peasant") == "king" and peer_id != chosen_king:
 				# Failed to get the role
 				data["ready"] = false
-				sync_ready_state.rpc(peer_id, false, data.get("name", "noob"), data.get("class", "peasant"))
+				sync_ready_state.rpc(peer_id, false, data.get("name", "noob"), data.get("class", "peasant"), data.get("appearance", {}))
 				rpc_show_name_error.rpc_id(peer_id, "You failed to get the King role. Please latejoin as another class.")
 			else:
-				Host.spawn_player(peer_id, data.get("name", "noob"), data.get("class", "peasant"), false)
+				Host.spawn_player(peer_id, data.get("name", "noob"), data.get("class", "peasant"), false, data.get("appearance", {}))
 				rpc_hide_lobby.rpc_id(peer_id)
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_latejoin(p_name: String, p_class: String) -> void:
+func request_latejoin(p_name: String, p_class: String, p_appearance: Dictionary) -> void:
 	if not multiplayer.is_server(): return
 	if not game_started: return
 	var peer_id := multiplayer.get_remote_sender_id()
@@ -402,7 +416,7 @@ func request_latejoin(p_name: String, p_class: String) -> void:
 	
 	if not Host.peers.has(peer_id):
 		# Latejoin gets true flag
-		Host.spawn_player(peer_id, p_name, p_class, true)
+		Host.spawn_player(peer_id, p_name, p_class, true, CharacterProfile.sanitize_appearance(p_appearance))
 	
 	rpc_hide_lobby.rpc_id(peer_id)
 
@@ -466,9 +480,39 @@ func sync_full_lobby_state(time_left: float, is_started: bool, ready_dict: Dicti
 			_class_option.visible = true
 			_class_option.disabled = my_ready
 
+@rpc("any_peer", "call_remote", "reliable")
+func request_update_character(p_appearance: Dictionary) -> void:
+	if not multiplayer.is_server():
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id <= 1:
+		return
+	var appearance := CharacterProfile.sanitize_appearance(p_appearance)
+	var data: Dictionary = ready_players.get(peer_id, {
+		"ready": false,
+		"name": "noob",
+		"class": "peasant",
+	})
+	data["appearance"] = appearance
+	ready_players[peer_id] = data
+	sync_lobby_character.rpc(peer_id, appearance)
+
+@rpc("authority", "call_local", "reliable")
+func sync_lobby_character(peer_id: int, p_appearance: Dictionary) -> void:
+	var appearance := CharacterProfile.sanitize_appearance(p_appearance)
+	var data: Dictionary = ready_players.get(peer_id, {
+		"ready": false,
+		"name": "noob",
+		"class": "peasant",
+	})
+	data["appearance"] = appearance
+	ready_players[peer_id] = data
+	if peer_id == multiplayer.get_unique_id():
+		CharacterProfile.set_appearance(appearance)
+
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
-		ready_players[id] = {"ready": false, "name": "noob", "class": "peasant"}
+		ready_players[id] = {"ready": false, "name": "noob", "class": "peasant", "appearance": CharacterProfile.get_default_appearance()}
 		sync_full_lobby_state.rpc_id(id, countdown, game_started, ready_players, round_time, Lighting.time_offset, Lighting.time_multiplier)
 		_refresh_host_dashboard(true)
 

@@ -8,6 +8,19 @@ func _init(p_player: Node2D) -> void:
 	player = p_player
 
 func setup_sprites() -> void:
+	for character_layer in [
+		{"node_name": "HairSprite", "layer": 5},
+		{"node_name": "FacialHairSprite", "layer": 5},
+	]:
+		var character_sprite := Sprite2D.new()
+		character_sprite.name = String(character_layer["node_name"])
+		character_sprite.scale = Vector2(2.0, 2.0)
+		character_sprite.region_enabled = true
+		character_sprite.region_rect = Rect2(0, 0, 32, 32)
+		character_sprite.visible = false
+		character_sprite.z_index = int(character_layer["layer"])
+		character_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		player.add_child(character_sprite)
 	for spec in PlayerVisualDefs.get_clothing_sprite_specs():
 		var s := Sprite2D.new()
 		s.name           = String(spec.get("node_name", ""))
@@ -16,11 +29,13 @@ func setup_sprites() -> void:
 		s.region_rect    = Rect2(0, 0, 32, 32)
 		s.visible        = false
 		s.z_index        = int(spec.get("default_layer", 1))
+		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		player.add_child(s)
 
 func update_clothing_sprites() -> void:
 	if not player.backend: return
 	var facing_name: String = player.FACING_NAMES[player.facing]
+	var female_character: bool = _is_female_character()
 	var target_rot: float = 0.0
 	if player.dead: target_rot = 90.0
 	elif player.sleep_state != player.SleepState.AWAKE:
@@ -65,9 +80,17 @@ func update_clothing_sprites() -> void:
 			continue
 
 		var _idata2 = ItemRegistry.get_by_type(item_name) if (item_name != null and item_name != "") else null
-		if _idata2 != null and _idata2.mob_texture_path != "":
-			sprite.texture = load(_idata2.mob_texture_path)
-			var cd = player.backend.get_clothing_transform(item_name, facing_name)
+		var uses_female_sprite: bool = (
+			female_character
+			and _idata2 != null
+			and _idata2.female_mob_texture_path != ""
+		)
+		var mob_texture_path: String = ""
+		if _idata2 != null:
+			mob_texture_path = _idata2.female_mob_texture_path if uses_female_sprite else _idata2.mob_texture_path
+		if _idata2 != null and mob_texture_path != "":
+			sprite.texture = load(mob_texture_path)
+			var cd = player.backend.get_clothing_transform(item_name, facing_name, uses_female_sprite)
 			
 			var pos: Vector2 = cd["offset"]
 			if target_rot == 90.0:
@@ -115,6 +138,9 @@ func update_clothing_sprites() -> void:
 func update_sprite() -> void:
 	var sprite: Sprite2D = player.get_node_or_null("Sprite2D")
 	if sprite == null: return
+	sprite.texture = load(CharacterProfile.get_body_texture_path(
+		str(player.character_appearance.get("sex", CharacterProfile.SEX_MALE))
+	))
 	sprite.region_enabled = true
 	sprite.region_rect    = Rect2(player.facing * 32, 0, 32, 32)
 	var target_rot = 0.0
@@ -124,7 +150,50 @@ func update_sprite() -> void:
 		elif player.sleep_state == player.SleepState.ASLEEP: target_rot = 90.0
 	elif player.is_lying_down: target_rot = 90.0
 	sprite.rotation_degrees = target_rot
+	_update_character_accessories(target_rot)
 	update_clothing_sprites()
+
+func _update_character_accessories(target_rotation: float) -> void:
+	var appearance: Dictionary = CharacterProfile.sanitize_appearance(player.character_appearance)
+	var hair: Sprite2D = player.get_node_or_null("HairSprite")
+	if hair != null:
+		var hair_row := CharacterProfile.get_hair_row(str(appearance["hair_style"]))
+		hair.visible = hair_row >= 0
+		if hair.visible:
+			var hair_offset := Vector2(
+				0.0,
+				CharacterProfile.get_hair_vertical_offset(str(appearance["sex"])) * absf(hair.scale.y)
+			)
+			if target_rotation == 90.0:
+				hair_offset = Vector2(-hair_offset.y, hair_offset.x)
+			hair.position = hair_offset
+			hair.texture = load(CharacterProfile.HAIR_TEXTURE)
+			hair.region_rect = Rect2(player.facing * 32, hair_row * 32, 32, 32)
+			hair.modulate = CharacterProfile.color_from_storage(appearance["hair_color"], Color.WHITE)
+			hair.rotation_degrees = target_rotation
+
+	var facial_hair: Sprite2D = player.get_node_or_null("FacialHairSprite")
+	if facial_hair != null:
+		var facial_row := CharacterProfile.get_facial_hair_row(str(appearance["facial_hair"]))
+		facial_hair.visible = (
+			str(appearance["sex"]) == CharacterProfile.SEX_MALE
+			and facial_row >= 0
+		)
+		if facial_hair.visible:
+			var facial_offset := Vector2(
+				0.0,
+				CharacterProfile.get_facial_hair_vertical_offset() * absf(facial_hair.scale.y)
+			)
+			if target_rotation == 90.0:
+				facial_offset = Vector2(-facial_offset.y, facial_offset.x)
+			facial_hair.position = facial_offset
+			facial_hair.texture = load(CharacterProfile.FACIAL_HAIR_TEXTURE)
+			facial_hair.region_rect = Rect2(player.facing * 32, facial_row * 32, 32, 32)
+			facial_hair.modulate = CharacterProfile.color_from_storage(appearance["facial_hair_color"], Color.WHITE)
+			facial_hair.rotation_degrees = target_rotation
+
+func _is_female_character() -> bool:
+	return str(player.character_appearance.get("sex", CharacterProfile.SEX_MALE)) == CharacterProfile.SEX_FEMALE
 
 func update_hand_positions() -> void:
 	if player.backend == null: return

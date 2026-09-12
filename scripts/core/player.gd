@@ -37,6 +37,11 @@ var _sleeping_on_bed: bool = false
 
 @export var character_name: String = "noob"
 @export var character_class: String = "peasant"
+@export var character_appearance: Dictionary = CharacterProfile.DEFAULT_APPEARANCE.duplicate(true):
+	set(value):
+		character_appearance = CharacterProfile.sanitize_appearance(value)
+		if visuals != null:
+			_update_sprite()
 var view_z_level: int = 3
 
 var pixel_pos:    Vector2
@@ -143,6 +148,17 @@ func set_character_name(p_name: String, p_class: String) -> void:
 	character_class = p_class
 	if class_changed: _apply_class_defaults()
 	_sync_character_name.rpc_id(get_multiplayer_authority(), p_name, p_class)
+
+@rpc("any_peer", "call_local", "reliable")
+func _sync_character_appearance(p_appearance: Dictionary) -> void:
+	if not _is_server_state_message():
+		return
+	character_appearance = CharacterProfile.sanitize_appearance(p_appearance)
+
+func set_character_appearance(p_appearance: Dictionary) -> void:
+	character_appearance = CharacterProfile.sanitize_appearance(p_appearance)
+	if MultiplayerSession.is_active(multiplayer) and multiplayer.is_server():
+		_sync_character_appearance.rpc(character_appearance)
 
 # ── Description / inspection delegation ──────────────────────────────────────
 

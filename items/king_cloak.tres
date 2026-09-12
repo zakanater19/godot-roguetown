@@ -16,3 +16,4 @@ too_large_for_satchel = false
 pickable = true
 hud_texture_path = "res://clothing/king_cloak.png"
 mob_texture_path = "res://clothing/king_cloak_onmob.png"
+female_mob_texture_path = "res://assets/characters/king_cloak_female.png"

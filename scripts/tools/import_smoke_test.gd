@@ -34,11 +34,12 @@ const PLAYER_REPLICATED_PROPERTIES: Array[NodePath] = [
 	NodePath(".:is_sneaking"), NodePath(".:sneak_alpha"), NodePath(".:active_hand"),
 	NodePath(".:sleep_state"), NodePath(".:exhausted"), NodePath(".:stats"),
 	NodePath(".:skills"), NodePath(".:intent"), NodePath(".:is_possessed"),
+	NodePath(".:character_appearance"),
 ]
 
 const PLAYER_LARGE_REPLICATED_PROPERTIES: Array[NodePath] = [
 	NodePath(".:equipped"), NodePath(".:equipped_data"),
-	NodePath(".:stats"), NodePath(".:skills"),
+	NodePath(".:stats"), NodePath(".:skills"), NodePath(".:character_appearance"),
 ]
 
 var _errors: Array[String] =[]
@@ -84,6 +85,13 @@ class _SmokePlayerStub:
 	var is_possessed: bool = true
 	var character_name: String = "Smoke Player"
 	var character_class: String = "peasant"
+	var character_appearance: Dictionary = {
+		"sex": "male",
+		"hair_style": "hair_bedhead",
+		"hair_color": "#4a3026",
+		"facial_hair": "facial_stubble",
+		"facial_hair_color": "#3a251e",
+	}
 	var z_level: int = 3
 	var tile_pos: Vector2i = Vector2i.ZERO
 	var pixel_pos: Vector2 = Vector2.ZERO
@@ -389,6 +397,9 @@ func run() -> Dictionary:
 
 	_begin_section("clothing offsets")
 	_validate_clothing_offsets()
+	_end_section()
+	_begin_section("character customization")
+	_validate_character_customization()
 	_end_section()
 
 	_begin_section("coin icons")
@@ -793,6 +804,8 @@ func _validate_items(item_types: Dictionary) -> void:
 			_validate_texture(item.hud_texture_path, "%s hud_texture_path" % path)
 		if not item.mob_texture_path.is_empty():
 			_validate_texture(item.mob_texture_path, "%s mob_texture_path" % path)
+		if not item.female_mob_texture_path.is_empty():
+			_validate_texture(item.female_mob_texture_path, "%s female_mob_texture_path" % path)
 
 		if not item.slot.is_empty() and item.slot not in VALID_SLOTS:
 			_fail("%s: slot '%s' is not a valid Defs slot." %[path, item.slot])
@@ -1120,6 +1133,79 @@ func _validate_clothing_offsets() -> void:
 			if not (scale_val is float or scale_val is int) or float(scale_val) <= 0.0:
 				_fail("%s: '%s.%s.scale' must be a positive number." % [OFFSETS_PATH, item_type, dir])
 
+# The character creator depends on generated body/accessory atlases and a
+# female overlay for every currently wearable clothing sprite that needs one.
+func _validate_character_customization() -> void:
+	const REQUIRED_TEXTURES: Array[String] = [
+		"res://assets/characters/body_female.png",
+		"res://assets/characters/hair_styles.png",
+		"res://assets/characters/facial_hair_styles.png",
+	]
+	const FEMALE_CLOTHING: Dictionary = {
+		"res://items/undershirt.tres": "res://assets/characters/undershirt_female.png",
+		"res://items/blackshirt.tres": "res://assets/characters/blackshirt_female.png",
+		"res://items/apothshirt.tres": "res://assets/characters/apothshirt_female.png",
+		"res://items/leathertrousers.tres": "res://assets/characters/leathertrousers_female.png",
+		"res://items/leatherboots.tres": "res://assets/characters/leatherboots_female.png",
+		"res://items/chaingloves.tres": "res://assets/characters/chaingloves_female.png",
+		"res://items/ironchestplate.tres": "res://assets/characters/ironchestplate_female.png",
+		"res://items/ironhelmet.tres": "res://assets/characters/ironhelmet_female.png",
+		"res://items/merchantrobe.tres": "res://assets/characters/merchantrobe_female.png",
+		"res://items/king_cloak.tres": "res://assets/characters/king_cloak_female.png",
+		"res://items/plate.tres": "res://assets/characters/plate_female.png",
+	}
+
+	for texture_path in REQUIRED_TEXTURES:
+		_validate_texture(texture_path, "character customization")
+
+	if Lobby._main_content == null or Lobby._character_creator == null:
+		_fail("Lobby: character customization controls were not constructed.")
+	else:
+		var expected_width := PlayerDefs.CAMERA_VIEW_SIZE.x
+		if not is_equal_approx(Lobby._main_content.offset_right, expected_width):
+			_fail("Lobby: main controls are not constrained to the left-side play area.")
+		if not is_equal_approx(Lobby._character_creator.offset_right, expected_width):
+			_fail("Lobby: character creator overlaps the right-hand status sidebar.")
+
+	var female := CharacterProfile.sanitize_appearance({
+		"sex": "female",
+		"hair_style": "hair_bedhead",
+		"facial_hair": "facial_viking",
+		"hair_color": "#102030",
+	})
+	if female.get("sex") != "female" or female.get("hair_style") != "fhair_bob":
+		_fail("CharacterProfile: invalid female hair was not replaced with the female default.")
+	if female.get("facial_hair") != "":
+		_fail("CharacterProfile: facial hair must be removed from female appearances.")
+	if female.get("hair_color") != "#102030":
+		_fail("CharacterProfile: valid hair colors did not round-trip.")
+
+	var invalid := CharacterProfile.sanitize_appearance({
+		"sex": "invalid",
+		"hair_style": "../../not-a-style",
+		"facial_hair": "not-a-beard",
+	})
+	if invalid.get("sex") != "male" or invalid.get("hair_style") != "hair_bedhead":
+		_fail("CharacterProfile: invalid network appearance data was not sanitized.")
+	if invalid.get("facial_hair") != "facial_stubble":
+		_fail("CharacterProfile: invalid facial hair data was not sanitized.")
+	if CharacterProfile.get_hair_vertical_offset("male") != -1:
+		_fail("CharacterProfile: male hairstyles must render one source pixel upward.")
+	if CharacterProfile.get_hair_vertical_offset("female") != 1:
+		_fail("CharacterProfile: female hairstyles must render one source pixel downward.")
+	if CharacterProfile.get_facial_hair_vertical_offset() != -2:
+		_fail("CharacterProfile: male facial hair must render two source pixels upward.")
+
+	for item_path: String in FEMALE_CLOTHING:
+		var item := ResourceLoader.load(item_path, "", ResourceLoader.CACHE_MODE_REPLACE) as ItemData
+		if item == null:
+			_fail("%s: failed to load while validating female clothing." % item_path)
+			continue
+		var expected_path := str(FEMALE_CLOTHING[item_path])
+		if item.female_mob_texture_path != expected_path:
+			_fail("%s: female_mob_texture_path must be '%s'." % [item_path, expected_path])
+		_validate_texture(expected_path, "%s female clothing" % item_path)
+
 # GAMEPLAY: all coin stack icon images referenced by Defs helpers must exist.
 func _validate_coin_icons() -> void:
 	for threshold: int in Defs.COIN_STACK_ICON_THRESHOLDS:
@@ -1362,6 +1448,11 @@ func _validate_network_sync_behavior() -> void:
 		"is_sneaking": true,
 		"sneak_alpha": 0.35,
 		"health": 77,
+		"character_appearance": {
+			"sex": "female",
+			"hair_style": "fhair_pixie",
+			"hair_color": "#123456",
+		},
 	}, true)
 	var synced_hand_ids: Array = synced_remote.get_meta("smoke_synced_hand_ids", [])
 	if synced_hand_ids.is_empty() or str(synced_hand_ids[0]) == "":
@@ -1376,6 +1467,8 @@ func _validate_network_sync_behavior() -> void:
 		_fail("LateJoinSync._apply_synced_player_state: clothing visuals were not refreshed after syncing equipment.")
 	if synced_remote.sprite_updates <= 0 or synced_remote.water_updates <= 0:
 		_fail("LateJoinSync._apply_synced_player_state: posture or sneak visuals were not refreshed.")
+	if synced_remote.character_appearance.get("sex") != "female" or synced_remote.character_appearance.get("hair_style") != "fhair_pixie":
+		_fail("LateJoinSync._apply_synced_player_state: character appearance was not restored.")
 	var hud_updates: Array[Dictionary] = (synced_remote._hud as _SmokeHudStub).stats_updates
 	if hud_updates.is_empty() or int(hud_updates[0].get("health", -1)) != 77:
 		_fail("LateJoinSync._apply_synced_player_state: HUD stats were not refreshed from the synced health payload.")

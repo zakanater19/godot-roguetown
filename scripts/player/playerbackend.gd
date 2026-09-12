@@ -203,11 +203,15 @@ func get_hand_transform(item_name: String, facing_name: String, hand: String) ->
 		if _wd != null: res.rotation = _wd.waist_rotation
 	return res
 
-func get_clothing_transform(item_name: String, facing_name: String) -> Dictionary:
+func get_clothing_transform(item_name: String, facing_name: String, uses_female_sprite: bool = false) -> Dictionary:
 	var default_layer := 1
 	var item_data: ItemData = ItemRegistry.get_by_type(item_name)
 	if item_data != null:
 		default_layer = PlayerVisualDefs.get_default_clothing_layer_for_slot(item_data.slot)
+	# Imported female sprites already use Roguetown's native 32x32 body
+	# alignment. Existing male art keeps its hand-tuned prototype offsets.
+	if uses_female_sprite:
+		return {"offset": Vector2.ZERO, "scale": 1.0, "layer": default_layer}
 	if clothing_offsets.has(item_name) and clothing_offsets[item_name].has(facing_name):
 		var entry = clothing_offsets[item_name][facing_name]
 		return {

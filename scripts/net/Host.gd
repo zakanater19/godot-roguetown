@@ -293,7 +293,7 @@ func clear_session_data() -> void:
 		session_ids[1] = 1.0
 
 
-func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peasant", is_latejoin: bool = false) -> void:
+func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peasant", is_latejoin: bool = false, p_appearance: Dictionary = {}) -> void:
 	# Peer 1 is reserved for the server console; playable peers are remote clients.
 	if not multiplayer.is_server() or peer_id <= 1:
 		return
@@ -315,6 +315,7 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 	player.set_multiplayer_authority(peer_id)
 	player.character_name = p_name
 	player.character_class = p_class
+	player.character_appearance = CharacterProfile.sanitize_appearance(p_appearance)
 
 	var preferred_spawns: Array[String] = []
 
@@ -359,6 +360,8 @@ func spawn_player(peer_id: int, p_name: String = "noob", p_class: String = "peas
 
 	if player.has_method("set_character_name"):
 		player.set_character_name(p_name, p_class)
+	if player.has_method("set_character_appearance"):
+		player.set_character_appearance(p_appearance)
 
 	if peer_id != 1 and player.has_method("rpc_set_spawn_position"):
 		player.rpc_set_spawn_position.rpc_id(peer_id, player.position)

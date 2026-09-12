@@ -65,6 +65,19 @@ offset_bottom = 110.0
 theme_override_font_sizes/font_size = 24
 text = "Unready"
 
+[node name="CharacterButton" type="Button" parent="MainContent"]
+custom_minimum_size = Vector2(250, 52)
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -125.0
+offset_top = 120.0
+offset_right = 125.0
+offset_bottom = 172.0
+theme_override_font_sizes/font_size = 21
+text = "Customize Character"
+
 [node name="ForceButton" type="Button" parent="MainContent"]
 visible = false
 custom_minimum_size = Vector2(250, 60)
@@ -73,9 +86,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -125.0
-offset_top = 120.0
+offset_top = 190.0
 offset_right = 125.0
-offset_bottom = 180.0
+offset_bottom = 250.0
 theme_override_font_sizes/font_size = 24
 text = "Force Start"
 
@@ -87,9 +100,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -200.0
-offset_top = -150.0
+offset_top = -205.0
 offset_right = 200.0
-offset_bottom = 150.0
+offset_bottom = 205.0
 
 [node name="Content" type="VBoxContainer" parent="LatejoinPanel"]
 anchor_right = 1.0
@@ -112,6 +125,10 @@ placeholder_text = "Character Name"
 
 [node name="ClassOption" type="OptionButton" parent="LatejoinPanel/Content"]
 theme_override_font_sizes/font_size = 20
+
+[node name="CharacterButton" type="Button" parent="LatejoinPanel/Content"]
+theme_override_font_sizes/font_size = 20
+text = "Customize Character"
 
 [node name="SpawnButton" type="Button" parent="LatejoinPanel/Content"]
 theme_override_font_sizes/font_size = 24

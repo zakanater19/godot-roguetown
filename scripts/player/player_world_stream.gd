@@ -8,7 +8,7 @@ const KEEPALIVE_INTERVAL: float = 0.2
 const PRESENTATION_RADIUS: int = 20 # FOV/light-map coverage, inside the loaded window.
 const TILE_BATCH_SIZE: int = 128
 const OBJECT_BATCH_SIZE: int = 8
-const ACTOR_DELTA_FIELDS: Array[StringName] = [&"equipped", &"equipped_data", &"stats", &"skills"]
+const ACTOR_DELTA_FIELDS: Array[StringName] = [&"equipped", &"equipped_data", &"stats", &"skills", &"character_appearance"]
 const SpatialIndex = preload("res://scripts/world/entity_spatial_index.gd")
 
 var index = SpatialIndex.new()

@@ -67,6 +67,11 @@ extends Resource
 ## Leave empty for items that are never visually worn (e.g. raw materials).
 @export var mob_texture_path: String = ""
 
+## Optional female-fitted on-mob texture. When present, this is selected for a
+## female character and uses the Roguetown-native zero-offset 32px alignment.
+## Hats and other unisex items should leave this empty to reuse mob_texture_path.
+@export var female_mob_texture_path: String = ""
+
 ## Rotation (degrees) applied to this item's waist sprite on the player body.
 ## e.g. 45.0 for a sword worn diagonally at the hip.
 @export var waist_rotation: float = 0.0

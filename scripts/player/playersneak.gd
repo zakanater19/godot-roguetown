@@ -26,7 +26,7 @@ func set_sneak_mode_local(val: bool) -> void:
 
 func apply_sneak_alpha(alpha: float) -> void:
 	var all_sprites: Array[String] = [
-		"Sprite2D", "TrousersSprite", "ClothingSprite", "ChestSprite",
+		"Sprite2D", "HairSprite", "FacialHairSprite", "TrousersSprite", "ClothingSprite", "ChestSprite",
 		"GlovesSprite", "BackpackSprite", "WaistSprite", "BootsSprite",
 		"HelmetSprite", "FaceSprite", "CloakSprite"
 	]

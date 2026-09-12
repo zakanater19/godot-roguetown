@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://mainmenuuid123"]
+[gd_scene load_steps=3 format=3 uid="uid://mainmenuuid123"]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://bt5tko3m6q3i3" path="res://assets/231.jpg" id="2_background"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -11,14 +12,16 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.12, 0.12, 0.12, 1)
+texture = ExtResource("2_background")
+expand_mode = 1
+stretch_mode = 6
 
 [node name="MainButtons" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -28,9 +31,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -150.0
-offset_top = -100.0
+offset_top = -175.0
 offset_right = 150.0
-offset_bottom = 100.0
+offset_bottom = 175.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 20
@@ -52,6 +55,12 @@ custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Join Server"
+
+[node name="CharacterButton" type="Button" parent="MainButtons"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Character Creator"
 
 [node name="QuitButton" type="Button" parent="MainButtons"]
 custom_minimum_size = Vector2(0, 50)
@@ -223,6 +232,7 @@ text = "Version: "
 
 [connection signal="pressed" from="MainButtons/HostButton" to="." method="_on_host_pressed"]
 [connection signal="pressed" from="MainButtons/JoinButton" to="." method="_on_join_pressed"]
+[connection signal="pressed" from="MainButtons/CharacterButton" to="." method="_on_character_creator_pressed"]
 [connection signal="pressed" from="MainButtons/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="HostOptionsPanel/VBoxContainer/StartHostingButton" to="." method="_on_start_hosting_pressed"]
 [connection signal="pressed" from="HostOptionsPanel/VBoxContainer/CancelHostButton" to="." method="_on_cancel_host_pressed"]

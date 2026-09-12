@@ -619,6 +619,8 @@ func _apply_synced_player_state(node: Node2D, p_data: Dictionary, limit_far_posi
 		node.set("health", p_data["health"])
 	if p_data.has("dead"):
 		node.set("dead", p_data["dead"])
+	if p_data.has("character_appearance") and "character_appearance" in node:
+		node.set("character_appearance", CharacterProfile.sanitize_appearance(p_data["character_appearance"]))
 	if p_data.has("limb_hp") and node.get("body") != null:
 		node.get("body").limb_hp = p_data["limb_hp"].duplicate()
 	if p_data.has("limb_broken") and node.get("body") != null:

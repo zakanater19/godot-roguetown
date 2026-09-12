@@ -147,6 +147,7 @@ func capture_player_state(player_node: Node2D) -> Dictionary:
 	return {
 		"character_name":  player_node.get("character_name"),
 		"character_class": player_node.get("character_class"),
+		"character_appearance": player_node.get("character_appearance").duplicate(true) if player_node.get("character_appearance") is Dictionary else CharacterProfile.get_default_appearance(),
 		"position":        player_node.position,
 		"z_level":         player_node.get("z_level"),
 		"tile_pos":        player_node.get("tile_pos"),
@@ -237,6 +238,8 @@ func capture_hands_state(player_node: Node2D) -> Array:
 func restore_player_state(player_node: Node2D, player_state: Dictionary) -> void:
 	player_node.set("character_name",  player_state.get("character_name", "noob"))
 	player_node.set("character_class", player_state.get("character_class", "peasant"))
+	if "character_appearance" in player_node:
+		player_node.set("character_appearance", CharacterProfile.sanitize_appearance(player_state.get("character_appearance", {})))
 	player_node.position = player_state["position"]
 	if player_state.has("z_level"):
 		player_node.set("z_level", player_state["z_level"])

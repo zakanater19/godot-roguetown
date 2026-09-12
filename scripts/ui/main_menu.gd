@@ -20,10 +20,13 @@ var _pending_connect_port: int = Host.PORT
 var _is_connecting: bool = false
 var _connect_retry_index: int = 0
 var _connect_attempt_serial: int = 0
+var _character_creator: CharacterCreator
 
 func _ready() -> void:
 	PatchBoot.confirm_startup(GameVersion.get_version())
 	version_label.text = "Version: " + GameVersion.APP_VERSION
+	_character_creator = CharacterCreator.new()
+	add_child(_character_creator)
 	Sidebar.set_visible(false)
 	ServerBrowser.server_found.connect(_on_server_found)
 	if not multiplayer.connected_to_server.is_connected(_on_connected_to_server):
@@ -37,6 +40,9 @@ func _ready() -> void:
 	if not LoadingScreen.secondary_action_pressed.is_connected(_on_loading_server_list_pressed):
 		LoadingScreen.secondary_action_pressed.connect(_on_loading_server_list_pressed)
 	_handle_auto_restart()
+
+func _on_character_creator_pressed() -> void:
+	_character_creator.open(CharacterProfile.get_appearance())
 
 func _handle_auto_restart() -> void:
 	if Host.auto_restart_server:

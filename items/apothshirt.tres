@@ -16,3 +16,4 @@ too_large_for_satchel = false
 pickable = true
 hud_texture_path = "res://clothing/apothshirt.png"
 mob_texture_path = "res://clothing/apothshirt.png"
+female_mob_texture_path = "res://assets/characters/apothshirt_female.png"
