@@ -1133,6 +1133,17 @@ func _validate_clothing_offsets() -> void:
 			if not (scale_val is float or scale_val is int) or float(scale_val) <= 0.0:
 				_fail("%s: '%s.%s.scale' must be a positive number." % [OFFSETS_PATH, item_type, dir])
 
+	var backend_player := _SmokePlayerStub.new()
+	var backend = load("res://scripts/player/playerbackend.gd").new(backend_player)
+	var female_king_south: Dictionary = backend.get_clothing_transform("KingCloak", "south", true)
+	var female_king_north: Dictionary = backend.get_clothing_transform("KingCloak", "north", true)
+	if int(female_king_south.get("layer", 0)) >= 0:
+		_fail("KingCloak: the female south-facing cape must render behind the body.")
+	if int(female_king_north.get("layer", 0)) < 0:
+		_fail("KingCloak: only the female south-facing cape should use the rear layer.")
+	backend = null
+	backend_player.free()
+
 # The character creator depends on generated body/accessory atlases and a
 # female overlay for every currently wearable clothing sprite that needs one.
 func _validate_character_customization() -> void:

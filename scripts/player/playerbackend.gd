@@ -211,7 +211,11 @@ func get_clothing_transform(item_name: String, facing_name: String, uses_female_
 	# Imported female sprites already use Roguetown's native 32x32 body
 	# alignment. Existing male art keeps its hand-tuned prototype offsets.
 	if uses_female_sprite:
-		return {"offset": Vector2.ZERO, "scale": 1.0, "layer": default_layer}
+		# The lord cloak's south-facing body section is a rear cape layer in
+		# Roguetown. The imported atlas also contains its visible side trim, so
+		# drawing this frame behind the body exposes the character through it.
+		var native_layer := -1 if item_name == "KingCloak" and facing_name == "south" else default_layer
+		return {"offset": Vector2.ZERO, "scale": 1.0, "layer": native_layer}
 	if clothing_offsets.has(item_name) and clothing_offsets[item_name].has(facing_name):
 		var entry = clothing_offsets[item_name][facing_name]
 		return {
