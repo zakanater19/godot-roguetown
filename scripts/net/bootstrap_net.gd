@@ -136,8 +136,16 @@ func receive_version_response_bootstrap(server_version: String, diffs: Dictionar
 	handle_receive_version_response(server_version, diffs, has_pck)
 
 func handle_receive_version_response(server_version: String, diffs: Dictionary, has_pck: bool) -> void:
+	if _restarting_for_patch:
+		return
 	if has_pck:
 		_pending_pck_version = server_version
+		# Check the live server's version before reusing its download: the host
+		# may now be running an older/different build at the same address.
+		var cached_pack := GameVersion.get_cached_patch(Host.last_server_address, Host.last_server_port, server_version)
+		if not cached_pack.is_empty() and GameVersion.get_version() != server_version:
+			_restart_with_server_patch(cached_pack, server_version)
+			return
 		LoadingScreen.update_status("Downloading update...", 0.0)
 		return
 
@@ -181,6 +189,8 @@ func receive_pck_header_bootstrap(total_size: int, total_chunks: int) -> void:
 	handle_receive_pck_header(total_size, total_chunks)
 
 func handle_receive_pck_header(total_size: int, total_chunks: int) -> void:
+	if _restarting_for_patch:
+		return
 	if total_size <= 0 or total_chunks != int(ceil(float(total_size) / float(PCK_CHUNK_SIZE))):
 		_patch_failed("The server sent an invalid update header.")
 		return
@@ -232,22 +242,14 @@ func _assemble_and_apply_pck() -> void:
 		_patch_failed("Could not finish saving the downloaded update.")
 		return
 
-	var reconnect_data: Dictionary = {
-		"ip": Host.last_server_address,
-		"port": Host.last_server_port,
-		"pack_path": pack_path,
-	}
-	if PatchBoot.write_json("user://pending_reconnect.json", reconnect_data) != OK:
-		_patch_failed("Could not save the server address for reconnecting.")
-		return
+	_restart_with_server_patch(pack_path, _pending_pck_version)
 
+func _restart_with_server_patch(pack_path: String, expected_version: String) -> void:
 	_restarting_for_patch = true
 	LoadingScreen.update_status("Restarting...")
 	# Release the old connection so the server accepts the replacement client.
-	var expected_version := _pending_pck_version
 	multiplayer.multiplayer_peer = null
 	if not await GameVersion.restart_with_patch(pack_path, expected_version):
-		DirAccess.remove_absolute("user://pending_reconnect.json")
 		_patch_failed(GameVersion.patch_restart_error)
 		return
 	get_tree().quit()

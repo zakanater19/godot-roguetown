@@ -21,6 +21,7 @@ var _is_connecting: bool = false
 var _connect_retry_index: int = 0
 var _connect_attempt_serial: int = 0
 var _character_creator: CharacterCreator
+var _restarting_for_server: bool = false
 
 func _ready() -> void:
 	PatchBoot.confirm_startup(GameVersion.get_version())
@@ -60,37 +61,23 @@ func _handle_auto_restart() -> void:
 		_check_pending_reconnect()
 
 func _check_pending_reconnect() -> void:
-	var path := "user://pending_reconnect.json"
-	if not FileAccess.file_exists(path):
-		return
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return
-	var text := file.get_as_text()
-	file.close()
-
-	var parsed = JSON.parse_string(text)
-	if not parsed is Dictionary:
-		DirAccess.remove_absolute(path)
+	var parsed := PatchBoot.pending_reconnect
+	PatchBoot.pending_reconnect = {}
+	if parsed.is_empty():
 		return
 	var ip: String = str(parsed.get("ip", ""))
 	var port: int  = int(parsed.get("port", Host.PORT))
 	var pack_path: String = str(parsed.get("pack_path", "")).strip_edges()
-	if ip == "":
-		DirAccess.remove_absolute(path)
-		return
-
 	# Reconnect only after the downloaded content actually loaded successfully.
 	var launched_from_patch: bool = GameVersion.has_active_content_patch()
 	var matching_pack := PatchBoot.pack_path == ProjectSettings.globalize_path(pack_path)
-	if not launched_from_patch or (not OS.has_feature("editor") and not matching_pack):
-		DirAccess.remove_absolute(path)
+	if OS.has_feature("editor"):
+		matching_pack = GameVersion.active_main_pack_path == ProjectSettings.globalize_path(pack_path)
+	if not PatchBoot.boot_error.is_empty() or (not pack_path.is_empty() and (not launched_from_patch or not matching_pack or GameVersion.get_version() != str(parsed.get("version", "")))):
 		LoadingScreen.show_loading("Update could not be loaded")
 		LoadingScreen.update_status(PatchBoot.boot_error if not PatchBoot.boot_error.is_empty() else "Reconnect to download the update again.")
 		return
 
-	# Consume the marker before attempting reconnect so the behavior is one-shot.
-	DirAccess.remove_absolute(path)
 	_begin_client_connection(ip, port, "Reconnecting after update...")
 
 func _on_host_pressed() -> void:
@@ -151,7 +138,21 @@ func _join_game(ip: String, port: int) -> void:
 	_begin_client_connection(ip, port)
 
 func _begin_client_connection(ip: String, port: int, stage: String = "Connecting...") -> void:
+	if _restarting_for_server:
+		return
 	ServerBrowser.stop_listening()
+	# Resource packs cannot be unmounted. Switching away from the patch's
+	# source server needs a fresh base process before connecting to that host.
+	if GameVersion.has_active_content_patch() and not GameVersion.patch_matches_server(ip, port):
+		_restarting_for_server = true
+		multiplayer.multiplayer_peer = null
+		LoadingScreen.show_loading("Switching servers...")
+		if await GameVersion.restart_without_patch(ip, port):
+			get_tree().quit()
+		else:
+			_restarting_for_server = false
+			LoadingScreen.update_status(GameVersion.patch_restart_error)
+		return
 	_pending_connect_ip = ip
 	_pending_connect_port = port
 	_connect_retry_index = 0
@@ -160,6 +161,9 @@ func _begin_client_connection(ip: String, port: int, stage: String = "Connecting
 func _start_client_connection_attempt(stage: String) -> void:
 	if multiplayer.multiplayer_peer != null:
 		multiplayer.multiplayer_peer = null
+	BootstrapNet.reset_client_state(false)
+	LateJoin._version_check_sent = false
+	LateJoin.version_checked = false
 	_is_connecting = true
 	_connect_attempt_serial += 1
 	var attempt_serial: int = _connect_attempt_serial

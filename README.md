@@ -11,7 +11,7 @@ just download godot 4.7 and open project.godot inside godot, no external tools n
 
 
 Multiplayer is one person hosts and others join via direct IP or the built-in server browser.
-Patching is automatic - your client checks the host's game version and if it doesn't match, it downloads the host's current game files over the connection and restarts with them. 
+Patching is automatic when connecting - your client checks the host's game version and if it doesn't match, it downloads the host's current game files and restarts to reconnect to that server. Opening the executable normally always starts the original game. A saved patch is only loaded for a reconnect to the server it came from, after checking that server's current version; switching servers restores the original game before connecting.
 Rejoining/disconnect/reconnect/latejoin all works
 
 To check patching, run `pwsh -File ./run_patch_smoketest.ps1` (PowerShell 7); add `-HostMode Exported` to test an exported host. The test uses an isolated copy and exports the game with the installed standard templates.
@@ -43,5 +43,4 @@ Very out of date video, ill get around to recording a new one when the game actu
 
 
 https://github.com/user-attachments/assets/a926e817-4305-4e13-8aa2-a9a2653f09d6
-
 

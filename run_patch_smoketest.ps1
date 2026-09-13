@@ -118,27 +118,64 @@ texture = ExtResource("2")
     [string]$port | Set-Content -LiteralPath (Join-Path $testRoot 'port.txt')
     $server = Start-Probe 'server' $serverExe $serverArgs 'server-data'
     Wait-Result 'server_ready.json'
+    $socket = [Net.Sockets.UdpClient]::new(0)
+    $basePort = $socket.Client.LocalEndPoint.Port
+    $socket.Dispose()
+    [string]$basePort | Set-Content -LiteralPath (Join-Path $testRoot 'base_port.txt')
+    $baseServer = Start-Probe 'base-server' $testClient @('--headless', '--', '--patch-smoke-base-server') 'base-server-data'
+    Wait-Result 'base_server_ready.json'
     Write-Host 'Testing download, early patch loading and automatic reconnect...'
     $client = Start-Probe 'client-initial' $testClient @('--headless', '--', '--patch-smoke-client') 'client-data'
     Wait-Result 'client_pass_2.json'
     Wait-Probe $client
     $replacement = Get-Content -LiteralPath (Join-Path $testRoot 'client_pass_2.json') -Raw | ConvertFrom-Json
     try { [Diagnostics.Process]::GetProcessById([int]$replacement.pid).WaitForExit(10000) | Out-Null } catch [ArgumentException] { }
-    Write-Host 'Testing another launch retains the update without downloading again...'
-    $clientAgain = Start-Probe 'client-persistent' $testClient @('--headless', '--', '--patch-smoke-client') 'client-data'
-    Wait-Result 'client_pass_3.json'
-    Wait-Probe $clientAgain
-    Write-Host 'Testing damaged and missing saved updates fall back to the base game...'
+    Write-Host 'Testing ordinary startup ignores the cached update and stale reconnect requests...'
     $stateFile = Get-ChildItem -LiteralPath (Join-Path $testRoot 'client-data') -Recurse -Filter active_patch.json -File | Select-Object -First 1
     $state = Get-Content -LiteralPath $stateFile.FullName -Raw | ConvertFrom-Json
+    $reconnectFile = Join-Path $stateFile.DirectoryName 'pending_reconnect.json'
+    $state | ConvertTo-Json | Set-Content -LiteralPath $reconnectFile
+    Wait-Probe (Start-Probe 'client-idle' $testClient @('--headless', '--', '--patch-smoke-idle') 'client-data')
+    Wait-Probe (Start-Probe 'client-stale-token' $testClient @('--headless', '--', '--patch-smoke-idle', '--patch-reconnect=stale-token') 'client-data')
+    Write-Host 'Testing cached reconnect, then switching to an older server restores the base game...'
+    $clientAgain = Start-Probe 'client-reconnect' $testClient @('--headless', '--', '--patch-smoke-client') 'client-data'
+    Wait-Result 'client_pass_5.json'
+    Wait-Probe $clientAgain
+    $replacement = Get-Content -LiteralPath (Join-Path $testRoot 'client_pass_5.json') -Raw | ConvertFrom-Json
+    try { [Diagnostics.Process]::GetProcessById([int]$replacement.pid).WaitForExit(10000) | Out-Null } catch [ArgumentException] { }
+    # Wait for the intermediate patched process to acknowledge its base restart.
+    $replacement = Get-Content -LiteralPath (Join-Path $testRoot 'client_pass_4.json') -Raw | ConvertFrom-Json
+    try { [Diagnostics.Process]::GetProcessById([int]$replacement.pid).WaitForExit(10000) | Out-Null } catch [ArgumentException] { }
+    $state = Get-Content -LiteralPath $stateFile.FullName -Raw | ConvertFrom-Json
+    Wait-Probe (Start-Probe 'client-consumed-token' $testClient @('--headless', '--', '--patch-smoke-idle', ('--patch-reconnect=' + $state.token)) 'client-data')
+    Write-Host 'Testing the original server address now hosting an older game version...'
+    $server.Process.Kill($true)
+    $server.Process.WaitForExit()
+    $baseServer.Process.Kill($true)
+    $baseServer.Process.WaitForExit()
+    [string]$port | Set-Content -LiteralPath (Join-Path $testRoot 'base_port.txt')
+    Remove-Item -LiteralPath (Join-Path $testRoot 'base_server_ready.json')
+    $baseServer = Start-Probe 'older-server' $testClient @('--headless', '--', '--patch-smoke-base-server') 'base-server-data'
+    Wait-Result 'base_server_ready.json'
+    Wait-Probe (Start-Probe 'client-older-server' $testClient @('--headless', '--', '--patch-smoke-older-client') 'client-data')
+    Write-Host 'Testing damaged and missing saved updates fall back to the base game...'
+    $state = Get-Content -LiteralPath $stateFile.FullName -Raw | ConvertFrom-Json
+    $wrongServer = Get-Content -LiteralPath $stateFile.FullName -Raw | ConvertFrom-Json
+    $wrongServer.ip = '192.0.2.1'
+    $wrongServer | ConvertTo-Json | Set-Content -LiteralPath $reconnectFile
+    Wait-Probe (Start-Probe 'client-wrong-server' $testClient @('--headless', '--', '--patch-smoke-invalid', ('--patch-reconnect=' + $state.token)) 'client-data')
     $savedPack = [IO.Path]::GetFullPath($state.pack_path)
     if (-not $savedPack.StartsWith($testRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'The saved test pack is outside the isolated test directory.' }
     $stream = [IO.File]::Open($savedPack, 'Open', 'Write', 'None')
     try { $stream.WriteByte(0) } finally { $stream.Dispose() }
-    Wait-Probe (Start-Probe 'client-corrupt' $testClient @('--headless', '--', '--patch-smoke-invalid') 'client-data')
+    Wait-Probe (Start-Probe 'client-corrupt-idle' $testClient @('--headless', '--', '--patch-smoke-idle') 'client-data')
+    $state | ConvertTo-Json | Set-Content -LiteralPath $reconnectFile
+    Wait-Probe (Start-Probe 'client-corrupt' $testClient @('--headless', '--', '--patch-smoke-invalid', ('--patch-reconnect=' + $state.token)) 'client-data')
     Remove-Item -LiteralPath $savedPack
-    Wait-Probe (Start-Probe 'client-missing' $testClient @('--headless', '--', '--patch-smoke-invalid') 'client-data')
-    Write-Host 'PASSED: exported-client patch download, restart, reconnect, early script/class/texture loading, removed files, persistence and invalid-update recovery.' -ForegroundColor Green
+    Wait-Probe (Start-Probe 'client-missing-idle' $testClient @('--headless', '--', '--patch-smoke-idle') 'client-data')
+    $state | ConvertTo-Json | Set-Content -LiteralPath $reconnectFile
+    Wait-Probe (Start-Probe 'client-missing' $testClient @('--headless', '--', '--patch-smoke-invalid', ('--patch-reconnect=' + $state.token)) 'client-data')
+    Write-Host 'PASSED: patch download, one-shot reconnect, clean ordinary startup, cached reconnect, server/version isolation, early script/class/texture loading, removed files and invalid-update recovery.' -ForegroundColor Green
 }
 finally {
     foreach ($job in $jobs) {

@@ -274,10 +274,6 @@ position = Vector2(29728, 11422)
 z_index = 402
 position = Vector2(30146, 11488)
 
-[node name="Tree12" parent="." unique_id=71963480 instance=ExtResource("18_074og")]
-z_index = 402
-position = Vector2(29535, 11629)
-
 [node name="Tree13" parent="." unique_id=377433694 instance=ExtResource("18_074og")]
 z_index = 402
 position = Vector2(30228, 11792)

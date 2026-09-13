@@ -3,7 +3,7 @@ extends Node
 
 ## Keep this for executable/binary level compatibility only. Runtime content,
 ## scenes, scripts, and maps are synced via the server bundle hash below.
-const APP_VERSION: String = "1789225512"
+const APP_VERSION: String = "1789287514"
 
 ## Directories that still support lightweight resource diffs as a fallback when
 ## talking to older servers. Full bundle sync does not depend on this list.
@@ -37,7 +37,7 @@ var _version: String = ""
 var server_pck_ready: bool = false
 ## Non-empty when the last generate_server_pck() call failed.
 var pck_generation_error: String = ""
-## The startup loader mounts persistent patches before any gameplay loads.
+## Only a server reconnect restart mounts a cached patch before gameplay loads.
 var patch_applied: bool = false
 var launched_with_main_pack: bool = false
 var active_main_pack_path: String = ""
@@ -63,7 +63,7 @@ func get_server_bundle_path() -> String:
 	return SERVER_BUNDLE_PATH
 
 
-func build_restart_args(main_pack_path: String = "") -> PackedStringArray:
+func build_restart_args(main_pack_path: String = "", reconnect_token: String = "") -> PackedStringArray:
 	var args: PackedStringArray = OS.get_cmdline_args()
 	var cleaned := PackedStringArray()
 	if DisplayServer.get_name() == "headless":
@@ -77,10 +77,32 @@ func build_restart_args(main_pack_path: String = "") -> PackedStringArray:
 	# Editor binaries support this; standard export templates do not.
 	if OS.has_feature("editor") and main_pack_path != "":
 		cleaned.append_array(["--main-pack", ProjectSettings.globalize_path(main_pack_path)])
+	elif OS.has_feature("editor"):
+		cleaned.append_array(["--path", ProjectSettings.globalize_path("res://")])
 	cleaned.append_array(["--log-file", ProjectSettings.globalize_path("user://patch_restart.log")])
 	cleaned.append("--")
-	cleaned.append_array(OS.get_cmdline_user_args())
+	for argument in OS.get_cmdline_user_args():
+		if not argument.begins_with(PatchBoot.RECONNECT_ARG):
+			cleaned.append(argument)
+	if not reconnect_token.is_empty():
+		cleaned.append(PatchBoot.RECONNECT_ARG + reconnect_token)
 	return cleaned
+
+
+func get_cached_patch(ip: String, port: int, expected_version: String) -> String:
+	var state := PatchBoot.read_json(PatchBoot.STATE_PATH)
+	if str(state.get("ip", "")) != ip.strip_edges().to_lower() or int(state.get("port", 0)) != port or str(state.get("version", "")) != expected_version:
+		return ""
+	if str(state.get("base_sha256", "")) != FileAccess.get_sha256(OS.get_executable_path()):
+		return ""
+	var path := str(state.get("pack_path", ""))
+	if not FileAccess.file_exists(path) or FileAccess.get_sha256(path) != str(state.get("pack_sha256", "")):
+		return ""
+	return path
+
+
+func patch_matches_server(ip: String, port: int) -> bool:
+	return PatchBoot.server_address == ip.strip_edges().to_lower() and PatchBoot.server_port == port
 
 
 func restart_with_patch(pack_path: String, expected_version: String) -> bool:
@@ -93,12 +115,37 @@ func restart_with_patch(pack_path: String, expected_version: String) -> bool:
 		"base_sha256": FileAccess.get_sha256(OS.get_executable_path()),
 		"version": expected_version,
 		"token": token,
+		"ip": Host.last_server_address.strip_edges().to_lower(),
+		"port": Host.last_server_port,
 	}
 	if state["pack_sha256"] == "" or PatchBoot.write_json(PatchBoot.STATE_PATH, state) != OK:
 		patch_restart_error = "Could not save the update. Check available disk space."
 		return false
+	if await _restart_for_reconnect(state):
+		return true
+	if previous.is_empty():
+		DirAccess.remove_absolute(PatchBoot.STATE_PATH)
+	else:
+		PatchBoot.write_json(PatchBoot.STATE_PATH, previous)
+	return false
+
+
+func restart_without_patch(ip: String, port: int) -> bool:
+	return await _restart_for_reconnect({
+		"ip": ip.strip_edges().to_lower(), "port": port, "pack_path": "", "version": "",
+		"token": "%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()],
+	})
+
+
+func _restart_for_reconnect(request: Dictionary) -> bool:
+	patch_restart_error = ""
+	if PatchBoot.write_json(PatchBoot.RECONNECT_PATH, request) != OK:
+		patch_restart_error = "Could not save the server address for reconnecting."
+		return false
+	var token: String = request["token"]
+	var expected_version: String = request["version"]
 	DirAccess.remove_absolute(PatchBoot.ACK_PATH)
-	var args := build_restart_args(pack_path)
+	var args := build_restart_args(request["pack_path"], token)
 	var pid := OS.create_instance(args)
 	if pid == -1:
 		pid = OS.create_process(OS.get_executable_path(), args)
@@ -107,17 +154,15 @@ func restart_with_patch(pack_path: String, expected_version: String) -> bool:
 		var deadline := Time.get_ticks_msec() + 30000
 		while Time.get_ticks_msec() < deadline:
 			var ack := PatchBoot.read_json(PatchBoot.ACK_PATH)
-			if ack.get("token", "") == token and int(ack.get("pid", -1)) == pid and ack.get("version", "") == expected_version:
+			if ack.get("token", "") == token and int(ack.get("pid", -1)) == pid and (expected_version.is_empty() or ack.get("version", "") == expected_version):
 				return true
 			if not OS.is_process_running(pid):
 				break
 			await get_tree().create_timer(0.1).timeout
 		if OS.is_process_running(pid):
 			OS.kill(pid)
-	if previous.is_empty():
-		DirAccess.remove_absolute(PatchBoot.STATE_PATH)
-	else:
-		PatchBoot.write_json(PatchBoot.STATE_PATH, previous)
+	if PatchBoot.read_json(PatchBoot.RECONNECT_PATH).get("token", "") == token:
+		DirAccess.remove_absolute(PatchBoot.RECONNECT_PATH)
 	patch_restart_error = "The updated game could not start. See patch_restart.log in the game data folder."
 	return false
 
